@@ -1,11 +1,7 @@
 # Future Data Continuity
 
-The 2017-2025 period is only the initial historical dataset when such a workbook is supplied. The DSS derives available years and account lists from validated database records.
+The initial historical years are data, not system limits. Years, accounts, cutoff, totals, weights, ranks, groups, and charts derive from committed records.
 
-Future files can include later transaction years, new customers, and more rows as long as the controlled source schema is preserved:
+A controlled fixture containing 2030 transactions and `NEW FUTURE ACCOUNT` passed validation, private demo storage, batch/source lineage persistence, account/invoice persistence, analytical publication, latest API exposure, account detail, RFM view, and export. CART correctly returned unavailable for that fixture because complete historical future-label support was insufficient; it did not retrain or fabricate risk.
 
-Upload -> Validate -> Preserve raw -> ETL -> Store in Supabase -> Recompute descriptive analytics -> Recompute CRITIC/MCS -> Recompute Priority Groups -> Rerun Sensitivity -> Refresh DSS and Power BI reporting views.
-
-If PESLC materially changes the source schema, the file is rejected or flagged for controlled import-mapping maintenance.
-
-For CART, the system scores with the validated current model when available. Retraining occurs only when complete labeled outcome windows exist and the feasibility safeguards pass.
+Future compatible files follow the same canonical schema. A material schema change is rejected until a versioned mapping is reviewed. New aliases remain separate unless an administrator approves a traceable canonical mapping.

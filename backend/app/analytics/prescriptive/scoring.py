@@ -48,22 +48,25 @@ def critic_weights(criteria_frame: pd.DataFrame) -> dict[str, float]:
 
 
 def assign_priority_groups(scored: list[tuple[str, float]]) -> dict[str, str]:
+    """Assign ranked thirds using tie-block midpoints so equal scores stay together."""
     if not scored:
         return {}
     ordered = sorted(scored, key=lambda item: (-item[1], item[0]))
-    unique_scores = sorted({score for _, score in ordered}, reverse=True)
-    high_cut_index = max(0, int(np.ceil(len(unique_scores) / 3)) - 1)
-    medium_cut_index = max(high_cut_index, int(np.ceil(len(unique_scores) * 2 / 3)) - 1)
-    high_threshold = unique_scores[high_cut_index]
-    medium_threshold = unique_scores[medium_cut_index]
     groups: dict[str, str] = {}
-    for account, score in ordered:
-        if score >= high_threshold:
-            groups[account] = "High"
-        elif score >= medium_threshold:
-            groups[account] = "Medium"
-        else:
-            groups[account] = "Low"
+    total = len(ordered)
+    if len({score for _, score in ordered}) == 1:
+        return {account: "Medium" for account, _ in ordered}
+    start = 0
+    while start < total:
+        score = ordered[start][1]
+        end = start
+        while end + 1 < total and np.isclose(ordered[end + 1][1], score, rtol=0, atol=1e-12):
+            end += 1
+        block_start = start / total
+        group = "High" if block_start < 1 / 3 else "Medium" if block_start < 2 / 3 else "Low"
+        for index in range(start, end + 1):
+            groups[ordered[index][0]] = group
+        start = end + 1
     return groups
 
 
@@ -93,7 +96,7 @@ def compute_priorities(rfm: list[AccountRFM], settlement: list[AccountSettlement
     previous_score: float | None = None
     current_rank = 0
     for position, (account, score) in enumerate(sorted(raw_scores.items(), key=lambda item: (-item[1], item[0])), start=1):
-        if previous_score is None or score != previous_score:
+        if previous_score is None or not np.isclose(score, previous_score, rtol=0, atol=1e-12):
             current_rank = position
         ranks[account] = current_rank
         previous_score = score

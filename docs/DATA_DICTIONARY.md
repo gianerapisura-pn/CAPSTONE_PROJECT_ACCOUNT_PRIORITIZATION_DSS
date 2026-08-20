@@ -1,26 +1,20 @@
 # Data Dictionary
 
-## Source Fields
+## Source
 
-- `CUSTOMER NAME`: raw account name.
-- `SI NO.`: sales invoice identifier stored as text.
-- `SI DATE`: sales invoice date.
-- `SI AMOUNT`: sales invoice amount.
-- `CR NO.`: collection receipt reference stored as text.
-- `CR DATE`: collection receipt date.
-- `CR AMOUNT`: collection receipt amount.
-- `EWT`: expanded withholding tax amount.
-- `PAYMENT MODE`: raw payment mode.
-- `PAYMENT STATUS`: raw payment status.
+`CUSTOMER NAME`, `SI NO.`, `SI DATE`, `SI AMOUNT`, `CR NO.`, `CR DATE`, `CR AMOUNT`, `EWT`, `PAYMENT MODE`, and `PAYMENT STATUS` are preserved in canonical raw payloads. Identifiers are text; money is parsed with Decimal semantics. `source_sheet`, `source_row_number`, `import_batch_id`, `file_hash`, and private `storage_path` provide lineage.
 
-## Derived Fields
+## Core dimensions and facts
 
-- `standardized_account_name`: conservative deterministic account name.
-- `invoice_group_key`: traceable logical invoice grouping key.
-- `is_cancelled`: true for cancelled records.
-- `reconciled`: true when `CR Amount + EWT` matches SI amount at currency precision.
-- `rfm_score`: descriptive account score.
-- `settlement_days_avg`: average settlement duration for eligible invoices.
-- `inactivity_risk`: binary predictive context, `Lower` or `Higher`.
-- `final_priority_score`: CRITIC/MCS score for ranking.
-- `priority_group`: tie-preserving `High`, `Medium`, or `Low`.
+- `dim_account`: stable account key and conservative standardized/display names.
+- `invoice_groups` / `fact_account_transactions`: one logical invoice, final CR date, reconciliation, eligibility, and review reason.
+- `fact_account_rfm`: Recency/Frequency/Monetary values, component scores, and RFM Score by run/account.
+- `fact_historical_settlement`: eligible invoice count and account average duration.
+- `account_priority_results` / `fact_account_priority`: normalized criteria, CRITIC/MCS score, tied rank/group, latest transaction, and separate risk context.
+- `model_runs`: CART configuration, temporal periods, feature evidence, OOP metrics, confusion matrix, and predictions.
+- `fact_sensitivity_analysis`: one account result per perturbation range/iteration.
+- `ranking_backtests` and `business_baseline_results`: validation and annual dynamic KPI payloads.
+
+## Operational
+
+`user_profiles`, `import_batches`, `import_row_issues`, `raw_source_rows`, `account_aliases`, `account_alias_review`, `analytics_runs`, and `audit_log` support roles, controlled imports, immutable publication, review, and traceability.

@@ -1,31 +1,23 @@
 # Architecture
 
-The DSS is one integrated account-prioritization system. The web UI handles authenticated user workflows, the FastAPI backend performs import validation, ETL, analytics, and exports, Supabase PostgreSQL stores traceable raw and analytical records, and Power BI reads reporting views only.
+The project is one integrated DSS. The Next.js UI owns authenticated operational workflows. FastAPI validates imports, performs ETL and analytics, publishes immutable outputs, and exports data. Supabase provides Auth, PostgreSQL persistence, and private source storage. Power BI reads stable reporting views; it does not calculate analytical formulas.
 
-## Runtime Flow
+## Runtime
 
-1. User authenticates through Supabase Auth.
-2. Admin uploads CSV/XLSX source data through the web UI.
-3. Backend hashes and privately stores the original file, validates schema and rows, and creates an import batch.
-4. Admin confirms a valid preview.
-5. Backend persists raw rows, standardizes account names conservatively, groups invoice rows, reconciles payments, and runs analytics.
-6. Outputs are saved under an immutable `analysis_run_id`.
-7. Latest-successful reporting views expose only complete runs to the UI and Power BI.
+1. Supabase Auth creates a persistent browser session. The backend verifies asymmetric JWTs against Supabase JWKS; legacy HS256 tokens are verified through the Supabase Auth user endpoint.
+2. `user_profiles` resolves `administrator` or `management`; API dependencies enforce authorization.
+3. An administrator uploads CSV/XLSX. The backend validates size/extension, sanitizes the filename, hashes the bytes, privately stores the source, and creates a PREVIEW batch with issues.
+4. Confirmation persists raw rows, account dimension records, grouped invoices, reconciliation evidence, and audit events. Same committed hashes are blocked unless an override reason is supplied.
+5. A run starts as `running`. Python validates and atomically inserts RFM, Settlement, Priority, CART/model, sensitivity scenario, backtest, and business-baseline output before marking it `successful`. Failure retains the previous latest successful run.
+6. Web APIs and Power BI views query persisted successful outputs rather than recomputing on page load.
 
-## Backend Modules
+Explicit demo mode uses ignored local SQLite and `.demo_data` storage. Production never falls back to demo authentication or records.
 
-- `app/imports`: file parsing, canonical column handling, row validation, duplicate-file checks.
-- `app/etl`: status processing, account standardization, invoice grouping, reconciliation.
-- `app/analytics/descriptive`: RFM and settlement duration.
-- `app/analytics/predictive`: historical cutoff construction and CART inactivity-risk classification.
-- `app/analytics/prescriptive`: normalization, CRITIC weights, MCS final scoring, priority grouping.
-- `app/analytics/validation`: sensitivity analysis, ranking backtest, baseline indicators.
-- `app/reports`: export payloads and reporting table refresh contracts.
+## Boundaries
 
-## Supabase
+- Descriptive: RFM and Historical Settlement Duration.
+- Predictive: chronological CART binary inactivity-risk context.
+- Prescriptive: normalized RFM/Settlement, CRITIC, MCS, rank, Priority Group.
+- Validation: multiplicative sensitivity, ranking backtest/lift, business/system baselines.
 
-Supabase PostgreSQL is the persistent database. Supabase Storage is used for private source-file retention. Migrations are in `supabase/migrations`. Row-level security policies are included as a production starting point and should be tightened to the institution's final role model.
-
-## Power BI Boundary
-
-Power BI must not implement the analytical formulas. It connects to reporting views/tables populated by Python analytics and is used for visualization, refresh, and presentation only.
+CART is parallel supporting context and never enters MCS. Power BI is downstream reporting only.

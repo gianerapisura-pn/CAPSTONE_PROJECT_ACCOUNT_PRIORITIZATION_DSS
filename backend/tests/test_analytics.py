@@ -89,6 +89,24 @@ def test_tie_preserving_priority_groups_keep_boundaries_together():
     assert groups["A"] == groups["B"] == "High"
 
 
+def test_rfm_account_percentiles_preserve_ties_and_direction():
+    groups = group_invoices([
+        row("A", "1", "2026-12-21", "10", "1", "2026-12-22", "10"),
+        row("B", "2", "2026-09-22", "20", "2", "2026-09-23", "20"),
+        row("C", "3", "2026-09-22", "20", "3", "2026-09-24", "20"),
+        row("D", "4", "2026-01-01", "40", "4", "2026-01-03", "40"),
+    ])
+    results = {item.account: item for item in compute_rfm(groups, pd.Timestamp("2026-12-31"))}
+    assert results["A"].recency_score > results["D"].recency_score
+    assert results["B"].recency_score == results["C"].recency_score
+    assert results["B"].monetary_score == results["C"].monetary_score
+
+
+def test_all_equal_priority_scores_remain_one_tied_group():
+    groups = assign_priority_groups([("A", 0.5), ("B", 0.5), ("C", 0.5)])
+    assert set(groups.values()) == {"Medium"}
+
+
 def test_sensitivity_and_backtest_are_reproducible():
     groups = group_invoices(
         [
@@ -100,6 +118,8 @@ def test_sensitivity_and_backtest_are_reproducible():
     priorities, weights = compute_priorities(compute_rfm(groups), compute_settlement_metrics(groups))
     sensitivity = run_sensitivity(priorities, weights, 0.10, 100, 42)
     assert sensitivity.iterations == 100
+    assert len(sensitivity.scenarios) == 300
+    assert all(abs(row["rfm_weight"] + row["settlement_weight"] - 1) < 1e-12 for row in sensitivity.scenarios)
     assert 0 <= sensitivity.group_movement_rate <= 1
     backtest = top_decile_backtest(priorities, groups, repetitions=10, random_seed=42)
     assert backtest.lift_over_random >= 0

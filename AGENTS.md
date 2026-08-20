@@ -33,3 +33,6 @@ Non-negotiable rules:
 15. Cancelled records must be identified before generic missing-data logic.
 16. Multiple collection rows belonging to one Sales Invoice must not inflate Frequency or Monetary.
 17. Current numerical results must be computed from data, not hardcoded.
+18. Production authentication must cryptographically verify Supabase sessions and resolve database roles.
+19. Preview and COMMITTED are distinct import states; successful analytical runs are immutable and atomically published.
+20. Demo storage/database/authentication must remain visibly labeled and isolated from production data.

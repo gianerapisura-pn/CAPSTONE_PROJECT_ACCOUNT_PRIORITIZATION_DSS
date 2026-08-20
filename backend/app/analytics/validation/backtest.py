@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from decimal import Decimal
 
 import numpy as np
+import pandas as pd
 
+from app.analytics.descriptive.rfm import compute_rfm
+from app.analytics.descriptive.settlement import compute_settlement_metrics
 from app.analytics.prescriptive.scoring import AccountPriority
+from app.analytics.prescriptive.scoring import compute_priorities
 from app.etl.invoices import InvoiceGroup
 
 
@@ -44,3 +49,29 @@ def top_decile_backtest(
     baseline = float(np.mean(random_captures))
     lift = capture / baseline if baseline else 0.0
     return BacktestSummary(capture, baseline, lift)
+
+
+def run_historical_backtest(
+    invoice_groups: list[InvoiceGroup],
+    holdout_months: int = 12,
+    repetitions: int = 100,
+    random_seed: int = 42,
+) -> BacktestSummary:
+    """Rank on pre-cutoff evidence and evaluate only later holdout invoices."""
+    eligible = [group for group in invoice_groups if group.rfm_eligible]
+    if not eligible:
+        return BacktestSummary(0.0, 0.0, 0.0)
+    cutoff = max(group.si_date for group in eligible) - pd.DateOffset(months=holdout_months)
+    historical: list[InvoiceGroup] = []
+    for original in eligible:
+        if original.si_date > cutoff:
+            continue
+        group = deepcopy(original)
+        if group.final_cr_date is not None and group.final_cr_date > cutoff:
+            group.final_cr_date = None
+            group.reconciled = False
+            group.review_reason = "Settlement evidence was unavailable at the historical cutoff."
+        historical.append(group)
+    future = [group for group in eligible if group.si_date > cutoff]
+    priorities, _ = compute_priorities(compute_rfm(historical, cutoff), compute_settlement_metrics(historical))
+    return top_decile_backtest(priorities, future, repetitions, random_seed)

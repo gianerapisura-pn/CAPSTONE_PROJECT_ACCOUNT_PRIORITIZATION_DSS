@@ -33,8 +33,9 @@ def test_cutoff_dataset_excludes_post_cutoff_features():
     groups = group_invoices([make_group("A", "2026-01-01"), make_group("A", "2027-01-01"), make_group("B", "2026-01-01")])
     frame = build_cutoff_dataset(groups, pd.Timestamp("2026-06-01"), 24, 12)
     account_a = frame[frame["account"] == "A"].iloc[0]
-    assert account_a["frequency"] == 1
-    assert account_a["inactivity_risk"] == "Lower"
+    assert account_a["frequency_count"] == 1
+    assert account_a["inactivity_risk"] == "Lower Inactivity Risk"
+    assert "rfm_score" not in frame.columns
 
 
 def test_cart_insufficient_class_safeguard():
@@ -44,8 +45,8 @@ def test_cart_insufficient_class_safeguard():
             "recency_days": [1, 2],
             "frequency": [1, 1],
             "monetary": [100, 100],
-            "inactivity_risk": ["Lower", "Lower"],
+            "inactivity_risk": ["Lower Inactivity Risk", "Lower Inactivity Risk"],
         }
     )
     result = train_cart_temporal(dev, dev)
-    assert result.status == "insufficient_classes"
+    assert result.status == "Predictive Context Unavailable / Insufficient Data"

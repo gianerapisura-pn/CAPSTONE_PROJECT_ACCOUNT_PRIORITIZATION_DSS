@@ -1,56 +1,21 @@
 "use client";
 
-import { Download, Search } from "lucide-react";
+import { ArrowDownUp, ChevronLeft, ChevronRight, Download, ExternalLink, Search } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { AccountPriority } from "@/types/dss";
+import { downloadExport } from "@/lib/api";
+import type { AccountPriority, InactivityRisk, PriorityGroup } from "@/types/dss";
+import { Badge } from "@/components/page-state";
 
-export function AccountPriorityTable({ rows }: { rows: AccountPriority[] }) {
-  const [query, setQuery] = useState("");
-  const filtered = useMemo(
-    () => rows.filter((row) => row.account.toLowerCase().includes(query.toLowerCase())).sort((a, b) => a.priorityRank - b.priorityRank || a.account.localeCompare(b.account)),
-    [rows, query]
-  );
-
-  return (
-    <section className="panel">
-      <div className="toolbar" style={{ gridTemplateColumns: "1fr auto", alignItems: "center" }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Search size={18} />
-          <input aria-label="Search accounts" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search accounts" />
-        </label>
-        <button className="button secondary" type="button">
-          <Download size={18} />
-          Export
-        </button>
-      </div>
-      <div className="table-wrap" style={{ marginTop: 16 }}>
-        <table>
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Account</th>
-              <th>Priority Group</th>
-              <th>Final Priority Score</th>
-              <th>RFM</th>
-              <th>Settlement Days</th>
-              <th>Inactivity Risk</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((row) => (
-              <tr key={row.account}>
-                <td>{row.priorityRank}</td>
-                <td>{row.account}</td>
-                <td><span className={`badge ${row.priorityGroup.toLowerCase()}`}>{row.priorityGroup}</span></td>
-                <td>{row.finalPriorityScore.toFixed(4)}</td>
-                <td>{row.rfmScore.toFixed(2)}</td>
-                <td>{row.settlementDaysAvg.toFixed(1)}</td>
-                <td>{row.inactivityRisk ?? "Unavailable"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
+export function AccountPriorityTable({ rows, accountKeys = {} }: { rows: AccountPriority[]; accountKeys?: Record<string, string> }) {
+  const [query, setQuery] = useState(""); const [group, setGroup] = useState<PriorityGroup | "">("");
+  const [risk, setRisk] = useState<InactivityRisk | "">(""); const [descending, setDescending] = useState(false);
+  const [page, setPage] = useState(1); const pageSize = 15;
+  const filtered = useMemo(() => rows.filter(row => row.account.toLowerCase().includes(query.toLowerCase()))
+    .filter(row => !group || row.priority_group === group).filter(row => !risk || row.inactivity_risk === risk)
+    .sort((a, b) => descending ? b.priority_rank - a.priority_rank : a.priority_rank - b.priority_rank), [descending, group, query, risk, rows]);
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize)); const visible = filtered.slice((page - 1) * pageSize, page * pageSize);
+  return <section className="data-section"><div className="table-toolbar"><div className="search-field"><Search size={17} /><input aria-label="Search accounts" value={query} onChange={event => { setQuery(event.target.value); setPage(1) }} placeholder="Search account name" /></div><select aria-label="Priority Group" value={group} onChange={event => { setGroup(event.target.value as PriorityGroup | ""); setPage(1) }}><option value="">All priority groups</option><option>High</option><option>Medium</option><option>Low</option></select><select aria-label="Inactivity Risk" value={risk} onChange={event => { setRisk(event.target.value as InactivityRisk | ""); setPage(1) }}><option value="">All risk contexts</option><option>Lower Inactivity Risk</option><option>Higher Inactivity Risk</option></select><button className="button secondary" onClick={() => setDescending(!descending)} title="Reverse rank order"><ArrowDownUp size={17} />Rank</button><button className="button secondary" onClick={() => downloadExport("/exports/priorities.csv", "peslc-account-priorities.csv")}><Download size={17} />CSV</button></div>
+    <div className="table-wrap"><table><thead><tr><th>Rank</th><th>Account</th><th>Priority</th><th>Final score</th><th>Normalized RFM</th><th>RFM</th><th>Avg. settlement</th><th>Normalized settlement</th><th>Inactivity risk</th><th>Latest transaction</th><th>R / F / M</th><th aria-label="Open details" /></tr></thead><tbody>{visible.map(row => <tr key={row.account}><td className="rank-cell">#{row.priority_rank}</td><td><strong>{row.account}</strong></td><td><Badge tone={row.priority_group}>{row.priority_group}</Badge></td><td>{row.final_priority_score.toFixed(4)}</td><td>{row.normalized_rfm.toFixed(3)}</td><td>{row.rfm_score.toFixed(2)}</td><td>{row.settlement_days_avg.toFixed(1)} days</td><td>{row.normalized_settlement.toFixed(3)}</td><td><Badge tone={row.inactivity_risk?.startsWith("Lower") ? "positive" : row.inactivity_risk ? "warning" : "neutral"}>{row.inactivity_risk ?? "Unavailable"}</Badge></td><td>{row.latest_valid_transaction}</td><td>{row.recency_days} / {row.frequency} / {Intl.NumberFormat("en-PH", { notation: "compact" }).format(row.monetary)}</td><td><Link className="row-link" aria-label={`Open ${row.account}`} href={`/accounts/${accountKeys[row.account] || encodeURIComponent(row.account)}`}><ExternalLink size={16} /></Link></td></tr>)}</tbody></table>{!visible.length && <div className="table-empty">No accounts match the selected filters.</div>}</div>
+    <div className="pagination"><span>Showing {visible.length ? (page - 1) * pageSize + 1 : 0}-{Math.min(page * pageSize, filtered.length)} of {filtered.length}</span><div><button className="icon-button" aria-label="Previous page" disabled={page === 1} onClick={() => setPage(page - 1)}><ChevronLeft /></button><span>Page {page} of {pages}</span><button className="icon-button" aria-label="Next page" disabled={page === pages} onClick={() => setPage(page + 1)}><ChevronRight /></button></div></div></section>;
 }

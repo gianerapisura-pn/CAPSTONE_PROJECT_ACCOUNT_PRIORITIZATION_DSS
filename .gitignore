@@ -3,6 +3,7 @@
 !.env.example
 __pycache__/
 .pytest_cache/
+.demo_data/
 .mypy_cache/
 .ruff_cache/
 .venv/

@@ -105,19 +105,19 @@ def validate_rows(frame: pd.DataFrame) -> list[ValidationIssue]:
         row_number = int(row["source_row_number"])
         status = " ".join(str(row["PAYMENT STATUS"]).strip().lower().split())
         is_cancelled = status == "cancelled"
-        if str(row["CUSTOMER NAME"]).strip() == "":
+        if not is_cancelled and str(row["CUSTOMER NAME"]).strip() == "":
             issues.append(ValidationIssue(row_number, "CUSTOMER NAME", "error", "Blank or unidentifiable customer."))
-        if pd.to_datetime(row["SI DATE"], errors="coerce") is pd.NaT:
+        if not is_cancelled and pd.isna(pd.to_datetime(row["SI DATE"], errors="coerce")):
             issues.append(ValidationIssue(row_number, "SI DATE", "error", "Invalid SI date."))
         if parse_decimal(row["SI AMOUNT"]) is None and not is_cancelled:
             issues.append(ValidationIssue(row_number, "SI AMOUNT", "error", "Invalid SI amount."))
-        for column in ("CR AMOUNT", "EWT"):
+        for column in (() if is_cancelled else ("CR AMOUNT", "EWT")):
             if str(row[column]).strip() and parse_decimal(row[column]) is None:
                 issues.append(ValidationIssue(row_number, column, "error", f"Invalid {column}."))
         cr_date = pd.to_datetime(row["CR DATE"], errors="coerce")
         si_date = pd.to_datetime(row["SI DATE"], errors="coerce")
-        if str(row["CR DATE"]).strip() and cr_date is pd.NaT:
+        if not is_cancelled and str(row["CR DATE"]).strip() and pd.isna(cr_date):
             issues.append(ValidationIssue(row_number, "CR DATE", "error", "Invalid CR date."))
-        if not is_cancelled and cr_date is not pd.NaT and si_date is not pd.NaT and cr_date < si_date:
+        if not is_cancelled and not pd.isna(cr_date) and not pd.isna(si_date) and cr_date < si_date:
             issues.append(ValidationIssue(row_number, "CR DATE", "warning", "Collection date is earlier than SI date."))
     return issues

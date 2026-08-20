@@ -7,7 +7,10 @@ import pandas as pd
 
 from app.analytics.descriptive.rfm import compute_rfm
 from app.analytics.descriptive.settlement import compute_settlement_metrics
+from app.analytics.predictive.cart import run_cart_analysis
 from app.analytics.prescriptive.scoring import compute_priorities
+from app.analytics.validation.backtest import run_historical_backtest
+from app.analytics.validation.baselines import annual_business_baselines
 from app.analytics.validation.sensitivity import run_sensitivity
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG, AnalyticsConfig
 from app.etl.invoices import InvoiceGroup
@@ -21,8 +24,13 @@ class AnalyticsRunResult:
     completed_at: str
     status: str
     critic_weights: dict[str, float]
+    rfm: list[dict]
+    settlement: list[dict]
     priorities: list[dict]
     sensitivity: list[dict]
+    cart: dict
+    backtest: dict
+    business_baselines: list[dict]
     warnings: list[str]
     effective_config: dict
 
@@ -42,8 +50,13 @@ def run_account_prioritization(
             completed_at=datetime.now(timezone.utc).isoformat(),
             status="no_mcs_eligible_accounts",
             critic_weights={},
+            rfm=[],
+            settlement=[],
             priorities=[],
             sensitivity=[],
+            cart={},
+            backtest={},
+            business_baselines=[],
             warnings=["No MCS-eligible accounts were found."],
             effective_config=config.serializable(),
         )
@@ -54,9 +67,32 @@ def run_account_prioritization(
     if not priorities:
         warnings.append("No accounts had both RFM and eligible settlement metrics.")
     sensitivity = [
-        asdict(run_sensitivity(priorities, weights, weight_range, config.sensitivity_iterations, config.random_seed))
-        for weight_range in config.sensitivity_ranges
-    ]
+        asdict(run_sensitivity(priorities, weights, weight_range, config.sensitivity_iterations, config.random_seed + index))
+        for index, weight_range in enumerate(config.sensitivity_ranges)
+    ] if priorities else []
+    cart = run_cart_analysis(invoice_groups, config)
+    backtest = run_historical_backtest(
+        invoice_groups,
+        repetitions=config.random_baseline_repetitions,
+        random_seed=config.random_seed,
+    )
+    rfm_by_account = {item.account: item for item in rfm}
+    priority_rows: list[dict] = []
+    for item in priorities:
+        metric = rfm_by_account[item.account]
+        row = asdict(item)
+        row.update({
+            "latest_valid_transaction": (cutoff - pd.Timedelta(days=metric.recency_days)).date().isoformat(),
+            "recency_days": metric.recency_days,
+            "frequency": metric.frequency,
+            "monetary": float(metric.monetary),
+            "recency_score": metric.recency_score,
+            "frequency_score": metric.frequency_score,
+            "monetary_score": metric.monetary_score,
+            "inactivity_risk": cart.predictions.get(item.account),
+            "model_version": cart.model_version,
+        })
+        priority_rows.append(row)
     completed = datetime.now(timezone.utc)
     return AnalyticsRunResult(
         analysis_run_id=f"run-{started.strftime('%Y%m%d%H%M%S')}",
@@ -65,8 +101,13 @@ def run_account_prioritization(
         completed_at=completed.isoformat(),
         status="successful",
         critic_weights=weights,
-        priorities=[asdict(item) for item in priorities],
+        rfm=[{**asdict(item), "monetary": float(item.monetary)} for item in rfm],
+        settlement=[asdict(item) for item in settlement],
+        priorities=priority_rows,
         sensitivity=sensitivity,
+        cart=asdict(cart),
+        backtest=asdict(backtest),
+        business_baselines=annual_business_baselines(invoice_groups),
         warnings=warnings,
         effective_config=config.serializable(),
     )

@@ -1,43 +1,20 @@
 "use client";
 
-import { FileCheck, Upload } from "lucide-react";
-import { useState } from "react";
-import { previewImport, runDemoAnalytics } from "@/lib/api";
-import type { ImportPreview } from "@/types/dss";
+import { AlertTriangle, CheckCircle2, Download, FileCheck2, FileSpreadsheet, LoaderCircle, UploadCloud, X } from "lucide-react";
+import { DragEvent, useRef, useState } from "react";
+import { Badge } from "@/components/page-state"; import { apiFetch, downloadExport } from "@/lib/api"; import type { ImportPreview } from "@/types/dss";
 
 export function ImportPanel() {
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
-  const [message, setMessage] = useState("");
-
-  async function onPreview() {
-    if (!file) return;
-    setPreview(await previewImport(file));
-  }
-
-  async function onRun() {
-    if (!file) return;
-    const result = await runDemoAnalytics(file);
-    setMessage(`Run ${result.analysis_run_id} completed with ${result.priorities.length} prioritized accounts.`);
-  }
-
-  return (
-    <section className="panel">
-      <h2>Data Import</h2>
-      <div className="toolbar" style={{ gridTemplateColumns: "1fr auto auto", alignItems: "center" }}>
-        <input aria-label="Source file" type="file" accept=".csv,.xlsx" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-        <button className="button secondary" type="button" onClick={onPreview}><FileCheck size={18} />Preview</button>
-        <button className="button" type="button" onClick={onRun} disabled={!preview?.can_commit}><Upload size={18} />Run</button>
-      </div>
-      {preview ? (
-        <div style={{ marginTop: 16 }}>
-          <p>Rows discovered: {preview.rows_discovered}. Sheets: {preview.sheets.join(", ")}. Commit ready: {preview.can_commit ? "Yes" : "No"}.</p>
-          {preview.issues.length > 0 ? (
-            <ul>{preview.issues.map((issue, index) => <li key={index}>{issue.severity}: {issue.message}</li>)}</ul>
-          ) : <p>No validation issues found.</p>}
-        </div>
-      ) : null}
-      {message ? <p>{message}</p> : null}
-    </section>
-  );
+  const input = useRef<HTMLInputElement>(null); const [file,setFile]=useState<File|null>(null); const [preview,setPreview]=useState<ImportPreview|null>(null);
+  const [busy,setBusy]=useState(false); const [error,setError]=useState(""); const [result,setResult]=useState<Record<string,unknown>|null>(null);
+  const [confirm,setConfirm]=useState(false); const [override,setOverride]=useState("");
+  function choose(next:File|null){setFile(next);setPreview(null);setResult(null);setError("")}
+  function drop(event:DragEvent){event.preventDefault();choose(event.dataTransfer.files[0]||null)}
+  async function validate(){if(!file)return;setBusy(true);setError("");const body=new FormData();body.append("file",file);try{setPreview(await apiFetch<ImportPreview>("/imports/preview",{method:"POST",body}))}catch(reason){setError(reason instanceof Error?reason.message:"Preview failed.")}finally{setBusy(false)}}
+  async function commit(){if(!preview)return;setBusy(true);setError("");try{const response=await apiFetch<Record<string,unknown>>(`/imports/${preview.import_batch_id}/commit`,{method:"POST",body:JSON.stringify({override_reason:override||null})});setResult(response);setConfirm(false)}catch(reason){setError(reason instanceof Error?reason.message:"Commit failed.")}finally{setBusy(false)}}
+  return <><section className="import-layout"><div className="upload-zone" onDragOver={event=>event.preventDefault()} onDrop={drop}><span className="upload-icon"><UploadCloud/></span><h2>Drop a controlled source file here</h2><p>CSV or XLSX, up to 15 MB. Selecting a file creates a preview only.</p><button className="button primary" onClick={()=>input.current?.click()}><FileSpreadsheet size={17}/>Choose source file</button><input ref={input} hidden type="file" accept=".csv,.xlsx" onChange={event=>choose(event.target.files?.[0]||null)}/>{file&&<div className="selected-file"><FileCheck2/><div><strong>{file.name}</strong><span>{(file.size/1024).toFixed(1)} KB</span></div><button className="icon-button" aria-label="Remove file" onClick={()=>choose(null)}><X/></button></div>}</div><aside className="import-guidance"><span className="eyebrow">Controlled schema</span><h2>Before you preview</h2><ul><li>Keep identifiers such as SI No. and CR No. as text.</li><li>Cancelled rows may leave collection fields blank.</li><li>Multiple collection rows may belong to one Sales Invoice.</li><li>Account names are normalized conservatively.</li></ul><div className="template-actions"><button className="button secondary" onClick={()=>downloadExport("/imports/template.csv","peslc-import-template.csv")}><Download size={16}/>CSV template</button><button className="button secondary" onClick={()=>downloadExport("/imports/template.xlsx","peslc-import-template.xlsx")}><Download size={16}/>Excel template</button></div></aside></section>
+    {file&&!preview&&!result&&<div className="center-action"><button className="button primary" disabled={busy} onClick={validate}>{busy?<LoaderCircle className="spin"/>:<FileCheck2/>}Validate and preview</button></div>}{error&&<div className="state-inline error-state"><AlertTriangle/><div><strong>Import action stopped</strong><span>{error}</span></div></div>}
+    {preview&&<section className="preview-section"><div className="section-heading"><div><span className="eyebrow">PREVIEW - not committed</span><h2>Validation result</h2></div><Badge tone={preview.can_commit?"positive":"warning"}>{preview.can_commit?"Ready for confirmation":"Action required"}</Badge></div><div className="kpi-grid compact"><div className="kpi-card"><div><span>Rows discovered</span><strong>{preview.rows_discovered}</strong><small>{preview.sheets.length} eligible sheet(s)</small></div></div><div className="kpi-card"><div><span>Cancelled rows</span><strong>{preview.cancelled_count}</strong><small>Traceable, analytics excluded</small></div></div><div className="kpi-card"><div><span>Errors</span><strong>{preview.issues.filter(issue=>issue.severity==="error").length}</strong><small>Must be zero to commit</small></div></div><div className="kpi-card"><div><span>Warnings</span><strong>{preview.issues.filter(issue=>issue.severity==="warning").length}</strong><small>Review before confirming</small></div></div></div>{preview.duplicate_committed_file&&<div className="state-inline warning-state"><AlertTriangle/><div><strong>Duplicate committed SHA-256 hash</strong><span>A deliberate administrator override reason is required.</span></div></div>}<div className="hash-line"><span>SHA-256</span><code>{preview.file_hash}</code></div>{preview.issues.length?<div className="table-wrap"><table><thead><tr><th>Severity</th><th>Row</th><th>Column</th><th>Message</th></tr></thead><tbody>{preview.issues.map((issue,index)=><tr key={index}><td><Badge tone={issue.severity==="error"?"danger":"warning"}>{issue.severity}</Badge></td><td>{issue.row_number??"File"}</td><td>{issue.column??"-"}</td><td>{issue.message}</td></tr>)}</tbody></table></div>:<div className="state-inline success-state"><CheckCircle2/><div><strong>No validation issues found</strong><span>The preview can proceed to administrator confirmation.</span></div></div>}<div className="preview-actions">{preview.issues.length>0&&<button className="button secondary" onClick={()=>downloadExport(`/imports/${preview.import_batch_id}/issues.csv`,`import-${preview.import_batch_id}-issues.csv`)}><Download size={16}/>Issue report</button>}<button className="button primary" disabled={!preview.can_commit&&!preview.duplicate_committed_file} onClick={()=>setConfirm(true)}>Confirm import</button></div></section>}
+    {result&&<section className="success-summary"><CheckCircle2/><div><span className="eyebrow">COMMITTED</span><h2>Import and analytics publication completed</h2><p>Run <code>{String(result.analysis_run_id)}</code> produced {String(result.prioritized_accounts)} prioritized accounts through cutoff {String(result.cutoff_date)}.</p><a className="button primary" href="/dashboard">Open updated dashboard</a></div></section>}
+    {confirm&&<div className="dialog-backdrop" role="presentation"><div className="dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title"><div className="dialog-heading"><span className="dialog-icon"><AlertTriangle/></span><div><h2 id="confirm-title">Commit validated source data?</h2><p>This persists lineage and invoice records, then publishes a new immutable analytical run.</p></div></div>{preview?.duplicate_committed_file&&<label>Required duplicate override reason<textarea value={override} onChange={event=>setOverride(event.target.value)} placeholder="Explain why this exact file must be committed again."/></label>}<div className="dialog-actions"><button className="button secondary" onClick={()=>setConfirm(false)}>Cancel</button><button className="button primary" disabled={busy||Boolean(preview?.duplicate_committed_file&&!override.trim())} onClick={commit}>{busy?<LoaderCircle className="spin"/>:<CheckCircle2/>}Commit and run analytics</button></div></div></div>}</>;
 }

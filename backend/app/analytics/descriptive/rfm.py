@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+import numpy as np
 import pandas as pd
 
 from app.etl.invoices import InvoiceGroup
@@ -21,22 +22,17 @@ class AccountRFM:
 
 
 def _tie_preserving_score(values: dict[str, float], higher_is_better: bool) -> dict[str, int]:
+    """Map account-level average percentile ranks to tie-preserving 1-5 bands."""
     if not values:
         return {}
     series = pd.Series(values, dtype="float64")
-    unique = sorted(series.dropna().unique(), reverse=higher_is_better)
-    if len(unique) == 1:
+    if series.nunique(dropna=True) <= 1:
         return {key: 3 for key in values}
-    scores: dict[str, int] = {}
-    for key, value in values.items():
-        rank = unique.index(value)
-        percentile = 1 - (rank / max(len(unique) - 1, 1))
-        if higher_is_better:
-            score = 1 + round(percentile * 4)
-        else:
-            score = 5 - round(percentile * 4)
-        scores[key] = int(max(1, min(5, score)))
-    return scores
+    percentiles = series.rank(method="average", pct=True, ascending=True)
+    if not higher_is_better:
+        percentiles = 1 - percentiles + (1 / len(series))
+    bands = np.ceil(percentiles * 5).clip(1, 5).astype(int)
+    return {str(key): int(score) for key, score in bands.items()}
 
 
 def compute_rfm(invoice_groups: list[InvoiceGroup], cutoff_date: pd.Timestamp | None = None) -> list[AccountRFM]:
