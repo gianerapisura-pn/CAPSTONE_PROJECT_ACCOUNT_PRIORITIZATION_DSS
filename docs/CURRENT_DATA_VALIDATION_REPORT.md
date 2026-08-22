@@ -1,6 +1,6 @@
 # Current PESLC Data Validation Report
 
-Validated on 2026-08-20 against the immutable local workbook `D:\GIANE\UST\SENIOR\CAPSTONE 2\Final Raw Data\PESLC_RAW_DATASET.xlsx` (SHA-256 `3d176e9fef5a2c1a1f7da706c9f4c003ea71d859bf98ab87d0d549b82c542e6f`). The workbook was read only and is not in Git.
+Validated on 2026-08-22 against the immutable local workbook `D:\GIANE\UST\SENIOR\CAPSTONE 2\Final Raw Data\PESLC_RAW_DATASET.xlsx` (SHA-256 `3d176e9fef5a2c1a1f7da706c9f4c003ea71d859bf98ab87d0d549b82c542e6f`). The workbook was read only and is not in Git.
 
 ## Data and prescriptive regression
 
@@ -9,6 +9,7 @@ Validated on 2026-08-20 against the immutable local workbook `D:\GIANE\UST\SENIO
 | Raw rows | 363 |
 | Fully Paid / Cancelled | 292 / 71 |
 | Logical valid invoice groups | 282 |
+| Multiple-payment rows / invoice groups | 18 / 8 |
 | Standardized accounts | 94 |
 | SI total | PHP 167,467,524.93 |
 | CR + EWT total at currency precision | PHP 167,467,524.93 |
@@ -23,9 +24,15 @@ These closely reproduce the approved CRITIC reference (approximately 0.6519/0.34
 ## Predictive regression
 
 - Status: Validated; selected outcome window 12 months; lookback 24 months.
-- Untouched OOP: 21 observations; accuracy `0.6190`; macro F1 `0.6182`; majority baseline `0.6190`.
+- Untouched OOP cutoff: `2024-08-13`; 21 observations; accuracy
+  `0.6190`; classification error `0.3810`; macro F1 `0.6182`.
+- Development-trained majority baseline: accuracy `0.6190`;
+  classification error `0.3810`; macro F1 `0.3824`.
 - Confusion matrix, rows actual Lower/Higher and columns predicted Lower/Higher: `[[7,1],[7,6]]`.
-- Selected predictors: `recency_days`, `frequency_count`, `monetary_value`, `account_activity_gap`, `has_valid_settlement_record`.
+- Selected predictors: `recency_days`, `frequency_count`,
+  `monetary_value`, `avg_settlement_days`,
+  `latest_transaction_year`, `account_activity_gap`, and
+  `has_valid_settlement_record`.
 - Lower risk: precision `0.5000`, recall `0.8750`, F1 `0.6364`, support `8`.
 - Higher risk: precision `0.8571`, recall `0.4615`, F1 `0.6000`, support `13`.
 
@@ -40,6 +47,13 @@ This does not reproduce the earlier approximate CART accuracy/F1 reference. The 
 | +/-30% | 0.996559 | 0.984850 / 1.000000 | 2.76% / 11.70% |
 | +/-40% | 0.994998 | 0.973646 / 0.999986 | 3.74% / 12.77% |
 
-Historical top-decile future valid-SI capture was `0.242273`, the average equal-size random capture was `0.054320`, and lift was `4.4601x`. This means the historical ranked selection captured more later-period sales than average random same-size selection; it is not a causal sales claim.
+Historical top-decile future valid-SI capture was `0.393520`, the average
+equal-size random capture was `0.088231`, and lift was `4.4601x`. The
+denominator contains only the 89 historically rank-eligible accounts; completely
+new future accounts are excluded. This describes historical ranking usefulness,
+not causal sales impact.
 
-The full persisted regression completed `PREVIEW -> COMMITTED -> successful`, stored all 94 priorities, four sensitivity ranges with account scenarios, CART model metadata, business years, and latest reporting payloads.
+This pass executed the workbook regression read-only through the corrected
+Python pipeline. Persisted preview/commit/publication behavior is covered by
+isolated integration tests; applying migration 003 and validating against the
+real Supabase project remains an external production step.

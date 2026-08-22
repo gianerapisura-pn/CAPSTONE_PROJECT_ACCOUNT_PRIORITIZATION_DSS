@@ -14,4 +14,12 @@ RFM and Historical Settlement Duration are descriptive. Priority Group is the CR
 
 Import Data accepts CSV/XLSX by drag/drop or picker. File selection is not commitment. Review PREVIEW counts/issues/hash, download an issue report, then confirm. Exact committed hashes require an explicit override reason. Successful confirmation displays COMMITTED and the immutable analysis run.
 
-Import History and Analytics Runs retain operational evidence. Settings keeps methodology/configuration read-only and provides administrators with the account-alias review queue. Every alias approval or rejection requires a reason and is audited; management users cannot make alias decisions. Reports exports CSV/XLSX and opens a configured secure Power BI report.
+Import History and Analytics Runs retain operational evidence. Settings keeps
+methodology/configuration read-only, exposes the active model version, and
+provides separate Monitor Matured Labels and Train/Revalidate actions plus the
+account-alias review queue to administrators only. Monitoring persists current
+metrics and can recommend review; it never replaces the model. Routine imports
+use the active model and never trigger replacement training. Every alias
+approval or rejection requires a reason and is audited; management users cannot
+make model or alias decisions. Reports
+exports CSV/XLSX and opens a configured secure Power BI report.

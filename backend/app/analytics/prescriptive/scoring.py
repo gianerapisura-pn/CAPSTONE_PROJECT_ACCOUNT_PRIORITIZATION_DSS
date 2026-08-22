@@ -16,6 +16,8 @@ class AccountPriority:
     settlement_days_avg: float
     normalized_rfm: float
     normalized_settlement: float
+    rfm_contribution: float
+    settlement_contribution: float
     final_priority_score: float
     priority_rank: int
     priority_group: str
@@ -48,7 +50,7 @@ def critic_weights(criteria_frame: pd.DataFrame) -> dict[str, float]:
 
 
 def assign_priority_groups(scored: list[tuple[str, float]]) -> dict[str, str]:
-    """Assign ranked thirds using tie-block midpoints so equal scores stay together."""
+    """Assign account-population thirds, moving boundaries to preserve score ties."""
     if not scored:
         return {}
     ordered = sorted(scored, key=lambda item: (-item[1], item[0]))
@@ -56,17 +58,19 @@ def assign_priority_groups(scored: list[tuple[str, float]]) -> dict[str, str]:
     total = len(ordered)
     if len({score for _, score in ordered}) == 1:
         return {account: "Medium" for account, _ in ordered}
-    start = 0
-    while start < total:
-        score = ordered[start][1]
-        end = start
-        while end + 1 < total and np.isclose(ordered[end + 1][1], score, rtol=0, atol=1e-12):
-            end += 1
-        block_start = start / total
-        group = "High" if block_start < 1 / 3 else "Medium" if block_start < 2 / 3 else "Low"
-        for index in range(start, end + 1):
-            groups[ordered[index][0]] = group
-        start = end + 1
+    boundaries: list[int] = []
+    for target in (int(np.ceil(total / 3)), int(np.ceil(2 * total / 3))):
+        boundary = min(target, total)
+        while boundary < total and np.isclose(
+            ordered[boundary - 1][1], ordered[boundary][1], rtol=0, atol=1e-12
+        ):
+            boundary += 1
+        boundaries.append(boundary)
+    first, second = boundaries
+    if second == first:
+        second = total
+    for index, (account, _) in enumerate(ordered):
+        groups[account] = "High" if index < first else "Medium" if index < second else "Low"
     return groups
 
 
@@ -108,6 +112,8 @@ def compute_priorities(rfm: list[AccountRFM], settlement: list[AccountSettlement
             settlement_days_avg=settlement_values[account],
             normalized_rfm=normalized_rfm[account],
             normalized_settlement=normalized_settlement[account],
+            rfm_contribution=normalized_rfm[account] * weights["rfm"],
+            settlement_contribution=normalized_settlement[account] * weights["settlement"],
             final_priority_score=raw_scores[account],
             priority_rank=ranks[account],
             priority_group=groups[account],

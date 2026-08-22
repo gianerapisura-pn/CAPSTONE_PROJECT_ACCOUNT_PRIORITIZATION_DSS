@@ -4,7 +4,14 @@
 
 Canonical source fields are validated case-insensitively after whitespace normalization. Non-empty eligible XLSX sheets retain `source_sheet` and `source_row_number`. Payment status is resolved before missing checks so intentionally blank Cancelled rows remain traceable without blocking import. Names receive conservative Unicode/space/capitalization normalization only.
 
-Rows are grouped to a logical Sales Invoice by import lineage, sheet, standardized account, SI number, SI date, and SI amount. `SI NO.` and `CR NO.` remain text. Fully Paid groups reconcile with Decimal precision: `SUM(CR Amount) + SUM(EWT) = SI Amount`. Frequency counts groups, Monetary sums SI amount once, and settlement uses the final valid CR date. Unresolved negative duration is excluded, never changed to zero.
+Rows are grouped to a stable logical Sales Invoice by standardized account, SI
+number, SI date, and currency-quantized SI amount. The cryptographic business
+key never includes import batch, sheet, or source-row lineage. Conflicting
+amount/status candidates are retained and excluded pending review. `SI NO.`
+and `CR NO.` remain text. Fully Paid groups reconcile with Decimal precision:
+`round(SUM(CR Amount) + SUM(EWT) - SI Amount, 0.01) = 0.00`. Frequency counts
+groups, Monetary sums SI amount once, and settlement uses the final valid CR
+date. Unresolved negative duration is excluded, never changed to zero.
 
 ## RFM and settlement
 
@@ -12,7 +19,11 @@ The latest valid SI date is the formal analysis cutoff. Recency Days is cutoff m
 
 Each metric uses account-level average percentile rank and five bands. Ties retain equal scores; all-equal series receives the neutral score 3. Recency direction is reversed. `RFM Score = (R + F + M) / 3`.
 
-Historical Settlement Duration is the account mean of eligible final collection date minus SI date. It does not infer formal timeliness because payment terms are unavailable.
+Historical Settlement Duration is the account mean of eligible final collection
+date minus SI date. Current runs use all collection evidence present when the
+run executes. Historical model/backtest slices enforce their explicit cutoff so
+later collections cannot leak backward. It does not infer formal timeliness
+because payment terms are unavailable.
 
 ## CRITIC, MCS, and groups
 
@@ -20,15 +31,35 @@ MCS requires both RFM and settlement evidence. RFM is benefit-normalized; Settle
 
 `Final Priority Score = w(RFM) * normalized RFM + w(Settlement) * normalized Settlement`.
 
-CART is absent from this equation. Scores rank descending with tied ranks. High/Medium/Low use ranked thirds based on tie-block starts; identical scores stay together, and an all-equal population remains one neutral Medium group.
+CART is absent from this equation. Scores rank descending with tied ranks.
+High/Medium/Low boundaries target thirds of the ranked account population and
+move forward when a boundary would split equal scores. An all-equal population
+remains one neutral Medium group.
 
 ## CART
 
-Labels are exactly `Lower Inactivity Risk` when a valid succeeding SI exists within the outcome window and `Higher Inactivity Risk` otherwise. Candidate windows are 3/6/12 months. Multiple six-month cutoff observations use a versioned 24-month lookback.
+Labels are exactly `Lower` when a valid succeeding SI exists within the outcome window and `Higher` otherwise. Candidate windows are 3/6/12 months. Multiple six-month cutoff observations use a versioned 24-month lookback.
 
 Candidate predictors are Recency Days, Frequency Count, Monetary Value, Average Settlement Days, Recent Transaction Count, Latest Transaction Year, Account Activity Gap, and settlement-record availability. Account identity, R/F/M scores, RFM Score, MCS fields, and post-cutoff information are prohibited.
 
-Development data alone determines window, eligibility/missingness, Spearman redundancy flags, Gini importance, permutation importance, broader/reduced feature comparison, and modest tree complexity. The latest complete cutoff is untouched OOP. Reports include per-class precision/recall/F1, macro F1, accuracy, confusion matrix, majority baseline, depth/leaves, selected predictors, and reasons. Insufficient data returns an unavailable status without blocking descriptive/prescriptive output. New uploads do not automatically retrain a model without complete future labels.
+The implemented sequence is: historical invoices -> candidate cutoffs ->
+complete labels -> chronological development slices -> data, missingness, and
+leakage checks -> Spearman redundancy evidence -> Gini importance ->
+development-validation permutation importance -> broad/reduced feature
+comparison -> 3/6/12-month horizon comparison -> modest CART tuning -> frozen
+decisions -> final untouched OOP -> operational scoring -> future monitoring ->
+controlled administrator retraining.
+
+Development data alone determines window, eligibility/missingness, Spearman
+redundancy flags, Gini importance, permutation importance, broader/reduced
+feature comparison, and modest tree complexity. Reports include per-class
+precision/recall/F1, macro F1, accuracy, classification error, confusion
+matrix, a development-trained majority `DummyClassifier` baseline,
+depth/leaves, selected predictors, and reasons. Insufficient data returns an
+unavailable status without blocking descriptive/prescriptive output. Validated
+artifacts are versioned, hash-verified, and privately stored. Normal imports
+score with the active frozen artifact; incomplete outcomes or monitoring review
+flags never trigger automatic retraining.
 
 ## Validation
 

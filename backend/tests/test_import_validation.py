@@ -37,3 +37,31 @@ def test_column_case_and_whitespace_are_canonicalized():
     frame=pd.DataFrame([valid_row()]);frame.columns=[f" {column.lower()} " for column in frame.columns]
     parsed=parse_source_file("source.csv",frame.to_csv(index=False).encode())
     assert tuple(parsed.frames["CSV"].columns[:len(REQUIRED_COLUMNS)])==REQUIRED_COLUMNS
+
+
+def test_duplicate_canonical_headers_are_rejected():
+    columns = list(REQUIRED_COLUMNS) + [" customer name "]
+    frame = pd.DataFrame([list(valid_row().values()) + ["Duplicate"]], columns=columns)
+    parsed = parse_source_file("duplicate.csv", frame.to_csv(index=False).encode())
+    assert not parsed.frames
+    assert any(issue.issue_type == "duplicate_column" for issue in parsed.issues)
+
+
+def test_cancelled_synonyms_and_unknown_status_are_handled_before_required_fields():
+    rows = pd.DataFrame([
+        valid_row(**{"CUSTOMER NAME":"", "SI NO.":"", "SI DATE":"", "SI AMOUNT":"", "PAYMENT STATUS":"Voided"}),
+        valid_row(**{"PAYMENT STATUS":"Needs Review"}),
+    ])
+    rows["source_sheet"] = "CSV"
+    rows["source_row_number"] = [2, 3]
+    issues = validate_rows(rows)
+    assert not [issue for issue in issues if issue.row_number == 2 and issue.severity == "error"]
+    assert any(issue.row_number == 3 and issue.issue_type == "unknown_payment_status" for issue in issues)
+
+
+def test_blank_si_and_invalid_collection_values_are_typed():
+    frame = pd.DataFrame([valid_row(**{"SI NO.":"", "CR DATE":"bad", "CR AMOUNT":"bad", "EWT":"bad"})])
+    frame["source_sheet"] = "CSV"
+    frame["source_row_number"] = 2
+    issue_types = {issue.issue_type for issue in validate_rows(frame)}
+    assert {"missing_si_number", "invalid_cr_date", "invalid_money"} <= issue_types

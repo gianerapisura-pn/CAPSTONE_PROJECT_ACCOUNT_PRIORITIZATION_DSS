@@ -5,8 +5,8 @@ import type { AccountPriority } from "@/types/dss";
 
 const base={normalized_rfm:.8,rfm_score:4,settlement_days_avg:20,normalized_settlement:.7,latest_valid_transaction:"2030-01-01",recency_days:10,frequency:3,monetary:1000,recency_score:5,frequency_score:4,monetary_score:3};
 const rows:AccountPriority[]=[
- {account:"ALPHA",priority_rank:1,priority_group:"High",final_priority_score:.9,inactivity_risk:"Lower Inactivity Risk",...base},
- {account:"BETA",priority_rank:2,priority_group:"Low",final_priority_score:.4,inactivity_risk:"Higher Inactivity Risk",...base},
+ {account:"ALPHA",priority_rank:1,priority_group:"High",final_priority_score:.9,inactivity_risk:"Lower",...base},
+ {account:"BETA",priority_rank:2,priority_group:"Low",final_priority_score:.4,inactivity_risk:"Higher",...base},
 ];
 
 test("search and priority filters operate on API-shaped account data",async()=>{

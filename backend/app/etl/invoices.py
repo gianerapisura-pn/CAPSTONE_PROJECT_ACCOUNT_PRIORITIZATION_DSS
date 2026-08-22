@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Decimal
-from hashlib import sha1
+from hashlib import sha256
 
 import pandas as pd
 
@@ -29,6 +29,7 @@ class SourceRow:
     import_batch_id: str = "demo"
     source_sheet: str = "CSV"
     source_row_number: int = 0
+    raw_source_row_id: str | None = None
 
 
 @dataclass
@@ -47,6 +48,7 @@ class InvoiceGroup:
     reconciliation_difference: Decimal = Decimal("0")
     reconciled: bool = False
     review_reason: str | None = None
+    conflicting_invoice: bool = False
 
     @property
     def is_cancelled(self) -> bool:
@@ -54,11 +56,17 @@ class InvoiceGroup:
 
     @property
     def rfm_eligible(self) -> bool:
-        return not self.is_cancelled and self.si_date is not pd.NaT and self.si_amount > 0
+        return not self.is_cancelled and not self.conflicting_invoice and not pd.isna(self.si_date) and self.si_amount > 0
 
     @property
     def settlement_eligible(self) -> bool:
-        if self.is_cancelled or self.final_cr_date is None or not self.reconciled:
+        if (
+            self.is_cancelled
+            or self.conflicting_invoice
+            or self.payment_status != "Fully Paid"
+            or self.final_cr_date is None
+            or not self.reconciled
+        ):
             return False
         return (self.final_cr_date - self.si_date).days >= 0
 
@@ -101,15 +109,14 @@ def dataframe_to_source_rows(frame: pd.DataFrame, import_batch_id: str = "demo")
 
 
 def invoice_group_key(row: SourceRow) -> str:
+    amount = row.si_amount.quantize(Decimal("0.01"))
     parts = [
-        row.import_batch_id,
-        row.source_sheet,
         row.standardized_account_name,
         row.si_no,
         str(row.si_date.date() if not pd.isna(row.si_date) else ""),
-        str(row.si_amount),
+        format(amount, "f"),
     ]
-    return sha1("|".join(parts).encode("utf-8")).hexdigest()
+    return sha256("|".join(parts).encode("utf-8")).hexdigest()
 
 
 def group_invoices(rows: list[SourceRow], precision: Decimal = Decimal("0.01")) -> list[InvoiceGroup]:
@@ -126,15 +133,37 @@ def group_invoices(rows: list[SourceRow], precision: Decimal = Decimal("0.01")) 
                 payment_status=row.payment_status,
             )
         grouped[key].rows.append(row)
+    conflict_amounts: dict[tuple[str, str, object], set[Decimal]] = {}
     for group in grouped.values():
+        identity = (
+            group.standardized_account_name,
+            group.si_no,
+            group.si_date.date() if not pd.isna(group.si_date) else None,
+        )
+        conflict_amounts.setdefault(identity, set()).add(group.si_amount.quantize(precision))
+    for group in grouped.values():
+        identity = (
+            group.standardized_account_name,
+            group.si_no,
+            group.si_date.date() if not pd.isna(group.si_date) else None,
+        )
+        group.conflicting_invoice = len(conflict_amounts[identity]) > 1
+        statuses = {row.payment_status for row in group.rows}
+        if len(statuses) == 1:
+            group.payment_status = next(iter(statuses))
+        else:
+            group.payment_status = "Unknown"
+            group.conflicting_invoice = True
         cr_dates = [row.cr_date for row in group.rows if row.cr_date is not None]
         group.final_cr_date = max(cr_dates) if cr_dates else None
         group.total_cr_amount = sum((row.cr_amount for row in group.rows), Decimal("0"))
         group.total_ewt = sum((row.ewt for row in group.rows), Decimal("0"))
         group.reconciliation_amount = group.total_cr_amount + group.total_ewt
         group.reconciliation_difference = (group.reconciliation_amount - group.si_amount).quantize(precision)
-        group.reconciled = abs(group.reconciliation_difference) <= precision
-        if group.is_cancelled:
+        group.reconciled = group.reconciliation_difference == Decimal("0.00")
+        if group.conflicting_invoice:
+            group.review_reason = "Conflicting invoice amount or payment status; excluded pending review."
+        elif group.is_cancelled:
             group.review_reason = "Cancelled; excluded from analytics."
         elif group.payment_status == "Fully Paid" and not group.reconciled:
             group.review_reason = "Fully Paid invoice does not reconcile to SI amount."

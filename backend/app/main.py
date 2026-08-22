@@ -18,13 +18,22 @@ from app.core.config import get_settings
 from app.db.models import (
     AccountAlias, AccountAliasReview, AccountPriorityResult, AnalyticsRun, DimAccount, ImportBatch,
     ImportRowIssue, InvoiceGroupRecord, ModelRun, RFMResult, SensitivityScenarioRecord,
-    SensitivitySummaryRecord, SettlementResult,
+    PredictiveModelVersion, SensitivitySummaryRecord, SettlementResult,
 )
 from app.db.repository import audit, latest_successful_run, load_invoice_groups, persist_run_output, run_payload, serialize_run
 from app.db.session import get_db, init_database
 from app.imports.validators import REQUIRED_COLUMNS
 from app.services.analytics_runner import run_account_prioritization
 from app.services.import_workflow import commit_source, preview_source
+from app.services.model_lifecycle import (
+    active_model_version, cart_for_current_run, monitor_active_model,
+    train_and_persist_model,
+)
+from app.schemas.api import (
+    AccountPriorityResponse, AnalyticsRunResponse, ImportBatchResponse,
+    ImportCommitResponse, ImportDetailResponse, ImportPreviewResponse,
+    ModelSummaryResponse,
+)
 
 settings = get_settings()
 
@@ -63,6 +72,19 @@ def _safe_sheet_value(value: object) -> object:
     if isinstance(value, str) and value[:1] in {"=", "+", "-", "@"}:
         return f"'{value}"
     return value
+
+
+def _serialize_import_batch(row: ImportBatch) -> dict:
+    return {
+        "import_batch_id": row.import_batch_id, "file_name": row.file_name,
+        "file_hash": row.file_hash, "uploaded_by": row.uploaded_by,
+        "uploaded_at": row.uploaded_at.isoformat(),
+        "committed_at": row.committed_at.isoformat() if row.committed_at else None,
+        "status": row.status, "rows_discovered": row.rows_discovered,
+        "rows_accepted": row.rows_accepted, "rows_flagged": row.rows_flagged,
+        "rows_excluded": row.rows_excluded, "cancelled_count": row.cancelled_count,
+        "analysis_run_id": row.analysis_run_id, "override_reason": row.override_reason,
+    }
 
 
 @app.get("/health")
@@ -122,35 +144,32 @@ def decide_alias(review_id: str, request: AliasDecisionRequest,
     return {"alias_review_id": review_id, "status": decision, "canonical_account_name": canonical or None}
 
 
-@app.post("/imports/preview")
+@app.post("/imports/preview", response_model=ImportPreviewResponse)
 async def preview_import(file: UploadFile = File(...), user: AuthenticatedUser = Depends(require_admin),
                          db: Session = Depends(get_db)) -> dict:
     return preview_source(db, user, file.filename or "upload", await file.read())
 
 
-@app.post("/imports/{batch_id}/commit")
+@app.post("/imports/{batch_id}/commit", response_model=ImportCommitResponse)
 def commit_import(batch_id: str, request: CommitRequest, user: AuthenticatedUser = Depends(require_admin),
                   db: Session = Depends(get_db)) -> dict:
     return commit_source(db, user, batch_id, request.override_reason)
 
 
-@app.get("/imports")
+@app.get("/imports", response_model=list[ImportBatchResponse])
 def import_history(user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db)) -> list[dict]:
     batches = db.scalars(select(ImportBatch).order_by(desc(ImportBatch.uploaded_at))).all()
-    return [{
-        "import_batch_id": row.import_batch_id, "file_name": row.file_name, "file_hash": row.file_hash,
-        "uploaded_by": row.uploaded_by, "uploaded_at": row.uploaded_at.isoformat(), "status": row.status,
-        "rows_discovered": row.rows_discovered, "rows_accepted": row.rows_accepted,
-        "rows_flagged": row.rows_flagged, "rows_excluded": row.rows_excluded,
-        "cancelled_count": row.cancelled_count, "analysis_run_id": row.analysis_run_id,
-    } for row in batches]
+    return [_serialize_import_batch(row) for row in batches]
 
 
 @app.get("/imports/{batch_id}/issues.csv")
 def import_issues(batch_id: str, user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db)) -> Response:
     rows = db.scalars(select(ImportRowIssue).where(ImportRowIssue.import_batch_id == batch_id)).all()
-    frame = pd.DataFrame([{"row_number": row.row_number, "column": row.column_name,
-                           "severity": row.severity, "message": row.message} for row in rows])
+    frame = pd.DataFrame([{
+        "source_sheet": row.source_sheet, "row_number": row.row_number,
+        "column": row.column_name, "issue_type": row.issue_type,
+        "severity": row.severity, "message": row.message,
+    } for row in rows])
     return Response(frame.to_csv(index=False), media_type="text/csv",
                     headers={"Content-Disposition": f'attachment; filename="import-{batch_id}-issues.csv"'})
 
@@ -170,6 +189,33 @@ def import_template(format: str, user: AuthenticatedUser = Depends(require_admin
     raise HTTPException(404, "Template format not found.")
 
 
+@app.get("/imports/{batch_id}", response_model=ImportDetailResponse)
+def import_detail(batch_id: str, user: AuthenticatedUser = Depends(require_admin),
+                  db: Session = Depends(get_db)) -> dict:
+    batch = db.get(ImportBatch, batch_id)
+    if not batch:
+        raise HTTPException(404, "Import batch not found.")
+    issues = db.scalars(
+        select(ImportRowIssue).where(ImportRowIssue.import_batch_id == batch_id)
+        .order_by(ImportRowIssue.source_sheet, ImportRowIssue.row_number)
+    ).all()
+    denominator = max(batch.rows_discovered, 1)
+    issue_counts: dict[str, int] = {}
+    for issue in issues:
+        issue_counts[issue.issue_type] = issue_counts.get(issue.issue_type, 0) + 1
+    payload = _serialize_import_batch(batch)
+    payload["issues"] = [{
+        "source_sheet": row.source_sheet, "row_number": row.row_number,
+        "column": row.column_name, "issue_type": row.issue_type,
+        "severity": row.severity, "message": row.message,
+    } for row in issues]
+    payload["quality_issue_rates"] = {
+        issue_type: count / denominator for issue_type, count in sorted(issue_counts.items())
+    }
+    payload["cancelled_row_rate"] = batch.cancelled_count / denominator
+    return payload
+
+
 @app.post("/analytics/run")
 def run_analytics(user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
     groups = load_invoice_groups(db)
@@ -179,7 +225,8 @@ def run_analytics(user: AuthenticatedUser = Depends(require_admin), db: Session 
     db.add(run)
     db.flush()
     try:
-        result = asdict(run_account_prioritization(groups))
+        cart = cart_for_current_run(db, groups)
+        result = asdict(run_account_prioritization(groups, cart_result=cart))
         persist_run_output(db, run, result)
         audit(db, user.user_id, "analytics_run", "analytics_run", run.analysis_run_id, {"status": run.status})
         db.commit()
@@ -204,7 +251,7 @@ def dashboard(user: AuthenticatedUser = Depends(require_user), db: Session = Dep
     priorities = payload["priorities"]
     group_counts = {group: sum(row["priority_group"] == group for row in priorities) for group in ("High", "Medium", "Low")}
     risk_counts = {risk: sum(row.get("inactivity_risk") == risk for row in priorities)
-                   for risk in ("Lower Inactivity Risk", "Higher Inactivity Risk")}
+                   for risk in ("Lower", "Higher")}
     total_accounts = db.scalar(select(func.count()).select_from(DimAccount)) or 0
     total_sales = sum(row.get("valid_si_sales", 0) for row in payload["business_baselines"])
     return {
@@ -212,6 +259,8 @@ def dashboard(user: AuthenticatedUser = Depends(require_user), db: Session = Dep
         "mcs_eligible_accounts": len(priorities), "priority_group_counts": group_counts,
         "risk_counts": risk_counts, "total_valid_historical_sales": total_sales,
         "critic_weights": run.critic_weights, "cart_status": payload["cart"].get("status", "Unavailable"),
+        "cart_horizon": payload["cart"].get("outcome_window_months"),
+        "warnings": run.warnings or [],
         "top_accounts": priorities[:8], "sales_trend": payload["business_baselines"],
         "sensitivity": payload["sensitivity"],
     }
@@ -308,6 +357,76 @@ def run_history(user: AuthenticatedUser = Depends(require_admin), db: Session = 
     return [serialize_run(run) for run in db.scalars(select(AnalyticsRun).order_by(desc(AnalyticsRun.started_at))).all()]
 
 
+@app.get("/analytics/runs", response_model=list[AnalyticsRunResponse])
+def analytics_run_history(
+    user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db),
+) -> list[dict]:
+    return [serialize_run(run) for run in db.scalars(
+        select(AnalyticsRun).order_by(desc(AnalyticsRun.started_at))
+    ).all()]
+
+
+@app.get("/analytics/runs/{run_id}")
+def analytics_run_detail(
+    run_id: str, user: AuthenticatedUser = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    run = db.get(AnalyticsRun, run_id)
+    if not run:
+        raise HTTPException(404, "Analytics run not found.")
+    return run_payload(db, run)
+
+
+@app.get("/accounts/priorities", response_model=list[AccountPriorityResponse])
+def account_priorities(
+    user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db),
+) -> list[dict]:
+    return run_payload(db, _latest_or_404(db))["priorities"]
+
+
+@app.get("/models/current", response_model=ModelSummaryResponse)
+def current_model(
+    user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db),
+) -> dict:
+    model = active_model_version(db)
+    if not model:
+        return {"status": "model_unavailable", "model_version": None}
+    return {
+        "status": model.status, "model_version": model.model_version,
+        "created_at": model.created_at, "trained_through_date": model.trained_through_date,
+        "selected_outcome_horizon": model.selected_outcome_horizon,
+        "retained_features": model.retained_features,
+        "last_validation_date": model.last_validation_date,
+        "review_recommended": model.review_recommended,
+        "oop_metrics": model.oop_metrics,
+    }
+
+
+@app.post("/models/train-validate")
+def train_validate_model(
+    user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db),
+) -> dict:
+    groups = load_invoice_groups(db)
+    if not groups:
+        raise HTTPException(422, "No committed invoice data is available.")
+    result = train_and_persist_model(db, groups)
+    audit(db, user.user_id, "model_train_validate", "predictive_model", result.model_version,
+          {"status": result.status})
+    db.commit()
+    return asdict(result)
+
+
+@app.post("/models/monitor")
+def monitor_model(
+    user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db),
+) -> dict:
+    result = monitor_active_model(db, load_invoice_groups(db))
+    audit(db, user.user_id, "model_monitor", "predictive_model",
+          result.get("model_version"), {"status": result["status"]})
+    db.commit()
+    return result
+
+
 @app.get("/settings/methodology")
 def methodology(user: AuthenticatedUser = Depends(require_admin)) -> dict:
     return {
@@ -342,11 +461,38 @@ def export_dataset(dataset: str, format: str, user: AuthenticatedUser = Depends(
     audit(db, user.user_id, "export", dataset, run.analysis_run_id, {"format": format})
     db.commit()
     filename = f"peslc-{dataset}-{run.analysis_run_id}.{format}"
+    currency_markers = ("amount", "monetary", "sales", "contribution")
+    currency_columns = [
+        column for column in frame.columns
+        if any(marker in column.lower() for marker in currency_markers)
+    ]
     if format == "csv":
-        return Response(frame.to_csv(index=False), media_type="text/csv",
+        csv_frame = frame.copy()
+        for column in currency_columns:
+            csv_frame[column] = csv_frame[column].map(
+                lambda value: "" if pd.isna(value) else f"{float(value):.2f}"
+            )
+        return Response(csv_frame.to_csv(index=False), media_type="text/csv",
                         headers={"Content-Disposition": f'attachment; filename="{filename}"'})
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         frame.to_excel(writer, index=False, sheet_name=dataset[:31])
+        worksheet = writer.sheets[dataset[:31]]
+        for column in currency_columns:
+            position = frame.columns.get_loc(column) + 1
+            for cells in worksheet.iter_cols(
+                min_col=position, max_col=position, min_row=2, max_row=worksheet.max_row
+            ):
+                for cell in cells:
+                    cell.number_format = "#,##0.00"
     return Response(output.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@app.get("/exports/priorities")
+def export_priorities_query(
+    format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    user: AuthenticatedUser = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    return export_dataset("priorities", format, user, db)

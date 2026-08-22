@@ -55,6 +55,7 @@ class ImportRowIssue(Base):
     column_name: Mapped[str | None] = mapped_column(String(100))
     severity: Mapped[str] = mapped_column(String(16))
     message: Mapped[str] = mapped_column(Text)
+    issue_type: Mapped[str] = mapped_column(String(80), default="validation")
 
 
 class RawSourceRow(Base):
@@ -63,6 +64,16 @@ class RawSourceRow(Base):
     import_batch_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_batch_id"), index=True)
     source_sheet: Mapped[str] = mapped_column(String(255))
     source_row_number: Mapped[int] = mapped_column(Integer)
+    customer_name_raw: Mapped[str | None] = mapped_column(Text)
+    si_no: Mapped[str | None] = mapped_column(Text)
+    si_date_raw: Mapped[str | None] = mapped_column(Text)
+    si_amount_raw: Mapped[str | None] = mapped_column(Text)
+    cr_no: Mapped[str | None] = mapped_column(Text)
+    cr_date_raw: Mapped[str | None] = mapped_column(Text)
+    cr_amount_raw: Mapped[str | None] = mapped_column(Text)
+    ewt_raw: Mapped[str | None] = mapped_column(Text)
+    payment_mode_raw: Mapped[str | None] = mapped_column(Text)
+    payment_status_raw: Mapped[str | None] = mapped_column(Text)
     canonical_payload: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
@@ -114,6 +125,20 @@ class InvoiceGroupRecord(Base):
     reconciled: Mapped[bool] = mapped_column(Boolean)
     review_reason: Mapped[str | None] = mapped_column(Text)
     is_cancelled: Mapped[bool] = mapped_column(Boolean)
+    conflicting_invoice: Mapped[bool] = mapped_column(Boolean, default=False)
+    rfm_eligible: Mapped[bool] = mapped_column(Boolean, default=False)
+    settlement_eligible: Mapped[bool] = mapped_column(Boolean, default=False)
+    settlement_days: Mapped[int | None] = mapped_column(Integer)
+
+
+class InvoiceGroupLineage(Base):
+    __tablename__ = "invoice_group_rows"
+    invoice_group_id: Mapped[str] = mapped_column(
+        ForeignKey("invoice_groups.invoice_group_id"), primary_key=True
+    )
+    raw_source_row_id: Mapped[str] = mapped_column(
+        ForeignKey("raw_source_rows.raw_source_row_id"), primary_key=True
+    )
 
 
 class AnalyticsRun(Base):
@@ -125,6 +150,10 @@ class AnalyticsRun(Base):
     latest_import_batch_id: Mapped[str | None] = mapped_column(String(36))
     status: Mapped[str] = mapped_column(String(40), index=True)
     critic_weights: Mapped[dict] = mapped_column(JSON, default=dict)
+    row_counts: Mapped[dict] = mapped_column(JSON, default=dict)
+    eligible_account_counts: Mapped[dict] = mapped_column(JSON, default=dict)
+    model_version: Mapped[str | None] = mapped_column(String(120))
+    predictive_status: Mapped[str | None] = mapped_column(String(80))
     effective_config: Mapped[dict] = mapped_column(JSON, default=dict)
     warnings: Mapped[list] = mapped_column(JSON, default=list)
     errors: Mapped[list] = mapped_column(JSON, default=list)
@@ -166,6 +195,75 @@ class ModelRun(Base):
     analysis_run_id: Mapped[str] = mapped_column(ForeignKey("analytics_runs.analysis_run_id"), index=True)
     model_version: Mapped[str] = mapped_column(String(120))
     status: Mapped[str] = mapped_column(String(80))
+    payload: Mapped[dict] = mapped_column(JSON)
+
+
+class PredictiveModelVersion(Base):
+    __tablename__ = "predictive_model_versions"
+    predictive_model_version_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    model_version: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    status: Mapped[str] = mapped_column(String(40), index=True)
+    trained_through_date: Mapped[datetime | None] = mapped_column(Date)
+    selected_outcome_horizon: Mapped[int | None] = mapped_column(Integer)
+    predictive_lookback_months: Mapped[int | None] = mapped_column(Integer)
+    recent_transaction_months: Mapped[int | None] = mapped_column(Integer)
+    retained_features: Mapped[list] = mapped_column(JSON, default=list)
+    preprocessing_config: Mapped[dict] = mapped_column(JSON, default=dict)
+    tree_hyperparameters: Mapped[dict] = mapped_column(JSON, default=dict)
+    random_seed: Mapped[int | None] = mapped_column(Integer)
+    development_metrics: Mapped[dict] = mapped_column(JSON, default=dict)
+    oop_cutoff: Mapped[datetime | None] = mapped_column(Date)
+    oop_metrics: Mapped[dict] = mapped_column(JSON, default=dict)
+    last_validation_date: Mapped[datetime | None] = mapped_column(Date)
+    method_version: Mapped[str | None] = mapped_column(String(80))
+    code_version: Mapped[str | None] = mapped_column(String(80))
+    artifact_path: Mapped[str | None] = mapped_column(Text)
+    artifact_hash: Mapped[str | None] = mapped_column(String(64))
+    review_recommended: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class PredictiveMonitoringEvaluation(Base):
+    __tablename__ = "predictive_monitoring_evaluations"
+    predictive_monitoring_evaluation_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    predictive_model_version_id: Mapped[str] = mapped_column(
+        ForeignKey("predictive_model_versions.predictive_model_version_id"), index=True
+    )
+    evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    cutoff_date: Mapped[datetime | None] = mapped_column(Date)
+    status: Mapped[str] = mapped_column(String(60))
+    review_recommended: Mapped[bool] = mapped_column(Boolean, default=False)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class PredictiveHorizonEvaluation(Base):
+    __tablename__ = "predictive_horizon_evaluations"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    predictive_model_version_id: Mapped[str] = mapped_column(
+        ForeignKey("predictive_model_versions.predictive_model_version_id"), index=True
+    )
+    horizon_months: Mapped[int] = mapped_column(Integer)
+    payload: Mapped[dict] = mapped_column(JSON)
+
+
+class PredictiveFeatureDecision(Base):
+    __tablename__ = "predictive_feature_decisions"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    predictive_model_version_id: Mapped[str] = mapped_column(
+        ForeignKey("predictive_model_versions.predictive_model_version_id"), index=True
+    )
+    feature_name: Mapped[str] = mapped_column(String(120))
+    retained: Mapped[bool] = mapped_column(Boolean)
+    payload: Mapped[dict] = mapped_column(JSON)
+
+
+class PredictiveOOPEvaluation(Base):
+    __tablename__ = "predictive_oop_evaluations"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    predictive_model_version_id: Mapped[str] = mapped_column(
+        ForeignKey("predictive_model_versions.predictive_model_version_id"), index=True
+    )
+    oop_cutoff: Mapped[datetime | None] = mapped_column(Date)
     payload: Mapped[dict] = mapped_column(JSON)
 
 

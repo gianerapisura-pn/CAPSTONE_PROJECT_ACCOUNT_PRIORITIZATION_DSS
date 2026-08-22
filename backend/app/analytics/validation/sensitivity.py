@@ -66,12 +66,15 @@ def run_sensitivity(
             scenarios.append({
                 "perturbation_level": weight_range, "iteration": iteration,
                 "rfm_weight": rfm_weight, "settlement_weight": settlement_weight,
+                "actual_rfm_weight": rfm_weight, "actual_settlement_weight": settlement_weight,
                 "account": item.account, "baseline_score": item.final_priority_score,
                 "scenario_score": scores[item.account], "baseline_rank": item.priority_rank,
                 "scenario_rank": new_rank[item.account],
                 "rank_difference": new_rank[item.account] - item.priority_rank,
+                "rank_change": new_rank[item.account] - item.priority_rank,
                 "baseline_priority_group": item.priority_group,
-                "scenario_priority_group": new_groups[item.account], "moved_group": did_move,
+                "scenario_priority_group": new_groups[item.account],
+                "moved_group": did_move, "group_changed": did_move,
             })
         movement_rates.append(moved / len(priorities))
     return SensitivitySummary(

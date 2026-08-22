@@ -19,6 +19,12 @@ class BacktestSummary:
     top_decile_capture: float
     random_baseline_capture: float
     lift_over_random: float
+    cutoff_date: str | None = None
+    evaluation_end_date: str | None = None
+    eligible_account_count: int = 0
+    selected_account_count: int = 0
+    repetitions: int = 100
+    random_seed: int = 42
 
 
 def top_decile_backtest(
@@ -29,13 +35,16 @@ def top_decile_backtest(
 ) -> BacktestSummary:
     if not priorities:
         return BacktestSummary(0.0, 0.0, 0.0)
-    account_sales: dict[str, Decimal] = {}
+    ranked_accounts = {item.account for item in priorities}
+    account_sales: dict[str, Decimal] = {account: Decimal("0") for account in ranked_accounts}
     for group in future_invoice_groups:
-        if group.rfm_eligible:
-            account_sales[group.standardized_account_name] = account_sales.get(group.standardized_account_name, Decimal("0")) + group.si_amount
+        if group.rfm_eligible and group.standardized_account_name in ranked_accounts:
+            account_sales[group.standardized_account_name] += group.si_amount
     total_sales = sum(account_sales.values(), Decimal("0"))
     if total_sales == 0:
-        return BacktestSummary(0.0, 0.0, 0.0)
+        return BacktestSummary(0.0, 0.0, 0.0, eligible_account_count=len(priorities),
+                               selected_account_count=max(1, int(np.ceil(len(priorities) * 0.10))),
+                               repetitions=repetitions, random_seed=random_seed)
     ordered = sorted(priorities, key=lambda item: (item.priority_rank, item.account))
     n = max(1, int(np.ceil(len(ordered) * 0.10)))
     selected = {item.account for item in ordered[:n]}
@@ -48,7 +57,8 @@ def top_decile_backtest(
         random_captures.append(float(sum((account_sales.get(account, Decimal("0")) for account in picked), Decimal("0")) / total_sales))
     baseline = float(np.mean(random_captures))
     lift = capture / baseline if baseline else 0.0
-    return BacktestSummary(capture, baseline, lift)
+    return BacktestSummary(capture, baseline, lift, eligible_account_count=len(priorities),
+                           selected_account_count=n, repetitions=repetitions, random_seed=random_seed)
 
 
 def run_historical_backtest(
@@ -72,6 +82,21 @@ def run_historical_backtest(
             group.reconciled = False
             group.review_reason = "Settlement evidence was unavailable at the historical cutoff."
         historical.append(group)
-    future = [group for group in eligible if group.si_date > cutoff]
-    priorities, _ = compute_priorities(compute_rfm(historical, cutoff), compute_settlement_metrics(historical))
-    return top_decile_backtest(priorities, future, repetitions, random_seed)
+    evaluation_end = cutoff + pd.DateOffset(months=holdout_months)
+    future = [group for group in eligible if cutoff < group.si_date <= evaluation_end]
+    priorities, _ = compute_priorities(
+        compute_rfm(historical, cutoff),
+        compute_settlement_metrics(historical, cutoff),
+    )
+    summary = top_decile_backtest(priorities, future, repetitions, random_seed)
+    return BacktestSummary(
+        summary.top_decile_capture,
+        summary.random_baseline_capture,
+        summary.lift_over_random,
+        cutoff.date().isoformat(),
+        evaluation_end.date().isoformat(),
+        summary.eligible_account_count,
+        summary.selected_account_count,
+        repetitions,
+        random_seed,
+    )

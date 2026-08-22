@@ -1,8 +1,11 @@
 .env
 .env.*
 !.env.example
+!backend/.env.example
+!frontend/.env.local.example
 __pycache__/
 .pytest_cache/
+.test-tmp/
 .demo_data/
 .mypy_cache/
 .ruff_cache/

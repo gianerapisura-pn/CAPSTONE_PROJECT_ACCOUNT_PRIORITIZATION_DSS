@@ -36,3 +36,5 @@ Non-negotiable rules:
 18. Production authentication must cryptographically verify Supabase sessions and resolve database roles.
 19. Preview and COMMITTED are distinct import states; successful analytical runs are immutable and atomically published.
 20. Demo storage/database/authentication must remain visibly labeled and isolated from production data.
+21. Logical invoice identity must exclude import batch, worksheet, and source-row lineage.
+22. Routine imports score with the active validated CART artifact; retraining is a separate controlled action.

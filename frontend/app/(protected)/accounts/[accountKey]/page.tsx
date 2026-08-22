@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Activity, Calculator, Calendar, Clock3, ReceiptText, Scale } from "lucide-react";
+import { ArrowLeft, Activity, Calculator, Clock3, ReceiptText, Scale } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Badge, PageHeader, PageState } from "@/components/page-state";

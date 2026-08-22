@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pandas as pd
+
 from app.etl.invoices import InvoiceGroup
 
 
@@ -13,8 +15,24 @@ class AccountSettlement:
     final_collection_days_max: int | None
 
 
-def compute_settlement_metrics(invoice_groups: list[InvoiceGroup]) -> list[AccountSettlement]:
-    eligible = [group for group in invoice_groups if group.settlement_eligible]
+def compute_settlement_metrics(
+    invoice_groups: list[InvoiceGroup],
+    cutoff_date: pd.Timestamp | None = None,
+) -> list[AccountSettlement]:
+    cutoff = pd.Timestamp(cutoff_date) if cutoff_date is not None else None
+    eligible = [
+        group
+        for group in invoice_groups
+        if group.settlement_eligible
+        and (
+            cutoff is None
+            or (
+                group.si_date <= cutoff
+                and group.final_cr_date is not None
+                and group.final_cr_date <= cutoff
+            )
+        )
+    ]
     accounts = sorted({group.standardized_account_name for group in eligible})
     results: list[AccountSettlement] = []
     for account in accounts:

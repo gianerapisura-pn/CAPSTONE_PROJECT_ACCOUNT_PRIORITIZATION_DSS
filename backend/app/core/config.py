@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
     supabase_jwt_audience: str = "authenticated"
     supabase_storage_bucket: str = "source-imports"
+    supabase_model_storage_bucket: str = "model-artifacts"
     cors_allowed_origins: str = "http://localhost:3000"
     app_env: str = "development"
     demo_mode: bool = True
@@ -16,6 +17,7 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 15_000_000
     supabase_jwt_issuer: str = ""
     demo_storage_path: str = ".demo_data/source-imports"
+    demo_model_storage_path: str = ".demo_data/model-artifacts"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -1,5 +1,5 @@
 export type PriorityGroup = "High" | "Medium" | "Low";
-export type InactivityRisk = "Lower Inactivity Risk" | "Higher Inactivity Risk";
+export type InactivityRisk = "Lower" | "Higher";
 export interface AccountPriority {
   account: string; account_key?: string; final_priority_score: number; priority_rank: number;
   priority_group: PriorityGroup; rfm_score: number; normalized_rfm: number; settlement_days_avg: number;
@@ -16,5 +16,5 @@ export interface RunSummary { analysis_run_id: string; cutoff_date: string | nul
   status: string; critic_weights: Record<string, number>; warnings: string[]; duration_seconds: number | null; latest_import_batch_id?: string }
 export interface DashboardData { run: RunSummary; total_standardized_accounts: number; mcs_eligible_accounts: number;
   priority_group_counts: Record<PriorityGroup, number>; risk_counts: Record<string, number>; total_valid_historical_sales: number;
-  critic_weights: Record<string, number>; cart_status: string; top_accounts: AccountPriority[];
+  critic_weights: Record<string, number>; cart_status: string; cart_horizon?: number | null; warnings: string[]; top_accounts: AccountPriority[];
   sales_trend: Array<Record<string, number | boolean | null>>; sensitivity: Array<Record<string, number>> }

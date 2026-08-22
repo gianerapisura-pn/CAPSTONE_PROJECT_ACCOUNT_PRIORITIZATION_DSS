@@ -12,6 +12,9 @@ export function useApi<T>(path: string) {
     try { setData(await apiFetch<T>(path)) } catch (reason) { setError(reason instanceof Error ? reason.message : "Request failed.") }
     finally { setLoading(false) }
   }, [path]);
-  useEffect(() => { void reload() }, [reload]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void reload(), 0);
+    return () => window.clearTimeout(timer);
+  }, [reload]);
   return { data, error, loading, reload };
 }

@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+from uuid import uuid4
 
 import pandas as pd
 
 from app.analytics.descriptive.rfm import compute_rfm
 from app.analytics.descriptive.settlement import compute_settlement_metrics
-from app.analytics.predictive.cart import run_cart_analysis
+from app.analytics.predictive.cart import CartResult, run_cart_analysis
 from app.analytics.prescriptive.scoring import compute_priorities
 from app.analytics.validation.backtest import run_historical_backtest
 from app.analytics.validation.baselines import annual_business_baselines
@@ -38,13 +39,14 @@ class AnalyticsRunResult:
 def run_account_prioritization(
     invoice_groups: list[InvoiceGroup],
     config: AnalyticsConfig = DEFAULT_ANALYTICS_CONFIG,
+    cart_result: CartResult | None = None,
 ) -> AnalyticsRunResult:
     started = datetime.now(timezone.utc)
     eligible_dates = [group.si_date for group in invoice_groups if group.rfm_eligible]
     warnings: list[str] = []
     if not eligible_dates:
         return AnalyticsRunResult(
-            analysis_run_id=f"run-{started.strftime('%Y%m%d%H%M%S')}",
+            analysis_run_id=str(uuid4()),
             cutoff_date=None,
             started_at=started.isoformat(),
             completed_at=datetime.now(timezone.utc).isoformat(),
@@ -62,6 +64,8 @@ def run_account_prioritization(
         )
     cutoff = max(eligible_dates)
     rfm = compute_rfm(invoice_groups, cutoff_date=cutoff)
+    # Current runs may use all collection evidence already present at execution.
+    # Historical model/backtest slices pass an explicit cutoff separately.
     settlement = compute_settlement_metrics(invoice_groups)
     priorities, weights = compute_priorities(rfm, settlement)
     if not priorities:
@@ -70,7 +74,9 @@ def run_account_prioritization(
         asdict(run_sensitivity(priorities, weights, weight_range, config.sensitivity_iterations, config.random_seed + index))
         for index, weight_range in enumerate(config.sensitivity_ranges)
     ] if priorities else []
-    cart = run_cart_analysis(invoice_groups, config)
+    cart = cart_result or run_cart_analysis(invoice_groups, config)
+    if isinstance(cart, tuple):
+        cart = cart[0]
     backtest = run_historical_backtest(
         invoice_groups,
         repetitions=config.random_baseline_repetitions,
@@ -95,7 +101,7 @@ def run_account_prioritization(
         priority_rows.append(row)
     completed = datetime.now(timezone.utc)
     return AnalyticsRunResult(
-        analysis_run_id=f"run-{started.strftime('%Y%m%d%H%M%S')}",
+        analysis_run_id=str(uuid4()),
         cutoff_date=pd.Timestamp(cutoff).date().isoformat(),
         started_at=started.isoformat(),
         completed_at=completed.isoformat(),

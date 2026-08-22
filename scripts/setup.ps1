@@ -18,6 +18,9 @@ Push-Location frontend
 npm install
 Pop-Location
 
-if (!(Test-Path ".env")) {
-  Write-Host "Create .env from .env.example and fill Supabase values for production."
+if (!(Test-Path "backend/.env")) {
+  Write-Host "Create backend/.env from backend/.env.example."
+}
+if (!(Test-Path "frontend/.env.local")) {
+  Write-Host "Create frontend/.env.local from frontend/.env.local.example."
 }

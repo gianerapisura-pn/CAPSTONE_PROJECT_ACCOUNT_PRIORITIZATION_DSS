@@ -51,6 +51,7 @@ def load_invoice_groups(db: Session) -> list[InvoiceGroup]:
         reconciliation_difference=Decimal(str(row.reconciliation_difference)),
         reconciled=row.reconciled,
         review_reason=row.review_reason,
+        conflicting_invoice=row.conflicting_invoice,
     ) for row in rows]
 
 
@@ -90,6 +91,18 @@ def persist_run_output(db: Session, run: AnalyticsRun, result: dict) -> None:
     run.critic_weights = result.get("critic_weights", {})
     run.effective_config = result.get("effective_config", {})
     run.warnings = result.get("warnings", [])
+    run.row_counts = {
+        "logical_invoices": len(load_invoice_groups(db)),
+        "rfm_results": len(result.get("rfm", [])),
+        "settlement_results": len(result.get("settlement", [])),
+    }
+    run.eligible_account_counts = {
+        "rfm": len(result.get("rfm", [])),
+        "settlement": len(result.get("settlement", [])),
+        "mcs": len(result.get("priorities", [])),
+    }
+    run.model_version = result.get("cart", {}).get("model_version") or None
+    run.predictive_status = result.get("cart", {}).get("status") or "model_unavailable"
     run.duration_seconds = (run.completed_at - run.started_at).total_seconds()
 
 
@@ -99,6 +112,8 @@ def serialize_run(run: AnalyticsRun) -> dict:
         "started_at": run.started_at.isoformat(), "completed_at": run.completed_at.isoformat() if run.completed_at else None,
         "status": run.status, "critic_weights": run.critic_weights or {}, "warnings": run.warnings or [],
         "duration_seconds": run.duration_seconds, "latest_import_batch_id": run.latest_import_batch_id,
+        "row_counts": run.row_counts or {}, "eligible_account_counts": run.eligible_account_counts or {},
+        "model_version": run.model_version, "predictive_status": run.predictive_status,
     }
 
 

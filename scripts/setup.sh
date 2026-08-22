@@ -14,6 +14,9 @@ backend/.venv/bin/pip install -r backend/requirements.txt
 
 (cd frontend && npm install)
 
-if [ ! -f ".env" ]; then
-  echo "Create .env from .env.example and fill Supabase values for production."
+if [ ! -f "backend/.env" ]; then
+  echo "Create backend/.env from backend/.env.example."
+fi
+if [ ! -f "frontend/.env.local" ]; then
+  echo "Create frontend/.env.local from frontend/.env.local.example."
 fi

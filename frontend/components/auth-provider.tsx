@@ -21,9 +21,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     if (demo) {
-      if (sessionStorage.getItem("peslc-demo-session")) setUser({ userId: "demo-administrator", email: "demo@local.invalid", role: "administrator", displayName: "Demo Administrator", demo: true });
-      setLoading(false);
-      return;
+      const timer = window.setTimeout(() => {
+        if (sessionStorage.getItem("peslc-demo-session")) setUser({ userId: "demo-administrator", email: "demo@local.invalid", role: "administrator", displayName: "Demo Administrator", demo: true });
+        setLoading(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
     const client = getSupabaseClient()!;
     client.auth.getUser().then(async ({ data }) => {
