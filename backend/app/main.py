@@ -221,7 +221,7 @@ def run_analytics(user: AuthenticatedUser = Depends(require_admin), db: Session 
     groups = load_invoice_groups(db)
     if not groups:
         raise HTTPException(422, "No committed invoice data is available.")
-    run = AnalyticsRun(status="running", code_version="corrective-pass")
+    run = AnalyticsRun(status="running", code_version="final-four-criterion")
     db.add(run)
     db.flush()
     try:
@@ -233,7 +233,7 @@ def run_analytics(user: AuthenticatedUser = Depends(require_admin), db: Session 
         return serialize_run(run)
     except Exception as exc:
         db.rollback()
-        failed = AnalyticsRun(status="failed", errors=[{"message": "Analytics run failed safely."}], code_version="corrective-pass")
+        failed = AnalyticsRun(status="failed", errors=[{"message": "Analytics run failed safely."}], code_version="final-four-criterion")
         db.add(failed)
         db.commit()
         raise HTTPException(500, "Analytics run failed; the previous successful run remains current.") from exc
@@ -258,7 +258,7 @@ def dashboard(user: AuthenticatedUser = Depends(require_user), db: Session = Dep
         "run": serialize_run(run), "total_standardized_accounts": total_accounts,
         "mcs_eligible_accounts": len(priorities), "priority_group_counts": group_counts,
         "risk_counts": risk_counts, "total_valid_historical_sales": total_sales,
-        "critic_weights": run.critic_weights, "cart_status": payload["cart"].get("status", "Unavailable"),
+        "critic_weights": run.critic_weights, "mcs_status": run.mcs_status, "cart_status": payload["cart"].get("status", "Unavailable"),
         "cart_horizon": payload["cart"].get("outcome_window_months"),
         "warnings": run.warnings or [],
         "top_accounts": priorities[:8], "sales_trend": payload["business_baselines"],
@@ -304,7 +304,7 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
     scenarios = db.scalars(select(SensitivityScenarioRecord).where(SensitivityScenarioRecord.analysis_run_id == run.analysis_run_id,
                                                                     SensitivityScenarioRecord.account_key == account.account_key)).all()
     ranks = [row.payload["scenario_rank"] for row in scenarios]
-    movement = sum(row.payload["moved_group"] for row in scenarios) / len(scenarios) if scenarios else 0
+    movement = sum(row.payload["group_changed"] for row in scenarios) / len(scenarios) if scenarios else 0
     return {
         "account_key": account.account_key, "account": account.standardized_account_name,
         "priority": priority.payload if priority else None, "rfm": rfm.payload if rfm else None,
@@ -433,8 +433,19 @@ def methodology(user: AuthenticatedUser = Depends(require_admin)) -> dict:
         "source_schema": list(REQUIRED_COLUMNS), "analytics_config": DEFAULT_ANALYTICS_CONFIG.serializable(),
         "rfm": "Account-level tie-preserving percentile quintiles; lower Recency is better.",
         "settlement": "Historical Settlement Duration uses final valid collection date after invoice grouping.",
-        "mcs": "CRITIC weights normalized RFM benefit and normalized Settlement cost; CART remains separate.",
-        "priority_groups": "Tie-preserving ranked thirds from each successful run.",
+        "mcs": "CRITIC objectively weights separately normalized Recency, Frequency, Monetary, and Average Settlement Days. Composite RFM Score remains descriptive, while CART Inactivity Risk remains separate supporting predictive context.",
+        "priority_groups": "Tie-preserving ranked thirds from each discriminatory four-criterion run.",
+        "reproducibility": {
+            "rfm_scoring": "favorable average rank mapped by min(5, ceil(5*r/N)); constant components score 3",
+            "cart_horizons_months": [3, 6, 12],
+            "cart_frequency_monetary_lookback_months": 24,
+            "cart_recent_count_months": 12,
+            "cart_redundancy_spearman_threshold": 0.80,
+            "sensitivity_iterations_per_range": 100,
+            "backtest_horizon_months": 12,
+            "backtest_random_repetitions": 100,
+            "random_seed": 42,
+        },
         "future_data_rule": "Years and accounts are derived from validated committed data.",
     }
 

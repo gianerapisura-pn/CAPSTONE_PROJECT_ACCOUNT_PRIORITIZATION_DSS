@@ -56,7 +56,12 @@ class InvoiceGroup:
 
     @property
     def rfm_eligible(self) -> bool:
-        return not self.is_cancelled and not self.conflicting_invoice and not pd.isna(self.si_date) and self.si_amount > 0
+        return (
+            self.payment_status in {"Fully Paid", "Partially Paid"}
+            and not self.conflicting_invoice
+            and not pd.isna(self.si_date)
+            and self.si_amount > 0
+        )
 
     @property
     def settlement_eligible(self) -> bool:
@@ -165,6 +170,8 @@ def group_invoices(rows: list[SourceRow], precision: Decimal = Decimal("0.01")) 
             group.review_reason = "Conflicting invoice amount or payment status; excluded pending review."
         elif group.is_cancelled:
             group.review_reason = "Cancelled; excluded from analytics."
+        elif group.payment_status not in {"Fully Paid", "Partially Paid"}:
+            group.review_reason = "Unsupported payment status; excluded from analytics pending review."
         elif group.payment_status == "Fully Paid" and not group.reconciled:
             group.review_reason = "Fully Paid invoice does not reconcile to SI amount."
         elif group.final_cr_date is not None and (group.final_cr_date - group.si_date).days < 0:

@@ -6,7 +6,7 @@ Production users enter Supabase email/password credentials. Sessions persist and
 
 ## Management
 
-Dashboard shows the latest successful cutoff, accounts, valid sales, CRITIC weights, Priority Group/risk distributions, and top accounts. Account Prioritization supports search, Priority Group/risk filters, rank order, pagination, detail links, and exports. Account Details separates RFM, Settlement, CRITIC/MCS contributions, CART context, sensitivity movement, and invoice lineage.
+Dashboard shows the latest successful cutoff, accounts, valid sales, CRITIC weights, Priority Group/risk distributions, and top accounts. Account Prioritization supports search, Priority Group/risk filters, rank order, pagination, detail links, and exports. Account Details separates descriptive RFM and Settlement from the four normalized CRITIC/MCS criteria and contributions, CART context, sensitivity movement, and invoice lineage.
 
 RFM and Historical Settlement Duration are descriptive. Priority Group is the CRITIC/MCS management-attention order. Inactivity Risk is separate CART context and does not guarantee activity or permanent churn.
 
@@ -16,7 +16,7 @@ Import Data accepts CSV/XLSX by drag/drop or picker. File selection is not commi
 
 Import History and Analytics Runs retain operational evidence. Settings keeps
 methodology/configuration read-only, exposes the active model version, and
-provides separate Monitor Matured Labels and Train/Revalidate actions plus the
+provides separate Monitor Matured Labels and Train / Validate CART Model actions plus the
 account-alias review queue to administrators only. Monitoring persists current
 metrics and can recommend review; it never replaces the model. Routine imports
 use the active model and never trigger replacement training. Every alias

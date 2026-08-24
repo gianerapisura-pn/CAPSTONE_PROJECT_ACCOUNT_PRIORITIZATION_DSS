@@ -6,3 +6,4 @@ set -euo pipefail
 (cd frontend && npm run lint)
 (cd frontend && npm run typecheck)
 (cd frontend && npm run build)
+(cd frontend && npm run test:e2e)

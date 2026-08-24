@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.stats import spearmanr
 
-from app.analytics.prescriptive.scoring import AccountPriority, assign_priority_groups
+from app.analytics.prescriptive.scoring import CRITERIA, AccountPriority, analytical_ranks, assign_priority_groups
 
 
 @dataclass(frozen=True)
@@ -27,54 +27,51 @@ def run_sensitivity(
     iterations: int,
     random_seed: int,
 ) -> SensitivitySummary:
-    if not priorities:
+    if not priorities or set(base_weights) != set(CRITERIA):
         return SensitivitySummary(iterations, weight_range, 0.0, 0.0, 0.0, 0.0, 0.0, [])
     rng = np.random.default_rng(random_seed)
-    base_order = {item.account: item.priority_rank for item in priorities}
+    baseline_ranks = {item.account: item.priority_rank for item in priorities}
     spearman_values: list[float] = []
     movement_rates: list[float] = []
     scenarios: list[dict] = []
     for iteration in range(1, iterations + 1):
-        rfm_weight = max(0.0, base_weights.get("rfm", 0.5) * (1 + rng.uniform(-weight_range, weight_range)))
-        settlement_weight = max(0.0, base_weights.get("settlement", 0.5) * (1 + rng.uniform(-weight_range, weight_range)))
-        total_weight = rfm_weight + settlement_weight or 1.0
-        rfm_weight /= total_weight
-        settlement_weight /= total_weight
+        perturbed = {
+            criterion: base_weights[criterion] * (1.0 + rng.uniform(-weight_range, weight_range))
+            for criterion in CRITERIA
+        }
+        total = sum(perturbed.values())
+        perturbed = {criterion: value / total for criterion, value in perturbed.items()}
         scores = {
-            item.account: item.normalized_rfm * rfm_weight + item.normalized_settlement * settlement_weight
+            item.account: sum(
+                getattr(item, f"normalized_{criterion}") * perturbed[criterion]
+                for criterion in CRITERIA
+            )
             for item in priorities
         }
-        ordered = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
-        new_rank: dict[str, int] = {}
-        previous_score = None
-        rank = 0
-        for index, (account, score) in enumerate(ordered, start=1):
-            if previous_score is None or not np.isclose(score, previous_score, rtol=0, atol=1e-12):
-                rank = index
-            new_rank[account] = rank
-            previous_score = score
-        corr = spearmanr(
-            [base_order[item.account] for item in priorities],
-            [new_rank[item.account] for item in priorities],
+        ranks = analytical_ranks(list(scores.items()))
+        groups = assign_priority_groups(list(scores.items()))
+        correlation = spearmanr(
+            [baseline_ranks[item.account] for item in priorities],
+            [ranks[item.account] for item in priorities],
         ).correlation
-        spearman_values.append(float(corr if not np.isnan(corr) else 1.0))
-        new_groups = assign_priority_groups(list(scores.items()))
+        spearman_values.append(float(correlation if not np.isnan(correlation) else 1.0))
         moved = 0
         for item in priorities:
-            did_move = new_groups[item.account] != item.priority_group
-            moved += int(did_move)
+            changed = groups[item.account] != item.priority_group
+            moved += int(changed)
             scenarios.append({
-                "perturbation_level": weight_range, "iteration": iteration,
-                "rfm_weight": rfm_weight, "settlement_weight": settlement_weight,
-                "actual_rfm_weight": rfm_weight, "actual_settlement_weight": settlement_weight,
-                "account": item.account, "baseline_score": item.final_priority_score,
-                "scenario_score": scores[item.account], "baseline_rank": item.priority_rank,
-                "scenario_rank": new_rank[item.account],
-                "rank_difference": new_rank[item.account] - item.priority_rank,
-                "rank_change": new_rank[item.account] - item.priority_rank,
+                "perturbation_level": weight_range,
+                "iteration": iteration,
+                **{f"perturbed_{criterion}_weight": perturbed[criterion] for criterion in CRITERIA},
+                "account": item.account,
+                "baseline_score": item.final_priority_score,
+                "scenario_score": scores[item.account],
+                "baseline_rank": item.priority_rank,
+                "scenario_rank": ranks[item.account],
+                "rank_difference": ranks[item.account] - item.priority_rank,
                 "baseline_priority_group": item.priority_group,
-                "scenario_priority_group": new_groups[item.account],
-                "moved_group": did_move, "group_changed": did_move,
+                "scenario_priority_group": groups[item.account],
+                "group_changed": changed,
             })
         movement_rates.append(moved / len(priorities))
     return SensitivitySummary(

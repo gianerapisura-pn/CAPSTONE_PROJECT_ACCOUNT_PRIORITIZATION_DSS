@@ -1,20 +1,113 @@
 # Test Results
 
-Executed 2026-08-22 on Windows with Python 3.13, Node 24, Next 16.3.1.
+Execution date: 2026-08-24
+Environment: Windows, Python 3.13.3, Node.js 24.11.1
 
-- Backend `python -m pytest -q --basetemp=../.test-tmp`: `33 passed in 5.68s` on the final rerun.
-- Frontend `npm test`: methodology scan passed; Vitest `5 files, 8 tests passed`.
-- ESLint `npm run lint`: passed with no errors or warnings.
-- Type check `npm run typecheck`: passed.
-- Production build `npm run build`: passed; 15 routes generated and the dynamic account route validated.
-- Dependency audit after upgrades: `0 vulnerabilities`.
-- Playwright `npm run test:e2e` with the installed Chromium executable:
-  `1 passed in 1.2m`; demo login, future preview/commit, new account,
-  account detail, RFM rendering, and CSV export completed.
-- Persisted integration tests cover duplicate blocking, preview/commit,
-  latest-successful publication, 2030 `NEW FUTURE ACCOUNT`, and API payloads
-  using isolated SQLite/private demo storage.
-- Frozen workbook: 363 rows processed read-only through the corrected analytics
-  pipeline; details in `CURRENT_DATA_VALIDATION_REPORT.md`.
+## Backend
 
-The workspace filesystem required elevated permission for generated `.next`, SQLite, and browser artifacts. Playwright used an already downloaded full Chromium because the optional headless-shell download exhausted available disk space after Chromium itself had completed.
+Command: cd backend; python -m pytest --basetemp=.pytest-final
+
+~~~text
+============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-8.4.1, pluggy-1.6.0
+rootdir: D:\GIANE\UST\SENIOR\CAPSTONE 2\Decision Support System (VSCode)\backend
+configfile: pytest.ini
+testpaths: tests
+plugins: cov-6.2.1, anyio-4.12.0
+collected 42 items
+
+tests\test_analytics.py ..............                                   [ 33%]
+tests\test_auth.py ..                                                    [ 38%]
+tests\test_import_future.py ..                                           [ 42%]
+tests\test_import_validation.py ......                                   [ 57%]
+tests\test_model_lifecycle.py ....                                       [ 66%]
+tests\test_persistence.py ....                                           [ 76%]
+tests\test_predictive.py .......                                         [ 92%]
+tests\test_repository_terms.py ...                                       [100%]
+
+============================= 42 passed in 5.49s =============================
+~~~
+
+The successful rerun used a repository-local `--basetemp` because the host user temp directory denied pytest access; the generated directory was removed afterward.
+
+## Frontend unit tests
+
+Command: cd frontend; npm test
+
+~~~text
+Test Files  5 passed (5)
+Tests       8 passed (8)
+Duration    18.75s
+~~~
+
+The command also completed the production-source obsolete-methodology scan before Vitest.
+
+## Lint
+
+Command: cd frontend; npm run lint
+
+~~~text
+> eslint .
+~~~
+
+Exit code: 0.
+
+## TypeScript
+
+Command: cd frontend; npm run typecheck
+
+~~~text
+> tsc --noEmit
+~~~
+
+Exit code: 0.
+
+## Production build
+
+Command: cd frontend; npm run build
+
+~~~text
+Compiled successfully in 81s
+Finished TypeScript in 16.6s
+Generating static pages using 3 workers (15/15)
+Route (app)
+/
+/_not-found
+/accounts
+/accounts/[accountKey]
+/analytics/cart
+/analytics/rfm
+/analytics/sensitivity
+/analytics/settlement
+/dashboard
+/import
+/import/history
+/login
+/reports
+/runs
+/settings
+~~~
+
+Exit code: 0. Fifteen application routes were generated.
+
+## Playwright
+
+Command: cd frontend; npm run test:e2e
+
+~~~text
+Running 1 test using 1 worker
+ok 1 e2e\dss-workflow.spec.ts:4:5
+  demo administrator imports future data and reaches updated decision outputs (1.4m)
+
+1 passed (1.9m)
+~~~
+
+The pinned Playwright Chromium runtime was installed after the initial launch reported that it was absent. The successful rerun used isolated demo mode, SQLite, and local private storage.
+
+## Migration and external checks
+
+Migration 004 passed repository contract assertions, balanced-parenthesis/additive static checks, and demo SQLite additive-schema E2E coverage. A PostgreSQL client and real Supabase project were unavailable, so applying and executing migration 004 against Supabase remains external.
+
+Power BI Desktop and a PBIX/report connection were unavailable. SQL reporting contracts and documentation were verified; no claim is made that a real report refresh was executed.
+
+The official confidential PESLC workbook was unavailable. Final-method current-data regression remains pending and no analytical result was invented.

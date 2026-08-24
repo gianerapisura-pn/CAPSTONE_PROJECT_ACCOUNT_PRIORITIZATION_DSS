@@ -133,12 +133,13 @@ def preview_source(db: Session, user: AuthenticatedUser, file_name: str, content
         if row.standardized_account_name and row.si_no and not pd.isna(row.si_date) and row.si_amount > 0
     ]
     preview_groups = group_invoices(preview_rows)
-    error_rows = {issue.row_number for issue in issues if issue.severity == "error" and issue.row_number is not None}
+    error_rows = {(issue.source_sheet, issue.row_number) for issue in issues if issue.severity == "error" and issue.row_number is not None}
+    warning_rows = {(issue.source_sheet, issue.row_number) for issue in issues if issue.severity == "warning" and issue.row_number is not None}
     duplicate = db.scalar(select(ImportBatch).where(ImportBatch.file_hash == parsed.file_hash, ImportBatch.status == "committed"))
     batch = ImportBatch(
         file_name=safe_name, file_hash=parsed.file_hash, uploaded_by=user.user_id, status="previewed",
         rows_discovered=rows_discovered, rows_accepted=max(0, rows_discovered - len(error_rows)),
-        rows_flagged=sum(i.severity == "warning" for i in issues), rows_excluded=sum(i.severity == "error" for i in issues),
+        rows_flagged=len(warning_rows), rows_excluded=len(error_rows),
         cancelled_count=cancelled,
     )
     db.add(batch)
@@ -200,7 +201,7 @@ def commit_source(db: Session, user: AuthenticatedUser, batch_id: str, override_
         batch.status = "committed"
         batch.committed_at = datetime.now(timezone.utc)
         db.flush()
-        run = AnalyticsRun(status="running", latest_import_batch_id=batch_id, code_version="corrective-pass")
+        run = AnalyticsRun(status="running", latest_import_batch_id=batch_id, code_version="final-four-criterion")
         db.add(run)
         db.flush()
         cumulative_groups = load_invoice_groups(db)

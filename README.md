@@ -26,6 +26,7 @@ in order:
 1. `supabase/migrations/001_initial_schema.sql`
 2. `supabase/migrations/002_corrective_completion.sql`
 3. `supabase/migrations/003_current_method_alignment.sql`
+4. `supabase/migrations/004_four_criterion_final_alignment.sql`
 
 Create private `source-imports` and `model-artifacts` Storage buckets, create
 Supabase Auth users, and assign each user a `user_profiles` role of

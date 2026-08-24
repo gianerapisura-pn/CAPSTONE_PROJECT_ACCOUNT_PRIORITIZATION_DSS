@@ -80,3 +80,16 @@ def test_incomplete_monitoring_window_is_persisted_without_retraining(monkeypatc
         assert result["status"] == "insufficient_outcome_coverage"
         assert db.query(PredictiveMonitoringEvaluation).count() == 1
         assert not record.review_recommended
+
+
+def test_no_active_model_returns_unavailable_without_training(monkeypatch):
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        monkeypatch.setattr(
+            model_lifecycle, "train_and_persist_model",
+            lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected training")),
+        )
+        result = model_lifecycle.cart_for_current_run(db, invoice_groups())
+        assert result.status == "model_unavailable"
+        assert result.predictions == {}

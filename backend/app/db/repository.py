@@ -71,7 +71,7 @@ def persist_run_output(db: Session, run: AnalyticsRun, result: dict) -> None:
             standardized_account_name=row["account"], payload=row,
         ))
     cart = result.get("cart") or {}
-    db.add(ModelRun(analysis_run_id=run.analysis_run_id, model_version=cart.get("model_version", "unavailable"),
+    db.add(ModelRun(analysis_run_id=run.analysis_run_id, model_version=cart.get("model_version") or "unavailable",
                     status=cart.get("status", "unavailable"), payload=cart))
     for summary in result.get("sensitivity", []):
         scenarios = summary.get("scenarios", [])
@@ -88,8 +88,10 @@ def persist_run_output(db: Session, run: AnalyticsRun, result: dict) -> None:
     run.cutoff_date = pd.Timestamp(result["cutoff_date"]).date() if result.get("cutoff_date") else None
     run.status = result["status"]
     run.completed_at = datetime.now(timezone.utc)
+    run.mcs_status = result.get("mcs_status", "unavailable")
     run.critic_weights = result.get("critic_weights", {})
     run.effective_config = result.get("effective_config", {})
+    run.context_metrics = result.get("context_metrics", {})
     run.warnings = result.get("warnings", [])
     run.row_counts = {
         "logical_invoices": len(load_invoice_groups(db)),
@@ -110,7 +112,8 @@ def serialize_run(run: AnalyticsRun) -> dict:
     return {
         "analysis_run_id": run.analysis_run_id, "cutoff_date": run.cutoff_date.isoformat() if run.cutoff_date else None,
         "started_at": run.started_at.isoformat(), "completed_at": run.completed_at.isoformat() if run.completed_at else None,
-        "status": run.status, "critic_weights": run.critic_weights or {}, "warnings": run.warnings or [],
+        "status": run.status, "mcs_status": run.mcs_status or "unavailable",
+        "critic_weights": run.critic_weights or {}, "warnings": run.warnings or [],
         "duration_seconds": run.duration_seconds, "latest_import_batch_id": run.latest_import_batch_id,
         "row_counts": run.row_counts or {}, "eligible_account_counts": run.eligible_account_counts or {},
         "model_version": run.model_version, "predictive_status": run.predictive_status,
@@ -128,4 +131,5 @@ def run_payload(db: Session, run: AnalyticsRun) -> dict:
     baselines = [item.payload for item in db.scalars(select(BusinessBaselineRecord).where(BusinessBaselineRecord.analysis_run_id == run.analysis_run_id).order_by(BusinessBaselineRecord.year)).all()]
     return {**serialize_run(run), "priorities": priorities, "rfm": rfm, "settlement": settlement,
             "cart": model.payload if model else {}, "sensitivity": sensitivity,
-            "backtest": backtest.payload if backtest else {}, "business_baselines": baselines}
+            "backtest": backtest.payload if backtest else {}, "business_baselines": baselines,
+            "context_metrics": run.context_metrics or {}}

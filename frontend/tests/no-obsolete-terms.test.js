@@ -9,7 +9,13 @@ const forbidden = [
   "60/40",
   "70/30",
   "80/20",
-  "Stronger Account Pattern"
+  "Stronger Account Pattern",
+  "Normalized RFM",
+  "CRITIC RFM weight",
+  "Baseline RFM weight",
+  "normalized_rfm",
+  "rfm_contribution",
+  "actual_rfm_weight"
 ];
 
 function walk(dir) {
@@ -22,7 +28,8 @@ function walk(dir) {
   });
 }
 
-const text = walk(path.join(__dirname, ".."))
+const sourceRoots = ["app", "components", "lib", "types"].map((dir) => path.join(__dirname, "..", dir));
+const text = sourceRoots.flatMap(walk)
   .filter((file) => [".ts", ".tsx", ".css"].includes(path.extname(file)))
   .map((file) => fs.readFileSync(file, "utf8"))
   .join("\n");
@@ -30,5 +37,21 @@ const text = walk(path.join(__dirname, ".."))
 for (const term of forbidden) {
   if (text.includes(term)) {
     throw new Error(`Obsolete methodology term found: ${term}`);
+  }
+}
+
+const root = path.join(__dirname, "..");
+const details = fs.readFileSync(path.join(root, "app", "(protected)", "accounts", "[accountKey]", "page.tsx"), "utf8");
+for (const term of ["Normalized Recency", "Normalized Frequency", "Normalized Monetary", "Normalized Settlement", "Recency weight / contribution", "Frequency weight / contribution", "Monetary weight / contribution", "Settlement weight / contribution"]) {
+  if (!details.includes(term)) throw new Error(`Account Details is missing: ${term}`);
+}
+for (const relative of [
+  ["app", "(protected)", "dashboard", "page.tsx"],
+  ["app", "(protected)", "analytics", "sensitivity", "page.tsx"],
+  ["app", "(protected)", "runs", "page.tsx"],
+]) {
+  const page = fs.readFileSync(path.join(root, ...relative), "utf8");
+  for (const criterion of ["recency", "frequency", "monetary", "settlement"]) {
+    if (!page.toLowerCase().includes(criterion)) throw new Error(`${relative.join("/")} is missing ${criterion} weight context`);
   }
 }

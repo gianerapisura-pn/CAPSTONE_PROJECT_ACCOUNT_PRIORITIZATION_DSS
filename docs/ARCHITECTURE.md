@@ -28,7 +28,7 @@ Explicit demo mode uses ignored local SQLite and `.demo_data` storage. Productio
 
 - Descriptive: RFM and Historical Settlement Duration.
 - Predictive: chronological CART binary inactivity-risk context.
-- Prescriptive: normalized RFM/Settlement, CRITIC, MCS, rank, Priority Group.
+- Prescriptive: separately normalized Recency, Frequency, Monetary, and Average Settlement Days; four-weight CRITIC/MCS, rank, and Priority Group.
 - Validation: multiplicative sensitivity, ranking backtest/lift, business/system baselines.
 
 CART is parallel supporting context and never enters MCS. The Web DSS owns

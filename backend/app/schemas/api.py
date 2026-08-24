@@ -30,6 +30,7 @@ class ImportCommitResponse(BaseModel):
     status: str
     import_batch_id: str
     analysis_run_id: str
+    prioritized_accounts: int
     cutoff_date: str | None = None
 
 
@@ -62,6 +63,7 @@ class AnalyticsRunResponse(BaseModel):
     started_at: str
     completed_at: str | None = None
     status: str
+    mcs_status: str
     critic_weights: dict[str, float]
     warnings: list[Any]
     duration_seconds: float | None = None
@@ -75,21 +77,25 @@ class AnalyticsRunResponse(BaseModel):
 class AccountPriorityResponse(BaseModel):
     account: str
     rfm_score: float
-    settlement_days_avg: float
-    normalized_rfm: float
-    normalized_settlement: float
-    rfm_contribution: float
-    settlement_contribution: float
-    final_priority_score: float
-    priority_rank: int
-    priority_group: str
-    latest_valid_transaction: str
     recency_days: int
     frequency: int
     monetary: float
     recency_score: int
     frequency_score: int
     monetary_score: int
+    settlement_days_avg: float
+    normalized_recency: float
+    normalized_frequency: float
+    normalized_monetary: float
+    normalized_settlement: float
+    recency_contribution: float
+    frequency_contribution: float
+    monetary_contribution: float
+    settlement_contribution: float
+    final_priority_score: float
+    priority_rank: int
+    priority_group: str
+    latest_valid_transaction: str
     inactivity_risk: str | None = None
     model_version: str | None = None
 

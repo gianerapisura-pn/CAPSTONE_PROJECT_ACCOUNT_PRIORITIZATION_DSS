@@ -80,7 +80,12 @@ def train_and_persist_model(
         predictive_lookback_months=config.predictive_lookback_months,
         recent_transaction_months=config.recent_transaction_months,
         retained_features=result.feature_columns,
-        preprocessing_config={"imputation": "development median", "scaling": None},
+        preprocessing_config={
+            "imputation": "development median",
+            "imputation_values": artifact.get("imputation_values", {}),
+            "automatic_indicators": False,
+            "scaling": None,
+        },
         tree_hyperparameters=result.hyperparameters or {},
         random_seed=config.random_seed,
         development_metrics={
@@ -127,17 +132,30 @@ def cart_for_current_run(
 ) -> CartResult:
     active = active_model_version(db)
     if active is None:
-        return train_and_persist_model(db, invoice_groups, config)
+        return CartResult(
+            status="model_unavailable",
+            outcome_window_months=0,
+            feature_columns=[],
+            report={},
+            predictions={},
+            lookback_months=config.predictive_lookback_months,
+            development_periods=list(config.cart_development_cutoffs),
+            oop_period=config.cart_oop_cutoff,
+        )
     try:
         return score_cart_artifact(invoice_groups, _load_artifact(active))
     except (OSError, ValueError, EOFError):
         active.review_recommended = True
-        unavailable = run_cart_analysis([], config)
-        assert isinstance(unavailable, CartResult)
-        return replace(
-            unavailable,
+        return CartResult(
             status="model_unavailable",
+            outcome_window_months=int(active.selected_outcome_horizon or 0),
+            feature_columns=list(active.retained_features or []),
+            report={},
+            predictions={},
             model_version=active.model_version,
+            lookback_months=int(active.predictive_lookback_months or config.predictive_lookback_months),
+            development_periods=list(config.cart_development_cutoffs),
+            oop_period=config.cart_oop_cutoff,
         )
 
 
@@ -173,8 +191,8 @@ def monitor_active_model(db: Session, invoice_groups: list[InvoiceGroup]) -> dic
         features = list(artifact["feature_columns"])
         predicted = artifact["pipeline"].predict(frame[features]) if not frame.empty else []
         baseline_predicted = [artifact["majority_class"]] * len(frame)
-        metrics = classification_metrics(frame["inactivity_risk"], predicted) if not frame.empty else {}
-        baseline = classification_metrics(frame["inactivity_risk"], baseline_predicted) if not frame.empty else {}
+        metrics = classification_metrics(frame["realized_inactivity_outcome"], predicted) if not frame.empty else {}
+        baseline = classification_metrics(frame["realized_inactivity_outcome"], baseline_predicted) if not frame.empty else {}
         review = bool(
             metrics and baseline
             and metrics.get("macro_f1", 0.0) <= baseline.get("macro_f1", 0.0)

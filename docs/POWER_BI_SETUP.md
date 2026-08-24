@@ -2,7 +2,7 @@
 
 Power BI connects to the same Supabase PostgreSQL outputs used by the Web DSS. Python remains the analytical source of truth.
 
-1. Apply Supabase migrations `001`, `002`, and `003` in order and complete at least one successful run.
+1. Apply Supabase migrations `001`, `002`, `003`, and `004` in order and complete at least one successful run.
 2. Create a read-only reporting database user; do not use the service-role key or expose database credentials in the frontend.
 3. In Power BI Desktop choose PostgreSQL, enter the Supabase database host/database, require SSL, and authenticate with the reporting user.
 4. For this small capstone dataset, prefer Import mode and scheduled refresh. DirectQuery is unnecessary unless future operational requirements justify it.
@@ -28,3 +28,5 @@ accounts; ranking evidence and contributions; predictive context; robustness
 and historical lift; data/run quality. Every visual should state the business
 question and supported decision. Power BI may aggregate published fields for
 display but must not reimplement Python formulas in DAX.
+
+Migration `004` exposes Recency, Frequency, Monetary, Average Settlement Days, four normalized values, four contributions, four CRITIC weights, four perturbed sensitivity weights, explicit predicted inactivity risk/model version, and one reporting row for each of the six backtest cutoffs. Null capture/lift values mean the denominator was unavailable; Power BI must not replace them with zero.

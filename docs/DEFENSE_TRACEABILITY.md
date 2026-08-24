@@ -4,7 +4,7 @@
 |---|---|---|---|
 | Manual historical review | Authenticated consolidated Web DSS and invoice lineage | Controlled ETL/account views | Generation time and workflow E2E |
 | Random account selection | Ranked management-attention list | CRITIC/MCS | Top-decile capture and lift over random |
-| No measurable criteria | RFM plus Historical Settlement Duration | Descriptive and prescriptive branches | Formula, score, rank, and dashboard checks |
+| No measurable criteria | Descriptive RFM/Settlement plus ranked attention | Four-criterion CRITIC/MCS using Recency, Frequency, Monetary, and Average Settlement Days | Formula, contribution, score, rank, and dashboard checks |
 | Ranking uncertainty | Scenario-level Sensitivity page | Relative +/-10/20/30/40%, 100 each | Spearman and group reclassification |
 | Need predictive context | Separate CART page | Temporal binary inactivity risk | OOP accuracy, classification error, per-class/macro F1, confusion matrix, and majority baseline |
 | Fragmented future files | Preview/commit/persistence pipeline | Dynamic years/accounts and immutable runs | 2030 future-data integration test |

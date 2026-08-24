@@ -10,7 +10,7 @@
 - `invoice_groups` / `fact_account_transactions`: one logical invoice, final CR date, reconciliation, eligibility, and review reason.
 - `fact_account_rfm`: Recency/Frequency/Monetary values, component scores, and RFM Score by run/account.
 - `fact_historical_settlement`: eligible invoice count and account average duration.
-- `account_priority_results` / `fact_account_priority`: normalized criteria, CRITIC/MCS score, tied rank/group, latest transaction, and separate risk context.
+- `account_priority_results` / `fact_account_priority`: four raw criteria, four normalized criteria, four contributions, descriptive RFM Score, CRITIC/MCS score, tied rank/group, latest transaction, and separate predicted risk context.
 - `model_runs`: CART configuration, temporal periods, feature evidence, OOP metrics, confusion matrix, and predictions.
 - `predictive_model_versions`: active/retired artifact version, private path
   and hash, frozen features/preprocessing/tree settings, OOP metrics, validation
@@ -19,8 +19,9 @@
   `predictive_oop_evaluations`: focused evidence tied to one model version.
 - `predictive_monitoring_evaluations`: future validation/review evidence; it
   does not authorize automatic retraining.
-- `fact_sensitivity_analysis`: one account result per perturbation range/iteration.
-- `ranking_backtests` and `business_baseline_results`: validation and annual dynamic KPI payloads.
+- `fact_sensitivity_analysis`: one account result per perturbation range/iteration with four perturbed weights.
+- `ranking_backtests`: one payload containing all six fixed historical cutoff evaluations; reporting migration 004 expands one row per cutoff.
+- `business_baseline_results`: annual dynamic sales/account context.
 
 ## Operational
 

@@ -8,10 +8,13 @@ import pandas as pd
 
 from app.analytics.descriptive.rfm import compute_rfm
 from app.analytics.descriptive.settlement import compute_settlement_metrics
-from app.analytics.predictive.cart import CartResult, run_cart_analysis
+from app.analytics.predictive.cart import CartResult
 from app.analytics.prescriptive.scoring import compute_priorities
 from app.analytics.validation.backtest import run_historical_backtest
-from app.analytics.validation.baselines import annual_business_baselines
+from app.analytics.validation.baselines import (
+    annual_business_baselines,
+    selected_horizon_no_transaction_rate,
+)
 from app.analytics.validation.sensitivity import run_sensitivity
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG, AnalyticsConfig
 from app.etl.invoices import InvoiceGroup
@@ -24,6 +27,7 @@ class AnalyticsRunResult:
     started_at: str
     completed_at: str
     status: str
+    mcs_status: str
     critic_weights: dict[str, float]
     rfm: list[dict]
     settlement: list[dict]
@@ -32,8 +36,22 @@ class AnalyticsRunResult:
     cart: dict
     backtest: dict
     business_baselines: list[dict]
+    context_metrics: dict
     warnings: list[str]
     effective_config: dict
+
+
+def unavailable_cart(config: AnalyticsConfig) -> CartResult:
+    return CartResult(
+        status="model_unavailable",
+        outcome_window_months=0,
+        feature_columns=[],
+        report={},
+        predictions={},
+        lookback_months=config.predictive_lookback_months,
+        development_periods=list(config.cart_development_cutoffs),
+        oop_period=config.cart_oop_cutoff,
+    )
 
 
 def run_account_prioritization(
@@ -44,68 +62,81 @@ def run_account_prioritization(
     started = datetime.now(timezone.utc)
     eligible_dates = [group.si_date for group in invoice_groups if group.rfm_eligible]
     warnings: list[str] = []
-    if not eligible_dates:
-        return AnalyticsRunResult(
-            analysis_run_id=str(uuid4()),
-            cutoff_date=None,
-            started_at=started.isoformat(),
-            completed_at=datetime.now(timezone.utc).isoformat(),
-            status="no_mcs_eligible_accounts",
-            critic_weights={},
-            rfm=[],
-            settlement=[],
-            priorities=[],
-            sensitivity=[],
-            cart={},
-            backtest={},
-            business_baselines=[],
-            warnings=["No MCS-eligible accounts were found."],
-            effective_config=config.serializable(),
-        )
-    cutoff = max(eligible_dates)
-    rfm = compute_rfm(invoice_groups, cutoff_date=cutoff)
-    # Current runs may use all collection evidence already present at execution.
-    # Historical model/backtest slices pass an explicit cutoff separately.
+    cutoff = max(eligible_dates) if eligible_dates else None
+    rfm = compute_rfm(invoice_groups, cutoff_date=cutoff) if cutoff is not None else []
     settlement = compute_settlement_metrics(invoice_groups)
     priorities, weights = compute_priorities(rfm, settlement)
-    if not priorities:
-        warnings.append("No accounts had both RFM and eligible settlement metrics.")
+
+    eligible_mcs_accounts = {
+        item.account for item in rfm
+    } & {
+        item.account for item in settlement if item.average_settlement_days is not None
+    }
+    if priorities:
+        mcs_status = "ranked"
+    elif eligible_mcs_accounts:
+        mcs_status = "non_discriminating"
+        warnings.append(
+            "The four MCS criteria contain zero total CRITIC information; no official ranking or Priority Groups were produced."
+        )
+    else:
+        mcs_status = "no_eligible_accounts"
+        warnings.append("No accounts had all four defensible MCS criteria.")
+    if not eligible_dates:
+        warnings.append("No valid Sales Invoice activity was available for descriptive RFM.")
+
     sensitivity = [
-        asdict(run_sensitivity(priorities, weights, weight_range, config.sensitivity_iterations, config.random_seed + index))
-        for index, weight_range in enumerate(config.sensitivity_ranges)
+        asdict(
+            run_sensitivity(
+                priorities,
+                weights,
+                weight_range,
+                config.sensitivity_iterations,
+                config.random_seed,
+            )
+        )
+        for weight_range in config.sensitivity_ranges
     ] if priorities else []
-    cart = cart_result or run_cart_analysis(invoice_groups, config)
-    if isinstance(cart, tuple):
-        cart = cart[0]
+
+    cart = cart_result or unavailable_cart(config)
     backtest = run_historical_backtest(
         invoice_groups,
+        config=config,
         repetitions=config.random_baseline_repetitions,
         random_seed=config.random_seed,
     )
+    context_metrics = {
+        "selected_horizon_no_transaction_rate": selected_horizon_no_transaction_rate(
+            invoice_groups, cart.outcome_window_months, config
+        )
+    }
+
     rfm_by_account = {item.account: item for item in rfm}
     priority_rows: list[dict] = []
     for item in priorities:
         metric = rfm_by_account[item.account]
         row = asdict(item)
+        row["monetary"] = float(item.monetary)
         row.update({
-            "latest_valid_transaction": (cutoff - pd.Timedelta(days=metric.recency_days)).date().isoformat(),
-            "recency_days": metric.recency_days,
-            "frequency": metric.frequency,
-            "monetary": float(metric.monetary),
+            "latest_valid_transaction": (
+                cutoff - pd.Timedelta(days=metric.recency_days)
+            ).date().isoformat() if cutoff is not None else None,
             "recency_score": metric.recency_score,
             "frequency_score": metric.frequency_score,
             "monetary_score": metric.monetary_score,
             "inactivity_risk": cart.predictions.get(item.account),
-            "model_version": cart.model_version,
+            "model_version": cart.model_version or None,
         })
         priority_rows.append(row)
+
     completed = datetime.now(timezone.utc)
     return AnalyticsRunResult(
         analysis_run_id=str(uuid4()),
-        cutoff_date=pd.Timestamp(cutoff).date().isoformat(),
+        cutoff_date=pd.Timestamp(cutoff).date().isoformat() if cutoff is not None else None,
         started_at=started.isoformat(),
         completed_at=completed.isoformat(),
         status="successful",
+        mcs_status=mcs_status,
         critic_weights=weights,
         rfm=[{**asdict(item), "monetary": float(item.monetary)} for item in rfm],
         settlement=[asdict(item) for item in settlement],
@@ -114,6 +145,7 @@ def run_account_prioritization(
         cart=asdict(cart),
         backtest=asdict(backtest),
         business_baselines=annual_business_baselines(invoice_groups),
+        context_metrics=context_metrics,
         warnings=warnings,
         effective_config=config.serializable(),
     )

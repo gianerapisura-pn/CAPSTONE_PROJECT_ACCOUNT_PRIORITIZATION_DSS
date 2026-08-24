@@ -1,68 +1,82 @@
 # Capstone Method
 
+## Scope
+
+The DSS recommends which previous or existing accounts should receive management attention first for review, follow-up, calls, visits, or quotation follow-up where applicable. High Priority is a relative management-attention recommendation, not a guaranteed buyer, sale, project, bid, quotation acceptance, forecast, or causal sales recovery.
+
 ## Import and ETL
 
-Canonical source fields are validated case-insensitively after whitespace normalization. Non-empty eligible XLSX sheets retain `source_sheet` and `source_row_number`. Payment status is resolved before missing checks so intentionally blank Cancelled rows remain traceable without blocking import. Names receive conservative Unicode/space/capitalization normalization only.
+The canonical source has exactly ten fields: CUSTOMER NAME, SI NO., SI DATE, SI AMOUNT, CR NO., CR DATE, CR AMOUNT, EWT, PAYMENT MODE, and PAYMENT STATUS. Years and accounts are data, not system constants.
 
-Rows are grouped to a stable logical Sales Invoice by standardized account, SI
-number, SI date, and currency-quantized SI amount. The cryptographic business
-key never includes import batch, sheet, or source-row lineage. Conflicting
-amount/status candidates are retained and excluded pending review. `SI NO.`
-and `CR NO.` remain text. Fully Paid groups reconcile with Decimal precision:
-`round(SUM(CR Amount) + SUM(EWT) - SI Amount, 0.01) = 0.00`. Frequency counts
-groups, Monetary sums SI amount once, and settlement uses the final valid CR
-date. Unresolved negative duration is excluded, never changed to zero.
+Rows are grouped to a logical Sales Invoice by standardized account, SI number, SI date, and cent-quantized SI amount. Batch, file, worksheet, and source row are lineage only. Account standardization uses Unicode normalization, trimming, repeated-space collapse, and consistent case. Alias merging requires explicit administrator approval; fuzzy matching never merges automatically.
 
-## RFM and settlement
+Cancelled rows remain in raw lineage and are excluded from analytics. Unknown statuses remain reviewable and analytics-ineligible. A Fully Paid invoice is settlement-eligible only when round(SUM(valid CR Amount) + SUM(valid EWT) - SI Amount, 2) equals 0.00.
 
-The latest valid SI date is the formal analysis cutoff. Recency Days is cutoff minus latest SI; lower is better. Frequency is unique valid SI count. Monetary is unique SI total.
+Multiple collection rows do not inflate Frequency or Monetary. Settlement uses the latest valid CR date. Unresolved negative chronology is excluded from Settlement but valid SI evidence may remain RFM-eligible.
 
-Each metric uses account-level average percentile rank and five bands. Ties retain equal scores; all-equal series receives the neutral score 3. Recency direction is reversed. `RFM Score = (R + F + M) / 3`.
+## Descriptive branch
 
-Historical Settlement Duration is the account mean of eligible final collection
-date minus SI date. Current runs use all collection evidence present when the
-run executes. Historical model/backtest slices enforce their explicit cutoff so
-later collections cannot leak backward. It does not infer formal timeliness
-because payment terms are unavailable.
+For cutoff T, Recency Days is T minus latest valid SI date; Frequency counts unique valid logical invoices; Monetary sums each unique SI amount once. Current T is the latest valid SI date. Historical analyses use their explicit cutoff.
 
-## CRITIC, MCS, and groups
+For each component, accounts receive favorable average rank r among N eligible accounts and Score = min(5, ceil(5*r/N)). Lower Recency is favorable; higher Frequency and Monetary are favorable. Ties share average rank. A constant component scores 3 for every eligible account.
 
-MCS requires both RFM and settlement evidence. RFM is benefit-normalized; Settlement is cost-normalized. Zero-range criteria are explicitly neutralized. CRITIC recalculates variability, correlation conflict, information content, and weights for every formal run. Degenerate information falls back to equal weights with transparent output.
+RFM Score = (R Score + F Score + M Score) / 3.
 
-`Final Priority Score = w(RFM) * normalized RFM + w(Settlement) * normalized Settlement`.
+RFM Score is descriptive only. It is not a CART predictor/target, CRITIC criterion, MCS criterion, or Final Priority Score contribution.
 
-CART is absent from this equation. Scores rank descending with tied ranks.
-High/Medium/Low boundaries target thirds of the ranked account population and
-move forward when a boundary would split equal scores. An all-equal population
-remains one neutral Medium group.
+Historical Settlement Duration is the account average of eligible final collection date minus SI date. Historical slices include only settlement evidence whose final collection date is known by the cutoff. Large positive durations are retained.
 
-## CART
+## Prescriptive four-criterion CRITIC/MCS branch
 
-Labels are exactly `Lower` when a valid succeeding SI exists within the outcome window and `Higher` otherwise. Candidate windows are 3/6/12 months. Multiple six-month cutoff observations use a versioned 24-month lookback.
+MCS requires four continuous criteria: Recency, Frequency, Monetary, and Average Settlement Days. Recency and Settlement are costs; Frequency and Monetary are benefits. Min-max normalization maps every criterion to a 0-1 benefit scale. A constant criterion receives 0.50 for every account.
 
-Candidate predictors are Recency Days, Frequency Count, Monetary Value, Average Settlement Days, Recent Transaction Count, Latest Transaction Year, Account Activity Gap, and settlement-record availability. Account identity, R/F/M scores, RFM Score, MCS fields, and post-cutoff information are prohibited.
+CRITIC uses the normalized four-column population, population standard deviation, and Pearson inter-criterion correlation:
 
-The implemented sequence is: historical invoices -> candidate cutoffs ->
-complete labels -> chronological development slices -> data, missingness, and
-leakage checks -> Spearman redundancy evidence -> Gini importance ->
-development-validation permutation importance -> broad/reduced feature
-comparison -> 3/6/12-month horizon comparison -> modest CART tuning -> frozen
-decisions -> final untouched OOP -> operational scoring -> future monitoring ->
-controlled administrator retraining.
+C_j = sigma_j * SUM_k(1 - r_jk)
 
-Development data alone determines window, eligibility/missingness, Spearman
-redundancy flags, Gini importance, permutation importance, broader/reduced
-feature comparison, and modest tree complexity. Reports include per-class
-precision/recall/F1, macro F1, accuracy, classification error, confusion
-matrix, a development-trained majority `DummyClassifier` baseline,
-depth/leaves, selected predictors, and reasons. Insufficient data returns an
-unavailable status without blocking descriptive/prescriptive output. Validated
-artifacts are versioned, hash-verified, and privately stored. Normal imports
-score with the active frozen artifact; incomplete outcomes or monitoring review
-flags never trigger automatic retraining.
+w_j = C_j / SUM(C_j)
 
-## Validation
+A constant criterion has zero information and zero weight. On discriminatory data, the four weights sum to one. If total information is zero, the run is explicitly non-discriminating: descriptive outputs remain available, but no official score, rank, or Priority Group is fabricated.
 
-Sensitivity independently multiplies each baseline weight by `1 + U(-p,+p)` for `p = 10%, 20%, 30%, 40%`, renormalizes, and runs exactly 100 deterministic iterations per range. Every account/scenario stores score, rank, group, and movement; summaries report Spearman and reclassification ranges.
+Final Priority Score = w_R*N_R + w_F*N_F + w_M*N_M + w_S*N_S.
 
-The historical backtest ranks pre-cutoff evidence, selects the top decile, measures later valid-SI sales capture, compares repeated random selections of equal size, and reports lift without causal claims.
+Each account persists all four normalized values, weights at run level, four contributions, Final Priority Score, analytical rank, and Priority Group. Equal scores share rank. Groups target ranked thirds and move boundaries to keep equal-score ties together; account name is only a deterministic display-order fallback.
+
+## Predictive CART branch
+
+CART supplies separate binary context: Lower when at least one succeeding valid SI occurs in (T, T+H], otherwise Higher. The historical target is realized_inactivity_outcome; the operational output is predicted_inactivity_risk. Candidate horizons are 3, 6, and 12 months.
+
+Forecast-origin cutoffs are exactly Dec 31 of 2018 through 2023. Development uses 2018-2022 in chronological walk-forward order. The untouched OOP cutoff is 2023-12-31. OOP evidence never selects horizons, predictors, preprocessing, or hyperparameters.
+
+Candidate predictors are:
+- recency_days: all pre-cutoff history
+- frequency_count and monetary_value: (T-24 months, T]
+- avg_settlement_days: all settlement evidence known by T
+- account_activity_gap: two latest pre-cutoff SI dates, otherwise missing
+- has_valid_settlement_record: explicit structural indicator
+- recent_transaction_count: (T-12 months, T], retained only with development support
+
+latest_transaction_year is diagnostic only and never enters a model matrix. Identity, RFM scores, normalized MCS fields, weights, scores, ranks, groups, and future helper fields are forbidden.
+
+Development selection reviews business relevance, eligibility, missingness, leakage, Spearman redundancy flags at abs(rho) >= 0.80, Gini importance, development-validation permutation importance, broader/reduced feature sets, temporal performance, and interpretability. Numeric missing values use training-fitted median imputation. There is no scaler, automatic imputer indicator, class weighting, or undocumented performance tolerance.
+
+The exact Gini tree grid is:
+- max_depth: 3, 4, 5
+- min_samples_split: 4, 8, 12
+- min_samples_leaf: 2, 4, 6
+
+Selection maximizes mean development macro F1, then minimizes mean classification error, then prefers lower depth, larger leaf, and larger split. Horizon ties use mean error and deterministic candidate order. The development-fitted artifact evaluated on OOP is persisted unchanged; OOP labels are never used for a refit.
+
+Routine imports only score an active hash-verified private artifact. With no active model or an artifact failure, predictive context is unavailable while descriptive/prescriptive publication continues. Training/validation and monitoring are explicit administrator actions; monitoring never retrains automatically.
+
+## Validation branch
+
+Sensitivity independently multiplies all four baseline weights by 1 + U(-p,+p), renormalizes them, and recomputes score, tied rank, and tied group. Ranges are 10%, 20%, 30%, and 40%, with exactly 100 iterations per range and seed 42. Every account/scenario persists four perturbed weights, score, rank, group, rank difference, and group movement. Summaries report mean/minimum Spearman and group reclassification without arbitrary stable/sensitive labels.
+
+Historical MCS backtesting uses exactly the six CART cutoffs, each with a 12-calendar-month future window. Every cutoff rebuilds the same historical four-criterion MCS using evidence known by T. The top decile expands through score ties. Random comparison uses 100 seed-42 samples of the tie-adjusted selected size from the same historical eligible universe. Future-only accounts are excluded from the denominator and random population. Zero future sales returns unavailable capture; zero mean random capture returns unavailable lift.
+
+Selected-Horizon No-Transaction Rate uses only eligible historical account-observations for the selected CART horizon. It is unavailable when no validated horizon exists and never treats future-only accounts as historically known.
+
+## System boundaries
+
+Python is the analytical source of truth. FastAPI validates, computes, and atomically publishes immutable successful runs. Supabase provides authentication, database persistence, private source/model storage, and row-level controls. The Next.js Web DSS supports operational review. Power BI reads stable reporting views and does not reimplement analytics.

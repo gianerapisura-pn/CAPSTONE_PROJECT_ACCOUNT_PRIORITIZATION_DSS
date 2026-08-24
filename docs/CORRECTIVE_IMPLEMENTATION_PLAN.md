@@ -2,8 +2,8 @@
 
 ## Baseline audit
 
-- Retain: canonical CSV/XLSX parsing, source-row lineage fields, conservative account normalization, invoice grouping, Decimal reconciliation, basic normalization/CRITIC/MCS, future fixture, initial migration, scripts, and documentation structure.
-- Correct: account-level tie-preserving RFM quintiles, rank/group boundaries, multiplicative sensitivity, chronological CART with multi-basis feature selection, and leakage-safe backtesting.
+- Retain: canonical CSV/XLSX parsing, source-row lineage fields, conservative account normalization, invoice grouping, Decimal reconciliation, existing persistence and reporting structure, future fixture, initial migration, scripts, and documentation structure.
+- Correct: account-level tie-preserving RFM quintiles, rank/group boundaries, multiplicative sensitivity, chronological CART with multi-basis feature selection, and leakage-safe fixed six-cutoff backtesting and final four-criterion CRITIC/MCS.
 - Complete: transactional import/run persistence, duplicate-file controls, private storage, JWT/role enforcement, reporting marts/views, exports, system/business KPIs, and audit events.
 - Replace production demo state with authenticated API data while keeping a visibly isolated local demo environment.
 - Build the required login, dashboard, account, analytics, import/history, run-history, reports, settings, profile, and logout flows using the Figma prototype's enterprise information hierarchy.
