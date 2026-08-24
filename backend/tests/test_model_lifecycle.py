@@ -1,6 +1,9 @@
 from decimal import Decimal
+from hashlib import sha256
+from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -27,6 +30,18 @@ def active_record():
         preprocessing_config={}, tree_hyperparameters={}, development_metrics={},
         oop_metrics={}, artifact_path="private/model.joblib", artifact_hash="hash",
     )
+
+
+def test_active_artifact_hash_mismatch_is_rejected(monkeypatch):
+    record = active_record()
+    record.artifact_hash = sha256(b"expected artifact").hexdigest()
+    monkeypatch.setattr(
+        model_lifecycle,
+        "ModelStorage",
+        lambda: SimpleNamespace(get=lambda _: b"tampered artifact"),
+    )
+    with pytest.raises(ValueError, match="hash verification failed"):
+        model_lifecycle._load_artifact(record)
 
 
 def test_current_scoring_uses_active_model_without_retraining(monkeypatch):

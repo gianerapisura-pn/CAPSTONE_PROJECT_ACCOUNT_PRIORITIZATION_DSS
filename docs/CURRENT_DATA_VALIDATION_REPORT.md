@@ -33,3 +33,5 @@ The official-data execution must recompute and record:
 - each of the six fixed historical backtest cutoff results
 
 Source-independent unit, integration, frontend, build, and browser results are recorded separately in TEST_RESULTS.md. Real Supabase migration execution and Power BI Desktop refresh remain external deployment checks.
+
+Official confidential PESLC workbook regression remains pending in this environment.

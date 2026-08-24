@@ -2,7 +2,7 @@
 
 ## Source
 
-`CUSTOMER NAME`, `SI NO.`, `SI DATE`, `SI AMOUNT`, `CR NO.`, `CR DATE`, `CR AMOUNT`, `EWT`, `PAYMENT MODE`, and `PAYMENT STATUS` are preserved in canonical raw payloads. Identifiers are text; money is parsed with Decimal semantics. `source_sheet`, `source_row_number`, `import_batch_id`, `file_hash`, and private `storage_path` provide lineage.
+`CUSTOMER NAME`, `SI NO.`, `SI DATE`, `SI AMOUNT`, `CR NO.`, `CR DATE`, `CR AMOUNT`, `EWT`, `PAYMENT MODE`, and `PAYMENT STATUS` are preserved in canonical raw payloads. Identifiers are text; money is parsed with Decimal semantics. Blank collection amounts remain nullable and distinct from explicitly recorded zero through the typed source representation; grouped totals safely aggregate only numeric contributions. `source_sheet`, `source_row_number`, `import_batch_id`, `file_hash`, and private `storage_path` provide lineage.
 
 ## Core dimensions and facts
 
@@ -10,7 +10,7 @@
 - `invoice_groups` / `fact_account_transactions`: one logical invoice, final CR date, reconciliation, eligibility, and review reason.
 - `fact_account_rfm`: Recency/Frequency/Monetary values, component scores, and RFM Score by run/account.
 - `fact_historical_settlement`: eligible invoice count and account average duration.
-- `account_priority_results` / `fact_account_priority`: four raw criteria, four normalized criteria, four contributions, descriptive RFM Score, CRITIC/MCS score, tied rank/group, latest transaction, and separate predicted risk context.
+- `account_priority_results` / `fact_account_priority`: four raw criteria, four normalized criteria, four contributions, descriptive RFM Score, CRITIC/MCS score, tied rank/group, latest transaction, and separate predicted risk context. Migration `005` exposes manuscript aliases (`frequency_count`, `monetary_value`, `average_settlement_days`, `valid_settlement_record_count`, four baseline weights, `latest_valid_transaction_date`, and `predicted_inactivity_risk`) without denormalizing physical storage.
 - `model_runs`: CART configuration, temporal periods, feature evidence, OOP metrics, confusion matrix, and predictions.
 - `predictive_model_versions`: active/retired artifact version, private path
   and hash, frozen features/preprocessing/tree settings, OOP metrics, validation

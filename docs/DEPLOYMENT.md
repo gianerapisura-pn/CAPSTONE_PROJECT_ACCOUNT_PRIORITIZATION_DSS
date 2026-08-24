@@ -2,7 +2,7 @@
 
 ## Supabase
 
-Create a project, apply migrations `001`, `002`, `003`, then `004`, create private
+Create a project, apply migrations `001`, `002`, `003`, `004`, then `005`, create private
 `source-imports` and `model-artifacts` buckets, create Auth users, and insert
 `user_profiles` roles. See `SUPABASE_SETUP.md`.
 

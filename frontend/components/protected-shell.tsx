@@ -36,7 +36,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
         const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
         return <Link key={item.href} href={item.href} className={active ? "active" : ""} onClick={() => setMobileOpen(false)}><item.icon size={18} /><span>{item.label}</span></Link>;
       })}</nav>
-      <div className="sidebar-foot"><span>Methodology version</span><strong>2026.08 corrective</strong></div>
+      <div className="sidebar-foot"><span>Methodology version</span><strong>2026.08 final hardening</strong></div>
     </aside>
     <div className="workspace">
       <header className="topbar"><button className="icon-button menu-button" aria-label="Open navigation" onClick={() => setMobileOpen(true)}><Menu /></button><div className="topbar-context"><span>Decision Support System</span><strong>Management workspace</strong></div><div className="profile-wrap"><button className="profile-button" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen}><span className="avatar">{user.displayName.slice(0, 2).toUpperCase()}</span><span><strong>{user.displayName}</strong><small>{user.role}</small></span><ChevronDown size={16} /></button>{menuOpen && <div className="profile-menu"><div><strong>{user.email}</strong><span>{user.demo ? "Local demo session" : "Supabase authenticated"}</span></div><button onClick={async () => { await signOut(); router.replace("/login") }}><LogOut size={16} />Sign out</button></div>}</div></header>

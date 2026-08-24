@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from pathlib import Path
 
-from app.db.models import AnalyticsRun, Base
+from app.db.models import AnalyticsRun, Base, RawSourceRow
 from app.auth.dependencies import AuthenticatedUser
 from app.core.config import get_settings
 from app.db.repository import latest_successful_run, run_payload
@@ -38,13 +38,41 @@ def test_future_file_persists_through_latest_api_payload(tmp_path, monkeypatch):
         payload=run_payload(db,latest)
         assert committed["status"]=="COMMITTED"
         assert latest.cutoff_date.year==2030
-        assert any(row["account"]=="NEW FUTURE ACCOUNT" for row in payload["priorities"])
+        assert any(row["account"]=="NEW FUTURE ACCOUNT" for row in payload["rfm"])
+        assert payload["priorities"]
+        assert {"frequency_count", "monetary_value", "average_settlement_days",
+                "valid_settlement_record_count", "predicted_inactivity_risk"} <= payload["priorities"][0].keys()
+        from app.schemas.api import AccountPriorityResponse
+        AccountPriorityResponse.model_validate(payload["priorities"][0])
         assert payload["cart"]["status"]=="model_unavailable"
         duplicate=preview_source(db,user,"future_valid.csv",content)
         assert duplicate["duplicate_committed_file"] and not duplicate["can_commit"]
         with pytest.raises(HTTPException) as blocked:
             commit_source(db,user,duplicate["import_batch_id"])
         assert blocked.value.status_code==409
+    get_settings.cache_clear()
+
+
+def test_raw_collection_blanks_are_preserved_through_commit(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEMO_MODE", "true")
+    monkeypatch.setenv("DEMO_STORAGE_PATH", str(tmp_path / "source"))
+    get_settings.cache_clear()
+    content = (
+        "CUSTOMER NAME,SI NO.,SI DATE,SI AMOUNT,CR NO.,CR DATE,CR AMOUNT,EWT,PAYMENT MODE,PAYMENT STATUS\n"
+        "Blank EWT,1,2030-01-01,100,CR-1,2030-01-01,100,,Bank,Fully Paid\n"
+        "Recorded Zero,2,2030-01-01,100,CR-2,2030-01-01,100,0.00,Bank,Fully Paid\n"
+    ).encode()
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        user = AuthenticatedUser("demo-administrator", "administrator", demo=True)
+        preview = preview_source(db, user, "collection-values.csv", content)
+        commit_source(db, user, preview["import_batch_id"])
+        raw_rows = db.scalars(select(RawSourceRow).order_by(RawSourceRow.source_row_number)).all()
+        assert raw_rows[0].ewt_raw == ""
+        assert raw_rows[1].ewt_raw == "0.00"
+        assert raw_rows[0].canonical_payload["EWT"] == ""
+        assert raw_rows[1].canonical_payload["EWT"] == "0.00"
     get_settings.cache_clear()
 
 

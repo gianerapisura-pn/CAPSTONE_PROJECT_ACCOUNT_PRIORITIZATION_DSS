@@ -250,6 +250,23 @@ def _tune(frame: pd.DataFrame, features: list[str], config: AnalyticsConfig) -> 
     return best[-1], best[0], -best[1]
 
 
+def _development_supported_features(
+    missingness: pd.Series,
+    gini_importance: dict[str, float],
+    permutation_scores: dict[str, float],
+) -> list[str]:
+    """Build a reduced set from development evidence without mandatory business features."""
+    selected = {
+        feature
+        for feature in CANDIDATE_FEATURES
+        if missingness[feature] < 0.80
+        and (gini_importance[feature] > 0 or permutation_scores[feature] > 0)
+    }
+    if "avg_settlement_days" in selected:
+        selected.add("has_valid_settlement_record")
+    return [feature for feature in CANDIDATE_FEATURES if feature in selected]
+
+
 def _select_window(
     groups: list[InvoiceGroup], config: AnalyticsConfig
 ) -> tuple[int, pd.DataFrame, list[dict]]:
@@ -349,13 +366,10 @@ def run_cart_analysis(
         permutation_scores = dict(zip(CANDIDATE_FEATURES, map(float, measured.importances_mean), strict=True))
         permutation_std = dict(zip(CANDIDATE_FEATURES, map(float, measured.importances_std), strict=True))
 
-    required = {"recency_days", "frequency_count", "monetary_value", "has_valid_settlement_record"}
-    retained = [
-        feature for feature in CANDIDATE_FEATURES
-        if missingness[feature] < 0.80
-        and (feature in required or gini[feature] > 0 or permutation_scores[feature] > 0)
-    ]
-    reduced_params, reduced_score, reduced_error = _tune(development, retained, config)
+    retained = _development_supported_features(missingness, gini, permutation_scores)
+    reduced_params, reduced_score, reduced_error = (
+        _tune(development, retained, config) if retained else ({}, 0.0, 1.0)
+    )
     use_reduced = bool(
         reduced_params
         and len(retained) < len(CANDIDATE_FEATURES)
@@ -370,7 +384,12 @@ def run_cart_analysis(
         "feature": feature,
         "status": "retained" if feature in selected else "removed",
         "reason": (
-            "Retained after business relevance, missingness, leakage, redundancy, importance, and temporal validation review."
+            "Retained with the nullable Settlement feature to represent structural evidence availability."
+            if feature == "has_valid_settlement_record"
+            and "avg_settlement_days" in selected
+            and gini[feature] <= 0
+            and permutation_scores[feature] <= 0
+            else "Retained after business relevance, missingness, leakage, redundancy, importance, and temporal validation review."
             if feature in selected
             else "Removed by the development-only reduced-set comparison; OOP evidence was not used."
         ),

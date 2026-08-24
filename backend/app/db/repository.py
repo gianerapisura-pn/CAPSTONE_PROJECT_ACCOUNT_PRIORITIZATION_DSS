@@ -101,7 +101,7 @@ def persist_run_output(db: Session, run: AnalyticsRun, result: dict) -> None:
     run.eligible_account_counts = {
         "rfm": len(result.get("rfm", [])),
         "settlement": len(result.get("settlement", [])),
-        "mcs": len(result.get("priorities", [])),
+        "mcs": int(result.get("mcs_eligible_account_count", len(result.get("priorities", [])))),
     }
     run.model_version = result.get("cart", {}).get("model_version") or None
     run.predictive_status = result.get("cart", {}).get("status") or "model_unavailable"
@@ -120,11 +120,41 @@ def serialize_run(run: AnalyticsRun) -> dict:
     }
 
 
+def _logical_priority_payload(
+    payload: dict,
+    critic_weights: dict,
+    settlement_record_count: int | None,
+) -> dict:
+    """Expose final logical aliases while keeping older stored payloads readable."""
+    row = dict(payload)
+    row.setdefault("frequency_count", row.get("frequency"))
+    row.setdefault("monetary_value", row.get("monetary"))
+    row.setdefault("average_settlement_days", row.get("settlement_days_avg"))
+    row.setdefault("latest_valid_transaction_date", row.get("latest_valid_transaction"))
+    row.setdefault("valid_settlement_record_count", settlement_record_count)
+    row.setdefault("predicted_inactivity_risk", row.get("inactivity_risk"))
+    row.setdefault("inactivity_risk", row.get("predicted_inactivity_risk"))
+    for criterion in ("recency", "frequency", "monetary", "settlement"):
+        row.setdefault(f"baseline_{criterion}_weight", critic_weights.get(criterion))
+    return row
+
+
 def run_payload(db: Session, run: AnalyticsRun) -> dict:
-    priorities = [item.payload for item in db.scalars(select(AccountPriorityResult).where(AccountPriorityResult.analysis_run_id == run.analysis_run_id)).all()]
-    priorities.sort(key=lambda row: (row["priority_rank"], row["account"]))
+    stored_priorities = [item.payload for item in db.scalars(select(AccountPriorityResult).where(AccountPriorityResult.analysis_run_id == run.analysis_run_id)).all()]
     rfm = [item.payload for item in db.scalars(select(RFMResult).where(RFMResult.analysis_run_id == run.analysis_run_id)).all()]
     settlement = [item.payload for item in db.scalars(select(SettlementResult).where(SettlementResult.analysis_run_id == run.analysis_run_id)).all()]
+    settlement_counts = {
+        row["account"]: int(row.get("settlement_invoice_count", 0)) for row in settlement
+    }
+    priorities = [
+        _logical_priority_payload(
+            row,
+            run.critic_weights or {},
+            settlement_counts.get(row["account"]),
+        )
+        for row in stored_priorities
+    ]
+    priorities.sort(key=lambda row: (row["priority_rank"], row["account"]))
     model = db.scalar(select(ModelRun).where(ModelRun.analysis_run_id == run.analysis_run_id))
     sensitivity = [item.payload for item in db.scalars(select(SensitivitySummaryRecord).where(SensitivitySummaryRecord.analysis_run_id == run.analysis_run_id)).all()]
     backtest = db.scalar(select(RankingBacktestRecord).where(RankingBacktestRecord.analysis_run_id == run.analysis_run_id))

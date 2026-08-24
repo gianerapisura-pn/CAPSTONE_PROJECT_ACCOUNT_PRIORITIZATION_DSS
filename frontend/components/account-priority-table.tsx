@@ -31,7 +31,7 @@ export function AccountPriorityTable({
       rows
         .filter((row) => row.account.toLowerCase().includes(query.toLowerCase()))
         .filter((row) => !group || row.priority_group === group)
-        .filter((row) => !risk || row.inactivity_risk === risk)
+        .filter((row) => !risk || row.predicted_inactivity_risk === risk)
         .sort((a, b) =>
           descending ? b.priority_rank - a.priority_rank : a.priority_rank - b.priority_rank
         ),
@@ -66,7 +66,7 @@ export function AccountPriorityTable({
           <option>High</option><option>Medium</option><option>Low</option>
         </select>
         <select
-          aria-label="Inactivity Risk"
+          aria-label="Predicted Inactivity Risk"
           value={risk}
           onChange={(event) => {
             setRisk(event.target.value as InactivityRisk | "");
@@ -85,7 +85,7 @@ export function AccountPriorityTable({
       </div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Rank</th><th>Account</th><th>Priority</th><th>Final score</th><th>Recency</th><th>Frequency</th><th>Monetary</th><th>Avg. settlement</th><th>Inactivity risk</th><th>Latest transaction</th><th aria-label="Open details" /></tr></thead>
+          <thead><tr><th>Rank</th><th>Account</th><th>Priority</th><th>Final score</th><th>Recency</th><th>Frequency</th><th>Monetary</th><th>Avg. settlement</th><th>Predicted inactivity risk</th><th>Latest transaction</th><th aria-label="Open details" /></tr></thead>
           <tbody>{visible.map((row) => (
             <tr key={row.account}>
               <td className="rank-cell">#{row.priority_rank}</td>
@@ -93,11 +93,11 @@ export function AccountPriorityTable({
               <td><Badge tone={row.priority_group}>{row.priority_group}</Badge></td>
               <td>{row.final_priority_score.toFixed(4)}</td>
               <td>{row.recency_days} days</td>
-              <td>{row.frequency}</td>
-              <td>{money.format(row.monetary)}</td>
-              <td>{row.settlement_days_avg.toFixed(1)} days</td>
-              <td><Badge tone={row.inactivity_risk?.startsWith("Lower") ? "positive" : row.inactivity_risk ? "warning" : "neutral"}>{row.inactivity_risk ?? "Unavailable"}</Badge></td>
-              <td>{row.latest_valid_transaction}</td>
+              <td>{row.frequency_count}</td>
+              <td>{money.format(row.monetary_value)}</td>
+              <td>{row.average_settlement_days.toFixed(1)} days</td>
+              <td><Badge tone={row.predicted_inactivity_risk?.startsWith("Lower") ? "positive" : row.predicted_inactivity_risk ? "warning" : "neutral"}>{row.predicted_inactivity_risk ?? "Unavailable"}</Badge></td>
+              <td>{row.latest_valid_transaction_date}</td>
               <td><Link className="row-link" aria-label={`Open ${row.account}`} href={`/accounts/${accountKeys[row.account] || encodeURIComponent(row.account)}`}><ExternalLink size={16} /></Link></td>
             </tr>
           ))}</tbody>

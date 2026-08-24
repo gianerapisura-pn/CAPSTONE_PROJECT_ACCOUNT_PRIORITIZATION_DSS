@@ -44,6 +44,7 @@ def test_methodological_implementation_guards():
     assert "StandardScaler" not in cart
     assert "add_indicator=True" not in cart
     assert "class_weight" not in cart
+    assert "required = {" not in cart
     assert "latest_transaction_year" not in candidate_block
     assert '"rfm_score"' not in candidate_block
     assert "rng.uniform(-weight_range, weight_range)" in sensitivity
@@ -59,6 +60,22 @@ def test_migration_004_exposes_final_reporting_contract():
         "recency_weight", "frequency_weight", "monetary_weight", "settlement_weight",
         "perturbed_recency_weight", "perturbed_frequency_weight", "perturbed_monetary_weight",
         "perturbed_settlement_weight", "jsonb_array_elements",
+    ):
+        assert field in migration
+    assert "normalized_rfm" not in migration
+    assert "rfm_weight" not in migration
+
+def test_migration_005_exposes_final_logical_priority_contract():
+    migration = Path("../supabase/migrations/005_final_hardening.sql").read_text(encoding="utf-8")
+    for field in (
+        "latest_valid_transaction_date", "frequency_count", "monetary_value",
+        "average_settlement_days", "valid_settlement_record_count",
+        "baseline_recency_weight", "baseline_frequency_weight",
+        "baseline_monetary_weight", "baseline_settlement_weight",
+        "normalized_recency", "normalized_frequency", "normalized_monetary",
+        "normalized_settlement", "recency_contribution", "frequency_contribution",
+        "monetary_contribution", "settlement_contribution",
+        "predicted_inactivity_risk", "security_invoker",
     ):
         assert field in migration
     assert "normalized_rfm" not in migration

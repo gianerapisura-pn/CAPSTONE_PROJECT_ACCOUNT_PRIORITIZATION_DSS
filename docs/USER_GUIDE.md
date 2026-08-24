@@ -6,9 +6,9 @@ Production users enter Supabase email/password credentials. Sessions persist and
 
 ## Management
 
-Dashboard shows the latest successful cutoff, accounts, valid sales, CRITIC weights, Priority Group/risk distributions, and top accounts. Account Prioritization supports search, Priority Group/risk filters, rank order, pagination, detail links, and exports. Account Details separates descriptive RFM and Settlement from the four normalized CRITIC/MCS criteria and contributions, CART context, sensitivity movement, and invoice lineage.
+Dashboard shows the latest successful cutoff, accounts, valid sales, CRITIC weights, Priority Group/predicted-risk distributions, and top accounts. Account Prioritization supports search, Priority Group/predicted-risk filters, rank order, pagination, detail links, and exports. Account Details separates descriptive RFM and Settlement from the four normalized CRITIC/MCS criteria and contributions, CART context, sensitivity movement, and invoice lineage.
 
-RFM and Historical Settlement Duration are descriptive. Priority Group is the CRITIC/MCS management-attention order. Inactivity Risk is separate CART context and does not guarantee activity or permanent churn.
+RFM and Historical Settlement Duration are descriptive. Priority Group is the CRITIC/MCS management-attention order. Predicted Inactivity Risk is separate CART context and does not guarantee activity or permanent churn.
 
 ## Administrator
 

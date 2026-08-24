@@ -19,7 +19,10 @@ from app.analytics.prescriptive.scoring import (
 from app.analytics.validation.backtest import run_historical_backtest, top_decile_backtest
 from app.analytics.validation.sensitivity import run_sensitivity
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
-from app.etl.invoices import SourceRow, group_invoices, invoice_group_key
+from app.services.analytics_runner import run_account_prioritization
+from app.etl.invoices import (
+    SourceRow, dataframe_to_source_rows, group_invoices, invoice_group_key,
+)
 
 
 def row(
@@ -29,8 +32,8 @@ def row(
     si_amount: str,
     cr: str,
     cr_date: str,
-    cr_amount: str,
-    ewt: str = "0",
+    cr_amount: str | None,
+    ewt: str | None = "0",
     status: str = "Fully Paid",
 ) -> SourceRow:
     return SourceRow(
@@ -41,8 +44,8 @@ def row(
         si_amount=Decimal(si_amount),
         cr_no=cr,
         cr_date=pd.Timestamp(cr_date) if cr_date else None,
-        cr_amount=Decimal(cr_amount),
-        ewt=Decimal(ewt),
+        cr_amount=Decimal(cr_amount) if cr_amount is not None else None,
+        ewt=Decimal(ewt) if ewt is not None else None,
         payment_mode="Bank",
         payment_status_raw=status,
         payment_status=status,
@@ -98,6 +101,38 @@ def test_reconciliation_uses_cr_plus_ewt_exactly_after_cent_rounding():
     assert not one_cent_short.reconciled
 
 
+def test_blank_collection_values_remain_distinct_from_recorded_zero():
+    frame = pd.DataFrame([
+        {
+            "CUSTOMER NAME": "Blank EWT", "SI NO.": "SI-1", "SI DATE": "2026-01-01",
+            "SI AMOUNT": "100", "CR NO.": "CR-1", "CR DATE": "2026-01-02",
+            "CR AMOUNT": "100", "EWT": "", "PAYMENT MODE": "Bank",
+            "PAYMENT STATUS": "Fully Paid", "source_sheet": "CSV", "source_row_number": 2,
+        },
+        {
+            "CUSTOMER NAME": "Recorded Zero", "SI NO.": "SI-2", "SI DATE": "2026-01-01",
+            "SI AMOUNT": "100", "CR NO.": "CR-2", "CR DATE": "2026-01-02",
+            "CR AMOUNT": "0.00", "EWT": "0.00", "PAYMENT MODE": "Bank",
+            "PAYMENT STATUS": "Fully Paid", "source_sheet": "CSV", "source_row_number": 3,
+        },
+        {
+            "CUSTOMER NAME": "Blank CR", "SI NO.": "SI-3", "SI DATE": "2026-01-01",
+            "SI AMOUNT": "100", "CR NO.": "CR-3", "CR DATE": "2026-01-02",
+            "CR AMOUNT": "", "EWT": "0.00", "PAYMENT MODE": "Bank",
+            "PAYMENT STATUS": "Fully Paid", "source_sheet": "CSV", "source_row_number": 4,
+        },
+    ])
+    blank_ewt, recorded_zero, blank_cr = dataframe_to_source_rows(frame)
+    assert blank_ewt.ewt is None
+    assert recorded_zero.ewt == Decimal("0.00")
+    assert blank_cr.cr_amount is None
+    assert recorded_zero.cr_amount == Decimal("0.00")
+    groups = group_invoices([blank_ewt, recorded_zero, blank_cr])
+    reconciled = next(group for group in groups if group.standardized_account_name == "BLANK EWT")
+    assert reconciled.reconciled
+    assert reconciled.total_ewt == Decimal("0")
+
+
 def test_invoice_identity_excludes_lineage():
     original = row("A", "SI-1", "2026-01-01", "100.00", "CR-1", "2026-01-05", "100")
     later = replace(original, import_batch_id="later", source_sheet="Other", source_row_number=99)
@@ -131,6 +166,28 @@ def test_settlement_cutoff_prevents_future_collection_leakage():
     ])[0]
     assert compute_settlement_metrics([group], pd.Timestamp("2026-02-01")) == []
     assert compute_settlement_metrics([group], pd.Timestamp("2026-03-01"))[0].average_settlement_days == 59
+
+
+def test_current_mcs_uses_latest_si_cutoff_for_settlement_evidence():
+    groups = group_invoices([
+        row("A", "A-1", "2026-01-01", "100", "A-CR", "2026-03-01", "100"),
+        row("B", "B-1", "2026-02-01", "200", "B-CR", "2026-02-10", "200"),
+        row("C", "C-1", "2026-02-15", "50", "", "", "0", status="Partially Paid"),
+    ])
+    current = run_account_prioritization(groups)
+    assert current.cutoff_date == "2026-02-15"
+    assert {item["account"] for item in current.rfm} == {"A", "B", "C"}
+    assert {item["account"] for item in current.settlement} == {"B"}
+    assert current.mcs_eligible_account_count == 1
+    assert not any(item["account"] == "A" for item in current.priorities)
+
+    advanced = run_account_prioritization(group_invoices([
+        *[source for group in groups for source in group.rows],
+        row("C", "C-2", "2026-04-01", "75", "", "", "0", status="Partially Paid"),
+    ]))
+    assert advanced.cutoff_date == "2026-04-01"
+    assert {item["account"] for item in advanced.settlement} == {"A", "B"}
+    assert any(item["account"] == "A" for item in advanced.priorities)
 
 
 def test_rfm_average_rank_formula_ties_direction_and_constant_component():
@@ -223,6 +280,19 @@ def test_backtest_expands_top_decile_ties_and_excludes_future_new_accounts():
     assert result.random_baseline_capture is not None
 
 
+def test_historical_backtest_excludes_post_cutoff_settlement_evidence():
+    groups = group_invoices([
+        row("A", "A-1", "2018-01-01", "100", "A-CR", "2019-01-15", "100"),
+        row("B", "B-1", "2018-06-01", "250", "B-CR", "2019-02-15", "250"),
+        row("A", "A-2", "2019-03-01", "50", "A2-CR", "2019-03-02", "50"),
+    ])
+    summary = run_historical_backtest(groups, DEFAULT_ANALYTICS_CONFIG)
+    first = summary.cutoffs[0]
+    assert first["cutoff_date"] == "2018-12-31"
+    assert first["eligible_account_count"] == 0
+    assert first["top_decile_capture"] is None
+
+
 def test_backtest_zero_denominators_are_unavailable_and_six_cutoffs_persist():
     priorities = [priority("A", 1.0, 1, "High")]
     empty = top_decile_backtest(priorities, [], repetitions=100, random_seed=42)
@@ -235,11 +305,10 @@ def test_backtest_zero_denominators_are_unavailable_and_six_cutoffs_persist():
 
 
 def test_non_discriminating_population_publishes_without_fake_ranking():
-    from app.services.analytics_runner import run_account_prioritization
 
     groups = group_invoices([
-        row("A", "A1", "2026-01-01", "100", "A1", "2026-01-11", "100"),
-        row("B", "B1", "2026-01-01", "100", "B1", "2026-01-11", "100"),
+        row("A", "A1", "2026-01-01", "100", "A1", "2026-01-01", "100"),
+        row("B", "B1", "2026-01-01", "100", "B1", "2026-01-01", "100"),
     ])
     result = run_account_prioritization(groups)
     assert result.status == "successful"

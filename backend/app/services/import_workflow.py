@@ -201,7 +201,7 @@ def commit_source(db: Session, user: AuthenticatedUser, batch_id: str, override_
         batch.status = "committed"
         batch.committed_at = datetime.now(timezone.utc)
         db.flush()
-        run = AnalyticsRun(status="running", latest_import_batch_id=batch_id, code_version="final-four-criterion")
+        run = AnalyticsRun(status="running", latest_import_batch_id=batch_id, code_version="final-hardening")
         db.add(run)
         db.flush()
         cumulative_groups = load_invoice_groups(db)

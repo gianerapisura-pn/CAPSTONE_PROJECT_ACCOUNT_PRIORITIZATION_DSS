@@ -5,6 +5,8 @@ test("demo administrator imports future data and reaches updated decision output
   await page.goto("/login");
   await expect(page.getByText("Demo mode is active")).toBeVisible();
   await page.getByRole("button", { name: /Enter isolated demo workspace/i }).click();
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("peslc-demo-session"))).toBe("administrator");
+  await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/dashboard/);
 
   await page.goto("/import");
@@ -20,15 +22,17 @@ test("demo administrator imports future data and reaches updated decision output
 
   await page.goto("/accounts");
   await page.getByLabel("Search accounts").fill("NEW FUTURE ACCOUNT");
-  await expect(page.getByText("NEW FUTURE ACCOUNT")).toBeVisible();
-  await page.getByRole("link", { name: "Open NEW FUTURE ACCOUNT" }).click();
-  await page.waitForURL(/\/accounts\/NEW%20FUTURE%20ACCOUNT/, { timeout: 60_000 });
-  await expect(page.getByRole("heading", { name: "NEW FUTURE ACCOUNT" })).toBeVisible();
-  await expect(page.getByText("Current rank")).toBeVisible();
-
+  await expect(page.getByText("No accounts match the selected filters.")).toBeVisible();
   await page.goto("/analytics/rfm");
   await expect(page.getByRole("heading", { name: "RFM analytics" })).toBeVisible();
   await expect(page.getByRole("table").getByText("NEW FUTURE ACCOUNT")).toBeVisible();
+
+  await page.goto("/accounts");
+  await page.getByLabel("Search accounts").fill("ALPHA INFRA CORP");
+  await page.getByRole("link", { name: "Open ALPHA INFRA CORP" }).click();
+  await page.waitForURL(/\/accounts\//, { timeout: 60_000 });
+  await expect(page.getByRole("heading", { name: "ALPHA INFRA CORP" })).toBeVisible();
+  await expect(page.getByText("Current rank")).toBeVisible();
 
   await page.goto("/reports");
   const download = page.waitForEvent("download");

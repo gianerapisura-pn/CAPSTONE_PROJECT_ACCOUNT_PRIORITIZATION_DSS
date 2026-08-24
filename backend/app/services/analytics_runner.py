@@ -28,6 +28,7 @@ class AnalyticsRunResult:
     completed_at: str
     status: str
     mcs_status: str
+    mcs_eligible_account_count: int
     critic_weights: dict[str, float]
     rfm: list[dict]
     settlement: list[dict]
@@ -64,7 +65,7 @@ def run_account_prioritization(
     warnings: list[str] = []
     cutoff = max(eligible_dates) if eligible_dates else None
     rfm = compute_rfm(invoice_groups, cutoff_date=cutoff) if cutoff is not None else []
-    settlement = compute_settlement_metrics(invoice_groups)
+    settlement = compute_settlement_metrics(invoice_groups, cutoff_date=cutoff) if cutoff is not None else []
     priorities, weights = compute_priorities(rfm, settlement)
 
     eligible_mcs_accounts = {
@@ -112,19 +113,33 @@ def run_account_prioritization(
     }
 
     rfm_by_account = {item.account: item for item in rfm}
+    settlement_by_account = {item.account: item for item in settlement}
     priority_rows: list[dict] = []
     for item in priorities:
         metric = rfm_by_account[item.account]
+        settlement_metric = settlement_by_account[item.account]
+        latest_transaction = (
+            cutoff - pd.Timedelta(days=metric.recency_days)
+        ).date().isoformat() if cutoff is not None else None
+        predicted_risk = cart.predictions.get(item.account)
         row = asdict(item)
         row["monetary"] = float(item.monetary)
         row.update({
-            "latest_valid_transaction": (
-                cutoff - pd.Timedelta(days=metric.recency_days)
-            ).date().isoformat() if cutoff is not None else None,
+            "latest_valid_transaction": latest_transaction,
+            "latest_valid_transaction_date": latest_transaction,
+            "frequency_count": item.frequency,
+            "monetary_value": float(item.monetary),
+            "average_settlement_days": item.settlement_days_avg,
+            "valid_settlement_record_count": settlement_metric.settlement_invoice_count,
+            "baseline_recency_weight": weights.get("recency"),
+            "baseline_frequency_weight": weights.get("frequency"),
+            "baseline_monetary_weight": weights.get("monetary"),
+            "baseline_settlement_weight": weights.get("settlement"),
             "recency_score": metric.recency_score,
             "frequency_score": metric.frequency_score,
             "monetary_score": metric.monetary_score,
-            "inactivity_risk": cart.predictions.get(item.account),
+            "predicted_inactivity_risk": predicted_risk,
+            "inactivity_risk": predicted_risk,
             "model_version": cart.model_version or None,
         })
         priority_rows.append(row)
@@ -137,6 +152,7 @@ def run_account_prioritization(
         completed_at=completed.isoformat(),
         status="successful",
         mcs_status=mcs_status,
+        mcs_eligible_account_count=len(eligible_mcs_accounts),
         critic_weights=weights,
         rfm=[{**asdict(item), "monetary": float(item.monetary)} for item in rfm],
         settlement=[asdict(item) for item in settlement],

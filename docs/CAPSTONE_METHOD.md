@@ -12,7 +12,7 @@ Rows are grouped to a logical Sales Invoice by standardized account, SI number, 
 
 Cancelled rows remain in raw lineage and are excluded from analytics. Unknown statuses remain reviewable and analytics-ineligible. A Fully Paid invoice is settlement-eligible only when round(SUM(valid CR Amount) + SUM(valid EWT) - SI Amount, 2) equals 0.00.
 
-Multiple collection rows do not inflate Frequency or Monetary. Settlement uses the latest valid CR date. Unresolved negative chronology is excluded from Settlement but valid SI evidence may remain RFM-eligible.
+Multiple collection rows do not inflate Frequency or Monetary. Blank CR Amount/EWT values remain nullable and distinct from explicitly recorded zero; aggregation treats missing values as no numeric contribution without rewriting the source fact. Settlement uses the latest valid CR date. Unresolved negative chronology is excluded from Settlement but valid SI evidence may remain RFM-eligible.
 
 ## Descriptive branch
 
@@ -24,7 +24,7 @@ RFM Score = (R Score + F Score + M Score) / 3.
 
 RFM Score is descriptive only. It is not a CART predictor/target, CRITIC criterion, MCS criterion, or Final Priority Score contribution.
 
-Historical Settlement Duration is the account average of eligible final collection date minus SI date. Historical slices include only settlement evidence whose final collection date is known by the cutoff. Large positive durations are retained.
+Historical Settlement Duration is the account average of eligible final collection date minus SI date. Current and historical MCS runs use the same cutoff as their RFM evidence and include only settlement evidence whose final collection date is known by that cutoff. An account without cutoff-known Settlement evidence remains descriptive-RFM eligible but is not eligible for official four-criterion ranking. Large positive durations are retained.
 
 ## Prescriptive four-criterion CRITIC/MCS branch
 
@@ -58,7 +58,7 @@ Candidate predictors are:
 
 latest_transaction_year is diagnostic only and never enters a model matrix. Identity, RFM scores, normalized MCS fields, weights, scores, ranks, groups, and future helper fields are forbidden.
 
-Development selection reviews business relevance, eligibility, missingness, leakage, Spearman redundancy flags at abs(rho) >= 0.80, Gini importance, development-validation permutation importance, broader/reduced feature sets, temporal performance, and interpretability. Numeric missing values use training-fitted median imputation. There is no scaler, automatic imputer indicator, class weighting, or undocumented performance tolerance.
+Development selection reviews business relevance, eligibility, missingness, leakage, Spearman redundancy flags at abs(rho) >= 0.80, Gini importance, development-validation permutation importance, broader/reduced feature sets, temporal performance, and interpretability. No Recency, Frequency, or Monetary predictor is automatically retained; if nullable avg_settlement_days survives reduction, has_valid_settlement_record remains with it to represent structural evidence availability. Numeric missing values use training-fitted median imputation. There is no scaler, automatic imputer indicator, class weighting, or undocumented performance tolerance.
 
 The exact Gini tree grid is:
 - max_depth: 3, 4, 5

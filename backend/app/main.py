@@ -221,7 +221,7 @@ def run_analytics(user: AuthenticatedUser = Depends(require_admin), db: Session 
     groups = load_invoice_groups(db)
     if not groups:
         raise HTTPException(422, "No committed invoice data is available.")
-    run = AnalyticsRun(status="running", code_version="final-four-criterion")
+    run = AnalyticsRun(status="running", code_version="final-hardening")
     db.add(run)
     db.flush()
     try:
@@ -233,7 +233,7 @@ def run_analytics(user: AuthenticatedUser = Depends(require_admin), db: Session 
         return serialize_run(run)
     except Exception as exc:
         db.rollback()
-        failed = AnalyticsRun(status="failed", errors=[{"message": "Analytics run failed safely."}], code_version="final-four-criterion")
+        failed = AnalyticsRun(status="failed", errors=[{"message": "Analytics run failed safely."}], code_version="final-hardening")
         db.add(failed)
         db.commit()
         raise HTTPException(500, "Analytics run failed; the previous successful run remains current.") from exc
@@ -250,13 +250,13 @@ def dashboard(user: AuthenticatedUser = Depends(require_user), db: Session = Dep
     payload = run_payload(db, run)
     priorities = payload["priorities"]
     group_counts = {group: sum(row["priority_group"] == group for row in priorities) for group in ("High", "Medium", "Low")}
-    risk_counts = {risk: sum(row.get("inactivity_risk") == risk for row in priorities)
+    risk_counts = {risk: sum(row.get("predicted_inactivity_risk") == risk for row in priorities)
                    for risk in ("Lower", "Higher")}
     total_accounts = db.scalar(select(func.count()).select_from(DimAccount)) or 0
     total_sales = sum(row.get("valid_si_sales", 0) for row in payload["business_baselines"])
     return {
         "run": serialize_run(run), "total_standardized_accounts": total_accounts,
-        "mcs_eligible_accounts": len(priorities), "priority_group_counts": group_counts,
+        "mcs_eligible_accounts": int((run.eligible_account_counts or {}).get("mcs", len(priorities))), "priority_group_counts": group_counts,
         "risk_counts": risk_counts, "total_valid_historical_sales": total_sales,
         "critic_weights": run.critic_weights, "mcs_status": run.mcs_status, "cart_status": payload["cart"].get("status", "Unavailable"),
         "cart_horizon": payload["cart"].get("outcome_window_months"),
@@ -268,7 +268,8 @@ def dashboard(user: AuthenticatedUser = Depends(require_user), db: Session = Dep
 
 @app.get("/accounts")
 def accounts(
-    search: str = "", priority_group: str | None = None, inactivity_risk: str | None = None,
+    search: str = "", priority_group: str | None = None, predicted_inactivity_risk: str | None = None,
+    inactivity_risk: str | None = None,
     page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=100),
     user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db),
 ) -> dict:
@@ -278,8 +279,9 @@ def accounts(
         rows = [row for row in rows if search.lower() in row["account"].lower()]
     if priority_group:
         rows = [row for row in rows if row["priority_group"] == priority_group]
-    if inactivity_risk:
-        rows = [row for row in rows if row.get("inactivity_risk") == inactivity_risk]
+    risk_filter = predicted_inactivity_risk or inactivity_risk
+    if risk_filter:
+        rows = [row for row in rows if row.get("predicted_inactivity_risk") == risk_filter]
     start = (page - 1) * page_size
     return {"items": rows[start:start + page_size], "total": len(rows), "page": page,
             "page_size": page_size, "analysis_run_id": run.analysis_run_id,
@@ -432,7 +434,7 @@ def methodology(user: AuthenticatedUser = Depends(require_admin)) -> dict:
     return {
         "source_schema": list(REQUIRED_COLUMNS), "analytics_config": DEFAULT_ANALYTICS_CONFIG.serializable(),
         "rfm": "Account-level tie-preserving percentile quintiles; lower Recency is better.",
-        "settlement": "Historical Settlement Duration uses final valid collection date after invoice grouping.",
+        "settlement": "Historical Settlement Duration uses only settlement evidence known by the current latest-valid-SI cutoff after invoice grouping.",
         "mcs": "CRITIC objectively weights separately normalized Recency, Frequency, Monetary, and Average Settlement Days. Composite RFM Score remains descriptive, while CART Inactivity Risk remains separate supporting predictive context.",
         "priority_groups": "Tie-preserving ranked thirds from each discriminatory four-criterion run.",
         "reproducibility": {

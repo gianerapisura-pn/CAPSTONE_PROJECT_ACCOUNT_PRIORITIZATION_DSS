@@ -27,6 +27,7 @@ in order:
 2. `supabase/migrations/002_corrective_completion.sql`
 3. `supabase/migrations/003_current_method_alignment.sql`
 4. `supabase/migrations/004_four_criterion_final_alignment.sql`
+5. `supabase/migrations/005_final_hardening.sql`
 
 Create private `source-imports` and `model-artifacts` Storage buckets, create
 Supabase Auth users, and assign each user a `user_profiles` role of
@@ -39,7 +40,7 @@ Administrator operations include import preview/commit, duplicate override, anal
 
 `Upload -> private store -> PREVIEW -> validate -> administrator confirmation -> raw lineage -> invoice grouping/reconciliation -> COMMITTED -> immutable analytics run -> latest-successful APIs/views`
 
-CSV/XLSX imports use the canonical template in `sample_data/`. Repeated payment rows do not inflate Frequency or Monetary. Cancelled rows remain traceable and are excluded from analytics. Exact committed SHA-256 duplicates are blocked unless an administrator gives an audited reason.
+CSV/XLSX imports use the canonical template in `sample_data/`. Repeated payment rows do not inflate Frequency or Monetary. Blank collection amounts remain distinct from recorded zero values in source lineage and are treated as no numeric contribution only during aggregation. Cancelled rows remain traceable and are excluded from analytics. Exact committed SHA-256 duplicates are blocked unless an administrator gives an audited reason.
 
 The first controlled training action evaluates CART candidate horizons and
 features chronologically, freezes development decisions, performs final

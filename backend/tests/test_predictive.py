@@ -8,6 +8,7 @@ import pandas as pd
 from app.analytics.predictive.cart import (
     CANDIDATE_FEATURES,
     TARGET_COLUMN,
+    _development_supported_features,
     build_cutoff_dataset,
     train_cart_temporal,
 )
@@ -103,6 +104,20 @@ def test_final_candidate_features_and_exact_temporal_grid():
     assert config.cart_max_depth == (3, 4, 5)
     assert config.cart_min_samples_split == (4, 8, 12)
     assert config.cart_min_samples_leaf == (2, 4, 6)
+
+
+def test_reduced_feature_selection_has_no_mandatory_rfm_retention():
+    missingness = pd.Series({feature: 0.0 for feature in CANDIDATE_FEATURES})
+    no_importance = {feature: 0.0 for feature in CANDIDATE_FEATURES}
+    frequency_only = dict(no_importance, frequency_count=0.2)
+    assert _development_supported_features(missingness, frequency_only, no_importance) == [
+        "frequency_count"
+    ]
+    settlement_only = dict(no_importance, avg_settlement_days=0.2)
+    assert _development_supported_features(missingness, settlement_only, no_importance) == [
+        "avg_settlement_days", "has_valid_settlement_record"
+    ]
+    assert _development_supported_features(missingness, no_importance, no_importance) == []
 
 
 def test_cart_insufficient_class_safeguard():

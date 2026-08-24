@@ -79,11 +79,15 @@ class AccountPriorityResponse(BaseModel):
     rfm_score: float
     recency_days: int
     frequency: int
+    frequency_count: int
     monetary: float
+    monetary_value: float
     recency_score: int
     frequency_score: int
     monetary_score: int
     settlement_days_avg: float
+    average_settlement_days: float
+    valid_settlement_record_count: int | None
     normalized_recency: float
     normalized_frequency: float
     normalized_monetary: float
@@ -96,6 +100,12 @@ class AccountPriorityResponse(BaseModel):
     priority_rank: int
     priority_group: str
     latest_valid_transaction: str
+    latest_valid_transaction_date: str | None
+    baseline_recency_weight: float | None
+    baseline_frequency_weight: float | None
+    baseline_monetary_weight: float | None
+    baseline_settlement_weight: float | None
+    predicted_inactivity_risk: str | None = None
     inactivity_risk: str | None = None
     model_version: str | None = None
 

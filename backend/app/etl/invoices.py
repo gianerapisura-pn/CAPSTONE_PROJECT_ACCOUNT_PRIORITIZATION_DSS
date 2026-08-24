@@ -20,8 +20,8 @@ class SourceRow:
     si_amount: Decimal
     cr_no: str
     cr_date: pd.Timestamp | None
-    cr_amount: Decimal
-    ewt: Decimal
+    cr_amount: Decimal | None
+    ewt: Decimal | None
     payment_mode: str
     payment_status_raw: str
     payment_status: str
@@ -99,8 +99,8 @@ def dataframe_to_source_rows(frame: pd.DataFrame, import_batch_id: str = "demo")
                 si_amount=parse_decimal(row["SI AMOUNT"]) or Decimal("0"),
                 cr_no=str(row["CR NO."]).strip(),
                 cr_date=cr_date,
-                cr_amount=parse_decimal(row["CR AMOUNT"]) or Decimal("0"),
-                ewt=parse_decimal(row["EWT"]) or Decimal("0"),
+                cr_amount=parse_decimal(row["CR AMOUNT"]),
+                ewt=parse_decimal(row["EWT"]),
                 payment_mode=str(row["PAYMENT MODE"]).strip(),
                 payment_status_raw=str(row["PAYMENT STATUS"]).strip(),
                 payment_status=status,
@@ -161,8 +161,12 @@ def group_invoices(rows: list[SourceRow], precision: Decimal = Decimal("0.01")) 
             group.conflicting_invoice = True
         cr_dates = [row.cr_date for row in group.rows if row.cr_date is not None]
         group.final_cr_date = max(cr_dates) if cr_dates else None
-        group.total_cr_amount = sum((row.cr_amount for row in group.rows), Decimal("0"))
-        group.total_ewt = sum((row.ewt for row in group.rows), Decimal("0"))
+        group.total_cr_amount = sum(
+            (row.cr_amount for row in group.rows if row.cr_amount is not None), Decimal("0")
+        )
+        group.total_ewt = sum(
+            (row.ewt for row in group.rows if row.ewt is not None), Decimal("0")
+        )
         group.reconciliation_amount = group.total_cr_amount + group.total_ewt
         group.reconciliation_difference = (group.reconciliation_amount - group.si_amount).quantize(precision)
         group.reconciled = group.reconciliation_difference == Decimal("0.00")
