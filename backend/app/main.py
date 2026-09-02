@@ -221,7 +221,7 @@ def run_analytics(user: AuthenticatedUser = Depends(require_admin), db: Session 
     groups = load_invoice_groups(db)
     if not groups:
         raise HTTPException(422, "No committed invoice data is available.")
-    run = AnalyticsRun(status="running", code_version="final-hardening")
+    run = AnalyticsRun(status="running", code_version="final-alignment")
     db.add(run)
     db.flush()
     try:
@@ -233,7 +233,7 @@ def run_analytics(user: AuthenticatedUser = Depends(require_admin), db: Session 
         return serialize_run(run)
     except Exception as exc:
         db.rollback()
-        failed = AnalyticsRun(status="failed", errors=[{"message": "Analytics run failed safely."}], code_version="final-hardening")
+        failed = AnalyticsRun(status="failed", errors=[{"message": "Analytics run failed safely."}], code_version="final-alignment")
         db.add(failed)
         db.commit()
         raise HTTPException(500, "Analytics run failed; the previous successful run remains current.") from exc

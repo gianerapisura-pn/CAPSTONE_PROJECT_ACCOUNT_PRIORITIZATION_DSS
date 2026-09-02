@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { AccountPriorityTable } from "@/components/account-priority-table";
 import type { AccountPriority } from "@/types/dss";
 
-const base={rfm_score:4,average_settlement_days:20,valid_settlement_record_count:2,normalized_recency:.8,normalized_frequency:.7,normalized_monetary:.6,normalized_settlement:.7,recency_contribution:.2,frequency_contribution:.2,monetary_contribution:.2,settlement_contribution:.2,latest_valid_transaction_date:"2030-01-01",recency_days:10,frequency_count:3,monetary_value:1000,baseline_recency_weight:.25,baseline_frequency_weight:.25,baseline_monetary_weight:.25,baseline_settlement_weight:.25,recency_score:5,frequency_score:4,monetary_score:3};
+const base={rfm_score:4,average_settlement_days:20,valid_settlement_record_count:2,normalized_recency:.8,normalized_frequency:.7,normalized_monetary:.6,normalized_settlement:.7,recency_contribution:.2,frequency_contribution:.2,monetary_contribution:.2,settlement_contribution:.2,latest_valid_transaction_date:"2030-01-01",latest_valid_si_date:"2030-01-01",recency_days:10,frequency_count:3,monetary_value:1000,baseline_recency_weight:.25,baseline_frequency_weight:.25,baseline_monetary_weight:.25,baseline_settlement_weight:.25,recency_score:5,frequency_score:4,monetary_score:3};
 const rows:AccountPriority[]=[
  {account:"ALPHA",priority_rank:1,priority_group:"High",final_priority_score:.9,predicted_inactivity_risk:"Lower",...base},
  {account:"BETA",priority_rank:2,priority_group:"Low",final_priority_score:.4,predicted_inactivity_risk:"Higher",...base},

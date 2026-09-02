@@ -14,12 +14,14 @@ RFM and Historical Settlement Duration are descriptive. Priority Group is the CR
 
 Import Data accepts CSV/XLSX by drag/drop or picker. File selection is not commitment. Review PREVIEW counts/issues/hash, download an issue report, then confirm. Exact committed hashes require an explicit override reason. Successful confirmation displays COMMITTED and the immutable analysis run.
 
+The import template begins with `ACCOUNT NAMES`. A legacy `CUSTOMER NAME` header is mapped only when `ACCOUNT NAMES` is absent; files containing both are rejected. `Partially Paid`, `Partial`, and other unsupported statuses are shown for administrator review and excluded from analytics rather than silently treated as valid invoices. Account labels receive whitespace-only cleanup and are never fuzzy-merged automatically.
+
 Import History and Analytics Runs retain operational evidence. Settings keeps
 methodology/configuration read-only, exposes the active model version, and
 provides separate Monitor Matured Labels and Train / Validate CART Model actions plus the
 account-alias review queue to administrators only. Monitoring persists current
 metrics and can recommend review; it never replaces the model. Routine imports
 use the active model and never trigger replacement training. Every alias
-approval or rejection requires a reason and is audited; management users cannot
+approval or rejection requires a reason and is audited as future-input governance; it does not rewrite historical source labels. Management users cannot
 make model or alias decisions. Reports
 exports CSV/XLSX and opens a configured secure Power BI report.

@@ -131,6 +131,7 @@ def _logical_priority_payload(
     row.setdefault("monetary_value", row.get("monetary"))
     row.setdefault("average_settlement_days", row.get("settlement_days_avg"))
     row.setdefault("latest_valid_transaction_date", row.get("latest_valid_transaction"))
+    row.setdefault("latest_valid_si_date", row.get("latest_valid_transaction_date"))
     row.setdefault("valid_settlement_record_count", settlement_record_count)
     row.setdefault("predicted_inactivity_risk", row.get("inactivity_risk"))
     row.setdefault("inactivity_risk", row.get("predicted_inactivity_risk"))

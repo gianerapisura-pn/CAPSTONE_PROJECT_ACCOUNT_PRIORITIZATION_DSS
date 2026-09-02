@@ -101,6 +101,7 @@ class AccountPriorityResponse(BaseModel):
     priority_group: str
     latest_valid_transaction: str
     latest_valid_transaction_date: str | None
+    latest_valid_si_date: str | None
     baseline_recency_weight: float | None
     baseline_frequency_weight: float | None
     baseline_monetary_weight: float | None

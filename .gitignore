@@ -25,3 +25,6 @@ test-results/
 *.xlsx
 !sample_data/future_import_template.xlsx
 !sample_data/test_fixtures/*.xlsx
+# Confidential official regression input must remain outside Git.
+PESLC_2017_2025_RAW_DATASET.xlsx
+private_data/

@@ -19,6 +19,7 @@ export interface AccountPriority {
   settlement_contribution: number;
   predicted_inactivity_risk?: InactivityRisk;
   latest_valid_transaction_date: string | null;
+  latest_valid_si_date: string | null;
   recency_days: number;
   frequency_count: number;
   monetary_value: number;

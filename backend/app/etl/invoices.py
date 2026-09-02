@@ -57,7 +57,7 @@ class InvoiceGroup:
     @property
     def rfm_eligible(self) -> bool:
         return (
-            self.payment_status in {"Fully Paid", "Partially Paid"}
+            self.payment_status == "Fully Paid"
             and not self.conflicting_invoice
             and not pd.isna(self.si_date)
             and self.si_amount > 0
@@ -92,8 +92,8 @@ def dataframe_to_source_rows(frame: pd.DataFrame, import_batch_id: str = "demo")
         cr_date = None if pd.isna(cr_date_raw) else cr_date_raw
         rows.append(
             SourceRow(
-                customer_name_raw=str(row["CUSTOMER NAME"]).strip(),
-                standardized_account_name=standardize_account_name(row["CUSTOMER NAME"]),
+                customer_name_raw=str(row["ACCOUNT NAMES"]),
+                standardized_account_name=standardize_account_name(row["ACCOUNT NAMES"]),
                 si_no=str(row["SI NO."]).strip(),
                 si_date=si_date,
                 si_amount=parse_decimal(row["SI AMOUNT"]) or Decimal("0"),
@@ -174,7 +174,7 @@ def group_invoices(rows: list[SourceRow], precision: Decimal = Decimal("0.01")) 
             group.review_reason = "Conflicting invoice amount or payment status; excluded pending review."
         elif group.is_cancelled:
             group.review_reason = "Cancelled; excluded from analytics."
-        elif group.payment_status not in {"Fully Paid", "Partially Paid"}:
+        elif group.payment_status != "Fully Paid":
             group.review_reason = "Unsupported payment status; excluded from analytics pending review."
         elif group.payment_status == "Fully Paid" and not group.reconciled:
             group.review_reason = "Fully Paid invoice does not reconcile to SI amount."

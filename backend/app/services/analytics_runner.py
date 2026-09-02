@@ -127,6 +127,7 @@ def run_account_prioritization(
         row.update({
             "latest_valid_transaction": latest_transaction,
             "latest_valid_transaction_date": latest_transaction,
+            "latest_valid_si_date": latest_transaction,
             "frequency_count": item.frequency,
             "monetary_value": float(item.monetary),
             "average_settlement_days": item.settlement_days_avg,

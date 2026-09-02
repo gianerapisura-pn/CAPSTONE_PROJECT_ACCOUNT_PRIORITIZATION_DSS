@@ -115,7 +115,7 @@ def test_reduced_feature_selection_has_no_mandatory_rfm_retention():
     ]
     settlement_only = dict(no_importance, avg_settlement_days=0.2)
     assert _development_supported_features(missingness, settlement_only, no_importance) == [
-        "avg_settlement_days", "has_valid_settlement_record"
+        "avg_settlement_days"
     ]
     assert _development_supported_features(missingness, no_importance, no_importance) == []
 

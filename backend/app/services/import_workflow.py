@@ -39,7 +39,7 @@ def _persist_source_and_invoices(
                 import_batch_id=batch_id,
                 source_sheet=str(row["source_sheet"]),
                 source_row_number=int(row["source_row_number"]),
-                customer_name_raw=str(row["CUSTOMER NAME"]),
+                customer_name_raw=str(row["ACCOUNT NAMES"]),
                 si_no=str(row["SI NO."]),
                 si_date_raw=str(row["SI DATE"]),
                 si_amount_raw=str(row["SI AMOUNT"]),
@@ -201,7 +201,7 @@ def commit_source(db: Session, user: AuthenticatedUser, batch_id: str, override_
         batch.status = "committed"
         batch.committed_at = datetime.now(timezone.utc)
         db.flush()
-        run = AnalyticsRun(status="running", latest_import_batch_id=batch_id, code_version="final-hardening")
+        run = AnalyticsRun(status="running", latest_import_batch_id=batch_id, code_version="final-alignment")
         db.add(run)
         db.flush()
         cumulative_groups = load_invoice_groups(db)

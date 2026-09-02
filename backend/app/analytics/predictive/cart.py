@@ -262,8 +262,7 @@ def _development_supported_features(
         if missingness[feature] < 0.80
         and (gini_importance[feature] > 0 or permutation_scores[feature] > 0)
     }
-    if "avg_settlement_days" in selected:
-        selected.add("has_valid_settlement_record")
+
     return [feature for feature in CANDIDATE_FEATURES if feature in selected]
 
 
@@ -384,12 +383,7 @@ def run_cart_analysis(
         "feature": feature,
         "status": "retained" if feature in selected else "removed",
         "reason": (
-            "Retained with the nullable Settlement feature to represent structural evidence availability."
-            if feature == "has_valid_settlement_record"
-            and "avg_settlement_days" in selected
-            and gini[feature] <= 0
-            and permutation_scores[feature] <= 0
-            else "Retained after business relevance, missingness, leakage, redundancy, importance, and temporal validation review."
+            "Retained after business relevance, missingness, leakage, redundancy, importance, and temporal validation review."
             if feature in selected
             else "Removed by the development-only reduced-set comparison; OOP evidence was not used."
         ),
@@ -428,7 +422,7 @@ def run_cart_analysis(
         feature_columns=selected,
         report=metrics,
         predictions=dict(zip(current.get("account", []), current_predictions, strict=False)),
-        model_version=f"cart-{config.version}",
+        model_version=config.cart_model_version,
         lookback_months=config.predictive_lookback_months,
         development_periods=list(config.cart_development_cutoffs),
         oop_period=config.cart_oop_cutoff,

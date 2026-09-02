@@ -4,7 +4,8 @@ from decimal import Decimal
 
 @dataclass(frozen=True)
 class AnalyticsConfig:
-    version: str = "2026.08.final-hardening"
+    version: str = "2026.09.final-alignment"
+    cart_model_version: str = "cart_final_data_run_v3"
     candidate_outcome_windows: tuple[int, ...] = (3, 6, 12)
     predictive_lookback_months: int = 24
     recent_transaction_months: int = 12

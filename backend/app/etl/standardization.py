@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 
 
 def standardize_account_name(raw_name: object) -> str:
-    """Conservatively normalize harmless formatting without fuzzy merging."""
-    text = unicodedata.normalize("NFKC", str(raw_name or ""))
-    text = re.sub(r"\s+", " ", text.strip())
-    return text.upper()
+    """Preserve the supplied account label after whitespace-only cleanup."""
+    return re.sub(r"\s+", " ", str(raw_name or "").strip())
 
 
 def possible_alias_key(raw_name: object) -> str:
-    text = standardize_account_name(raw_name)
+    text = standardize_account_name(raw_name).upper()
     return re.sub(r"[^A-Z0-9]", "", text)

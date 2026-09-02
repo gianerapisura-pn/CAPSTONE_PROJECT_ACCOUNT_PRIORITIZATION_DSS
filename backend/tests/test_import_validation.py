@@ -6,7 +6,7 @@ from app.imports.validators import REQUIRED_COLUMNS, parse_source_file, validate
 
 
 def valid_row(**changes):
-    row = {"CUSTOMER NAME":"Future Co","SI NO.":"001","SI DATE":"2035-01-01","SI AMOUNT":"100.00",
+    row = {"ACCOUNT NAMES":"Future Co","SI NO.":"001","SI DATE":"2035-01-01","SI AMOUNT":"100.00",
            "CR NO.":"CR-1","CR DATE":"2035-01-10","CR AMOUNT":"98.00","EWT":"2.00",
            "PAYMENT MODE":"Bank","PAYMENT STATUS":"Fully Paid"}
     row.update(changes)
@@ -25,7 +25,7 @@ def test_valid_xlsx_and_multiple_nonempty_sheets():
 
 
 def test_cancelled_collection_blanks_are_valid_but_bad_values_fail():
-    cancelled=pd.DataFrame([valid_row(**{"CUSTOMER NAME":"","SI DATE":"","SI AMOUNT":"","PAYMENT STATUS":"Cancelled","CR DATE":"","CR AMOUNT":"","EWT":""})])
+    cancelled=pd.DataFrame([valid_row(**{"ACCOUNT NAMES":"","SI DATE":"","SI AMOUNT":"","PAYMENT STATUS":"Cancelled","CR DATE":"","CR AMOUNT":"","EWT":""})])
     cancelled["source_sheet"]="CSV";cancelled["source_row_number"]=2
     assert not [issue for issue in validate_rows(cancelled) if issue.severity=="error"]
     bad=pd.DataFrame([valid_row(**{"SI DATE":"not-a-date","SI AMOUNT":"oops"})])
@@ -40,23 +40,41 @@ def test_column_case_and_whitespace_are_canonicalized():
 
 
 def test_duplicate_canonical_headers_are_rejected():
-    columns = list(REQUIRED_COLUMNS) + [" customer name "]
+    columns = list(REQUIRED_COLUMNS) + [" account names "]
     frame = pd.DataFrame([list(valid_row().values()) + ["Duplicate"]], columns=columns)
     parsed = parse_source_file("duplicate.csv", frame.to_csv(index=False).encode())
     assert not parsed.frames
     assert any(issue.issue_type == "duplicate_column" for issue in parsed.issues)
 
 
+def test_customer_name_compatibility_alias_maps_to_account_names():
+    frame = pd.DataFrame([valid_row()]).rename(columns={"ACCOUNT NAMES": "CUSTOMER NAME"})
+    parsed = parse_source_file("legacy.csv", frame.to_csv(index=False).encode())
+    assert not parsed.issues
+    assert parsed.frames["CSV"].iloc[0]["ACCOUNT NAMES"] == "Future Co"
+    assert "CUSTOMER NAME" not in parsed.frames["CSV"]
+
+
+def test_account_name_and_compatibility_alias_together_are_rejected():
+    frame = pd.DataFrame([valid_row()])
+    frame["CUSTOMER NAME"] = "Ambiguous Co"
+    parsed = parse_source_file("ambiguous.csv", frame.to_csv(index=False).encode())
+    assert not parsed.frames
+    assert any(issue.issue_type == "ambiguous_column_alias" for issue in parsed.issues)
+
+
 def test_cancelled_synonyms_and_unknown_status_are_handled_before_required_fields():
     rows = pd.DataFrame([
-        valid_row(**{"CUSTOMER NAME":"", "SI NO.":"", "SI DATE":"", "SI AMOUNT":"", "PAYMENT STATUS":"Voided"}),
+        valid_row(**{"ACCOUNT NAMES":"", "SI NO.":"", "SI DATE":"", "SI AMOUNT":"", "PAYMENT STATUS":"Voided"}),
         valid_row(**{"PAYMENT STATUS":"Needs Review"}),
+        valid_row(**{"PAYMENT STATUS":"Partially Paid"}),
     ])
     rows["source_sheet"] = "CSV"
-    rows["source_row_number"] = [2, 3]
+    rows["source_row_number"] = [2, 3, 4]
     issues = validate_rows(rows)
     assert not [issue for issue in issues if issue.row_number == 2 and issue.severity == "error"]
     assert any(issue.row_number == 3 and issue.issue_type == "unknown_payment_status" for issue in issues)
+    assert any(issue.row_number == 4 and issue.issue_type == "unknown_payment_status" for issue in issues)
 
 
 def test_blank_si_and_invalid_collection_values_are_typed():

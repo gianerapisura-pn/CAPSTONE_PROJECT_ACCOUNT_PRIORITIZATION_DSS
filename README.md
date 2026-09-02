@@ -28,6 +28,7 @@ in order:
 3. `supabase/migrations/003_current_method_alignment.sql`
 4. `supabase/migrations/004_four_criterion_final_alignment.sql`
 5. `supabase/migrations/005_final_hardening.sql`
+6. `supabase/migrations/006_final_capstone_alignment.sql`
 
 Create private `source-imports` and `model-artifacts` Storage buckets, create
 Supabase Auth users, and assign each user a `user_profiles` role of
@@ -41,6 +42,8 @@ Administrator operations include import preview/commit, duplicate override, anal
 `Upload -> private store -> PREVIEW -> validate -> administrator confirmation -> raw lineage -> invoice grouping/reconciliation -> COMMITTED -> immutable analytics run -> latest-successful APIs/views`
 
 CSV/XLSX imports use the canonical template in `sample_data/`. Repeated payment rows do not inflate Frequency or Monetary. Blank collection amounts remain distinct from recorded zero values in source lineage and are treated as no numeric contribution only during aggregation. Cancelled rows remain traceable and are excluded from analytics. Exact committed SHA-256 duplicates are blocked unless an administrator gives an audited reason.
+
+The canonical ten-field source starts with `ACCOUNT NAMES`. `CUSTOMER NAME` is accepted only as a compatibility input alias and is immediately mapped to `ACCOUNT NAMES`; files containing both are rejected as ambiguous. Official analytics eligibility recognizes `Fully Paid` and excludes `Cancelled`; partial or unsupported statuses are retained for administrator review but excluded from analytics.
 
 The first controlled training action evaluates CART candidate horizons and
 features chronologically, freezes development decisions, performs final
@@ -70,6 +73,14 @@ npm run test:e2e
 ```
 
 Playwright needs Chromium. Run `npx playwright install chromium` if it is not already installed.
+
+The confidential official-data regression is opt-in and never requires the workbook inside Git:
+
+```powershell
+$env:PESLC_OFFICIAL_RAW_PATH = "C:\private\PESLC_2017_2025_RAW_DATASET.xlsx"
+cd backend
+python -m pytest tests/test_official_raw_regression.py -v
+```
 
 ## Documentation
 

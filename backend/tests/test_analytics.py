@@ -20,6 +20,7 @@ from app.analytics.validation.backtest import run_historical_backtest, top_decil
 from app.analytics.validation.sensitivity import run_sensitivity
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
 from app.services.analytics_runner import run_account_prioritization
+from app.etl.standardization import possible_alias_key, standardize_account_name
 from app.etl.invoices import (
     SourceRow, dataframe_to_source_rows, group_invoices, invoice_group_key,
 )
@@ -104,19 +105,19 @@ def test_reconciliation_uses_cr_plus_ewt_exactly_after_cent_rounding():
 def test_blank_collection_values_remain_distinct_from_recorded_zero():
     frame = pd.DataFrame([
         {
-            "CUSTOMER NAME": "Blank EWT", "SI NO.": "SI-1", "SI DATE": "2026-01-01",
+            "ACCOUNT NAMES": "Blank EWT", "SI NO.": "SI-1", "SI DATE": "2026-01-01",
             "SI AMOUNT": "100", "CR NO.": "CR-1", "CR DATE": "2026-01-02",
             "CR AMOUNT": "100", "EWT": "", "PAYMENT MODE": "Bank",
             "PAYMENT STATUS": "Fully Paid", "source_sheet": "CSV", "source_row_number": 2,
         },
         {
-            "CUSTOMER NAME": "Recorded Zero", "SI NO.": "SI-2", "SI DATE": "2026-01-01",
+            "ACCOUNT NAMES": "Recorded Zero", "SI NO.": "SI-2", "SI DATE": "2026-01-01",
             "SI AMOUNT": "100", "CR NO.": "CR-2", "CR DATE": "2026-01-02",
             "CR AMOUNT": "0.00", "EWT": "0.00", "PAYMENT MODE": "Bank",
             "PAYMENT STATUS": "Fully Paid", "source_sheet": "CSV", "source_row_number": 3,
         },
         {
-            "CUSTOMER NAME": "Blank CR", "SI NO.": "SI-3", "SI DATE": "2026-01-01",
+            "ACCOUNT NAMES": "Blank CR", "SI NO.": "SI-3", "SI DATE": "2026-01-01",
             "SI AMOUNT": "100", "CR NO.": "CR-3", "CR DATE": "2026-01-02",
             "CR AMOUNT": "", "EWT": "0.00", "PAYMENT MODE": "Bank",
             "PAYMENT STATUS": "Fully Paid", "source_sheet": "CSV", "source_row_number": 4,
@@ -128,7 +129,7 @@ def test_blank_collection_values_remain_distinct_from_recorded_zero():
     assert blank_cr.cr_amount is None
     assert recorded_zero.cr_amount == Decimal("0.00")
     groups = group_invoices([blank_ewt, recorded_zero, blank_cr])
-    reconciled = next(group for group in groups if group.standardized_account_name == "BLANK EWT")
+    reconciled = next(group for group in groups if group.standardized_account_name == "Blank EWT")
     assert reconciled.reconciled
     assert reconciled.total_ewt == Decimal("0")
 
@@ -152,12 +153,19 @@ def test_negative_chronology_and_cancelled_component_eligibility():
 
 
 def test_unsupported_payment_status_is_ineligible_for_all_analytics():
-    unsupported = group_invoices([
-        row("A", "SI-1", "2026-01-01", "100", "CR-1", "2026-01-05", "100", status="Needs Review")
-    ])[0]
-    assert not unsupported.rfm_eligible
-    assert not unsupported.settlement_eligible
-    assert unsupported.review_reason == "Unsupported payment status; excluded from analytics pending review."
+    for status in ("Needs Review", "Partially Paid", "Partial"):
+        unsupported = group_invoices([
+            row("A", f"SI-{status}", "2026-01-01", "100", "CR-1", "2026-01-05", "100", status=status)
+        ])[0]
+        assert not unsupported.rfm_eligible
+        assert not unsupported.settlement_eligible
+        assert unsupported.review_reason == "Unsupported payment status; excluded from analytics pending review."
+
+
+def test_account_standardization_preserves_display_case_and_only_cleans_whitespace():
+    assert standardize_account_name("  Acme   Pump Co.  ") == "Acme Pump Co."
+    assert standardize_account_name("ACME PUMP CO.") == "ACME PUMP CO."
+    assert possible_alias_key("Acme Pump Co.") == "ACMEPUMPCO"
 
 
 def test_settlement_cutoff_prevents_future_collection_leakage():
@@ -172,7 +180,7 @@ def test_current_mcs_uses_latest_si_cutoff_for_settlement_evidence():
     groups = group_invoices([
         row("A", "A-1", "2026-01-01", "100", "A-CR", "2026-03-01", "100"),
         row("B", "B-1", "2026-02-01", "200", "B-CR", "2026-02-10", "200"),
-        row("C", "C-1", "2026-02-15", "50", "", "", "0", status="Partially Paid"),
+        row("C", "C-1", "2026-02-15", "50", "", "", "0", status="Fully Paid"),
     ])
     current = run_account_prioritization(groups)
     assert current.cutoff_date == "2026-02-15"
@@ -183,7 +191,7 @@ def test_current_mcs_uses_latest_si_cutoff_for_settlement_evidence():
 
     advanced = run_account_prioritization(group_invoices([
         *[source for group in groups for source in group.rows],
-        row("C", "C-2", "2026-04-01", "75", "", "", "0", status="Partially Paid"),
+        row("C", "C-2", "2026-04-01", "75", "", "", "0", status="Fully Paid"),
     ]))
     assert advanced.cutoff_date == "2026-04-01"
     assert {item["account"] for item in advanced.settlement} == {"A", "B"}
@@ -256,6 +264,10 @@ def test_sensitivity_perturbs_four_weights_reproducibly_for_all_ranges():
     assert sum(result.iterations for result in results) == 400
     assert sum(len(result.scenarios) for result in results) == 400 * len(priorities)
     assert all(required <= scenario.keys() for result in results for scenario in result.scenarios)
+    assert all(
+        result.min_spearman <= scenario["spearman_correlation"] <= result.max_spearman
+        for result in results for scenario in result.scenarios
+    )
     assert all(
         abs(sum(scenario[key] for key in required) - 1) < 1e-12
         for result in results for scenario in result.scenarios

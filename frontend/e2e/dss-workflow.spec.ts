@@ -21,17 +21,17 @@ test("demo administrator imports future data and reaches updated decision output
   await expect(page.getByText("Import and analytics publication completed")).toBeVisible({ timeout: 90_000 });
 
   await page.goto("/accounts");
-  await page.getByLabel("Search accounts").fill("NEW FUTURE ACCOUNT");
+  await page.getByLabel("Search accounts").fill("New Future Account");
   await expect(page.getByText("No accounts match the selected filters.")).toBeVisible();
   await page.goto("/analytics/rfm");
   await expect(page.getByRole("heading", { name: "RFM analytics" })).toBeVisible();
-  await expect(page.getByRole("table").getByText("NEW FUTURE ACCOUNT")).toBeVisible();
+  await expect(page.getByRole("table").getByText("New Future Account")).toBeVisible();
 
   await page.goto("/accounts");
-  await page.getByLabel("Search accounts").fill("ALPHA INFRA CORP");
-  await page.getByRole("link", { name: "Open ALPHA INFRA CORP" }).click();
+  await page.getByLabel("Search accounts").fill("Alpha Infra Corp");
+  await page.getByRole("link", { name: "Open Alpha Infra Corp" }).click();
   await page.waitForURL(/\/accounts\//, { timeout: 60_000 });
-  await expect(page.getByRole("heading", { name: "ALPHA INFRA CORP" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Alpha Infra Corp" })).toBeVisible();
   await expect(page.getByText("Current rank")).toBeVisible();
 
   await page.goto("/reports");

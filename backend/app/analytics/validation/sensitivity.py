@@ -54,7 +54,8 @@ def run_sensitivity(
             [baseline_ranks[item.account] for item in priorities],
             [ranks[item.account] for item in priorities],
         ).correlation
-        spearman_values.append(float(correlation if not np.isnan(correlation) else 1.0))
+        correlation_value = float(correlation if not np.isnan(correlation) else 1.0)
+        spearman_values.append(correlation_value)
         moved = 0
         for item in priorities:
             changed = groups[item.account] != item.priority_group
@@ -68,7 +69,8 @@ def run_sensitivity(
                 "scenario_score": scores[item.account],
                 "baseline_rank": item.priority_rank,
                 "scenario_rank": ranks[item.account],
-                "rank_difference": ranks[item.account] - item.priority_rank,
+                "rank_change": ranks[item.account] - item.priority_rank,
+                "spearman_correlation": correlation_value,
                 "baseline_priority_group": item.priority_group,
                 "scenario_priority_group": groups[item.account],
                 "group_changed": changed,

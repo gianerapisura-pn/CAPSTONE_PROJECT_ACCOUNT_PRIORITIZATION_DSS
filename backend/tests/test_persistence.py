@@ -38,9 +38,9 @@ def test_future_file_persists_through_latest_api_payload(tmp_path, monkeypatch):
         payload=run_payload(db,latest)
         assert committed["status"]=="COMMITTED"
         assert latest.cutoff_date.year==2030
-        assert any(row["account"]=="NEW FUTURE ACCOUNT" for row in payload["rfm"])
+        assert any(row["account"]=="New Future Account" for row in payload["rfm"])
         assert payload["priorities"]
-        assert {"frequency_count", "monetary_value", "average_settlement_days",
+        assert {"latest_valid_si_date", "frequency_count", "monetary_value", "average_settlement_days",
                 "valid_settlement_record_count", "predicted_inactivity_risk"} <= payload["priorities"][0].keys()
         from app.schemas.api import AccountPriorityResponse
         AccountPriorityResponse.model_validate(payload["priorities"][0])
@@ -58,7 +58,7 @@ def test_raw_collection_blanks_are_preserved_through_commit(tmp_path, monkeypatc
     monkeypatch.setenv("DEMO_STORAGE_PATH", str(tmp_path / "source"))
     get_settings.cache_clear()
     content = (
-        "CUSTOMER NAME,SI NO.,SI DATE,SI AMOUNT,CR NO.,CR DATE,CR AMOUNT,EWT,PAYMENT MODE,PAYMENT STATUS\n"
+        "ACCOUNT NAMES,SI NO.,SI DATE,SI AMOUNT,CR NO.,CR DATE,CR AMOUNT,EWT,PAYMENT MODE,PAYMENT STATUS\n"
         "Blank EWT,1,2030-01-01,100,CR-1,2030-01-01,100,,Bank,Fully Paid\n"
         "Recorded Zero,2,2030-01-01,100,CR-2,2030-01-01,100,0.00,Bank,Fully Paid\n"
     ).encode()
@@ -85,13 +85,13 @@ def test_preview_counts_unique_rows_by_sheet_not_issue_objects(tmp_path, monkeyp
     monkeypatch.setenv("DEMO_STORAGE_PATH", str(tmp_path / "source"))
     get_settings.cache_clear()
     base = {
-        "CUSTOMER NAME": "A", "SI NO.": "1", "SI DATE": "2035-01-01",
+        "ACCOUNT NAMES": "A", "SI NO.": "1", "SI DATE": "2035-01-01",
         "SI AMOUNT": "100", "CR NO.": "1", "CR DATE": "2035-01-02",
         "CR AMOUNT": "100", "EWT": "0", "PAYMENT MODE": "Bank",
         "PAYMENT STATUS": "Needs Review",
     }
     first = pd.DataFrame([base])
-    second = pd.DataFrame([{**base, "CUSTOMER NAME": "", "SI DATE": "bad"}])
+    second = pd.DataFrame([{**base, "ACCOUNT NAMES": "", "SI DATE": "bad"}])
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         first.to_excel(writer, sheet_name="A", index=False)

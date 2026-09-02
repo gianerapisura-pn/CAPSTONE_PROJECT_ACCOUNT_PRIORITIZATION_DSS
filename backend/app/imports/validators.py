@@ -12,7 +12,7 @@ import pandas as pd
 from app.etl.status import standardize_payment_status
 
 REQUIRED_COLUMNS = (
-    "CUSTOMER NAME",
+    "ACCOUNT NAMES",
     "SI NO.",
     "SI DATE",
     "SI AMOUNT",
@@ -23,6 +23,10 @@ REQUIRED_COLUMNS = (
     "PAYMENT MODE",
     "PAYMENT STATUS",
 )
+
+INPUT_COLUMN_ALIASES = {
+    "CUSTOMER NAME": "ACCOUNT NAMES",
+}
 
 
 @dataclass(frozen=True)
@@ -64,6 +68,16 @@ def _canonicalize_frame(frame: pd.DataFrame, sheet_name: str) -> tuple[pd.DataFr
         return None, issues
     renamed = dict(zip(frame.columns, normalized, strict=True))
     canonical = frame.rename(columns=renamed)
+    for alias, target in INPUT_COLUMN_ALIASES.items():
+        if alias in canonical.columns and target in canonical.columns:
+            issues.append(ValidationIssue(
+                None, None, "error",
+                f"{sheet_name}: both {target} and compatibility alias {alias} are present; remove one.",
+                "ambiguous_column_alias", sheet_name,
+            ))
+            return None, issues
+        if alias in canonical.columns:
+            canonical = canonical.rename(columns={alias: target})
     missing = [column for column in REQUIRED_COLUMNS if column not in canonical.columns]
     if missing:
         issues.append(ValidationIssue(
@@ -128,10 +142,10 @@ def validate_rows(frame: pd.DataFrame) -> list[ValidationIssue]:
         def add(column: str | None, severity: str, message: str, issue_type: str) -> None:
             issues.append(ValidationIssue(row_number, column, severity, message, issue_type, sheet))
 
-        if status not in {"Fully Paid", "Cancelled", "Partially Paid"}:
-            add("PAYMENT STATUS", "warning", "Unknown payment status requires review.", "unknown_payment_status")
-        if not is_cancelled and str(row["CUSTOMER NAME"]).strip() == "":
-            add("CUSTOMER NAME", "error", "Blank or unidentifiable customer.", "missing_customer")
+        if status not in {"Fully Paid", "Cancelled"}:
+            add("PAYMENT STATUS", "warning", "Unsupported payment status requires administrator review and is excluded from analytics.", "unknown_payment_status")
+        if not is_cancelled and str(row["ACCOUNT NAMES"]).strip() == "":
+            add("ACCOUNT NAMES", "error", "Blank or unidentifiable account.", "missing_account")
         if not is_cancelled and str(row["SI NO."]).strip() == "":
             add("SI NO.", "error", "Blank Sales Invoice number.", "missing_si_number")
         if not is_cancelled and pd.isna(pd.to_datetime(row["SI DATE"], errors="coerce")):

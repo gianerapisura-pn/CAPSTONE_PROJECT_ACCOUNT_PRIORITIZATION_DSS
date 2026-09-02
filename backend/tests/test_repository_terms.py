@@ -48,6 +48,8 @@ def test_methodological_implementation_guards():
     assert "latest_transaction_year" not in candidate_block
     assert '"rfm_score"' not in candidate_block
     assert "rng.uniform(-weight_range, weight_range)" in sensitivity
+    assert '"rank_change"' in sensitivity
+    assert "rank_difference" not in sensitivity
     assert "method=\"pearson\"" in scoring
     assert "demoPriorities" not in production_frontend_text()
 
@@ -78,5 +80,20 @@ def test_migration_005_exposes_final_logical_priority_contract():
         "predicted_inactivity_risk", "security_invoker",
     ):
         assert field in migration
+    assert "normalized_rfm" not in migration
+    assert "rfm_weight" not in migration
+
+def test_migration_006_exposes_locked_final_reporting_contract():
+    migration = Path("../supabase/migrations/006_final_capstone_alignment.sql").read_text(encoding="utf-8")
+    for field in (
+        "latest_valid_si_date", "settlement_invoice_count",
+        "weight_recency", "weight_frequency", "weight_monetary", "weight_settlement",
+        "contribution_recency", "contribution_frequency",
+        "contribution_monetary", "contribution_settlement",
+        "analysis_date", "scenario_key", "spearman_correlation",
+        "predicted_inactivity_risk", "rank_change", "security_invoker",
+    ):
+        assert field in migration
+    assert "rank_difference" not in migration
     assert "normalized_rfm" not in migration
     assert "rfm_weight" not in migration

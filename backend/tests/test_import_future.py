@@ -16,11 +16,11 @@ def test_future_year_and_new_account_import_pipeline():
     rows = dataframe_to_source_rows(frame, import_batch_id=parsed.file_hash[:12])
     groups = group_invoices(rows)
     assert any(group.si_date.year == 2030 for group in groups)
-    assert any(group.standardized_account_name == "NEW FUTURE ACCOUNT" for group in groups)
+    assert any(group.standardized_account_name == "New Future Account" for group in groups)
     result = run_account_prioritization(groups)
     assert result.status == "successful"
 
 
 def test_missing_columns_rejected():
-    parsed = parse_source_file("bad.csv", b"CUSTOMER NAME,SI NO.\nAcme,1\n")
+    parsed = parse_source_file("bad.csv", b"ACCOUNT NAMES,SI NO.\nAcme,1\n")
     assert any(issue.severity == "error" for issue in parsed.issues)

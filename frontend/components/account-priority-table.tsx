@@ -85,7 +85,7 @@ export function AccountPriorityTable({
       </div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Rank</th><th>Account</th><th>Priority</th><th>Final score</th><th>Recency</th><th>Frequency</th><th>Monetary</th><th>Avg. settlement</th><th>Predicted inactivity risk</th><th>Latest transaction</th><th aria-label="Open details" /></tr></thead>
+          <thead><tr><th>Rank</th><th>Account</th><th>Priority</th><th>Final score</th><th>Recency</th><th>Frequency</th><th>Monetary</th><th>Avg. settlement</th><th>Predicted inactivity risk</th><th>Latest valid SI</th><th aria-label="Open details" /></tr></thead>
           <tbody>{visible.map((row) => (
             <tr key={row.account}>
               <td className="rank-cell">#{row.priority_rank}</td>
@@ -97,7 +97,7 @@ export function AccountPriorityTable({
               <td>{money.format(row.monetary_value)}</td>
               <td>{row.average_settlement_days.toFixed(1)} days</td>
               <td><Badge tone={row.predicted_inactivity_risk?.startsWith("Lower") ? "positive" : row.predicted_inactivity_risk ? "warning" : "neutral"}>{row.predicted_inactivity_risk ?? "Unavailable"}</Badge></td>
-              <td>{row.latest_valid_transaction_date}</td>
+              <td>{row.latest_valid_si_date}</td>
               <td><Link className="row-link" aria-label={`Open ${row.account}`} href={`/accounts/${accountKeys[row.account] || encodeURIComponent(row.account)}`}><ExternalLink size={16} /></Link></td>
             </tr>
           ))}</tbody>

@@ -2,6 +2,8 @@
 
 The project is one integrated DSS. The Next.js UI owns authenticated operational workflows. FastAPI validates imports, performs ETL and analytics, publishes immutable outputs, and exports data. Supabase provides Auth, PostgreSQL persistence, and private source storage. Power BI reads stable reporting views; it does not calculate analytical formulas.
 
+The deployed Web DSS uses Pandas for tabular parsing and analytical frames alongside NumPy, SciPy, and scikit-learn. This implementation detail is distinct from the separate locked/reference reproducibility package, which did not require Pandas; both must implement the same locked methodology and reproduce the same accepted outputs.
+
 ## Runtime
 
 1. Supabase Auth creates a persistent browser session. The backend verifies asymmetric JWTs against Supabase JWKS; legacy HS256 tokens are verified through the Supabase Auth user endpoint.

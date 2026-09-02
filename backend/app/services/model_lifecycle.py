@@ -96,7 +96,7 @@ def train_and_persist_model(
         oop_metrics=result.report,
         last_validation_date=now.date(),
         method_version=config.version,
-        code_version="final-hardening",
+        code_version="final-alignment",
         artifact_path=path,
         artifact_hash=sha256(content).hexdigest(),
         review_recommended=False,

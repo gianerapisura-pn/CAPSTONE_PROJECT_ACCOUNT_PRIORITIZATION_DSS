@@ -6,11 +6,11 @@ The DSS recommends which previous or existing accounts should receive management
 
 ## Import and ETL
 
-The canonical source has exactly ten fields: CUSTOMER NAME, SI NO., SI DATE, SI AMOUNT, CR NO., CR DATE, CR AMOUNT, EWT, PAYMENT MODE, and PAYMENT STATUS. Years and accounts are data, not system constants.
+The canonical source has exactly ten fields: ACCOUNT NAMES, SI NO., SI DATE, SI AMOUNT, CR NO., CR DATE, CR AMOUNT, EWT, PAYMENT MODE, and PAYMENT STATUS. `CUSTOMER NAME` is an optional compatibility input alias that is immediately mapped to `ACCOUNT NAMES`; a file containing both is rejected as ambiguous. Years and accounts are data, not system constants.
 
-Rows are grouped to a logical Sales Invoice by standardized account, SI number, SI date, and cent-quantized SI amount. Batch, file, worksheet, and source row are lineage only. Account standardization uses Unicode normalization, trimming, repeated-space collapse, and consistent case. Alias merging requires explicit administrator approval; fuzzy matching never merges automatically.
+Rows are grouped to a logical Sales Invoice by the whitespace-cleaned supplied account label, SI number, SI date, and cent-quantized SI amount. Batch, file, worksheet, and source row are lineage only. Technical account cleanup trims outer whitespace and collapses repeated whitespace while preserving the supplied display case. Fuzzy matching never merges accounts. Alias review is future-input governance only: explicit administrator decisions do not rewrite historical RAW labels or source facts.
 
-Cancelled rows remain in raw lineage and are excluded from analytics. Unknown statuses remain reviewable and analytics-ineligible. A Fully Paid invoice is settlement-eligible only when round(SUM(valid CR Amount) + SUM(valid EWT) - SI Amount, 2) equals 0.00.
+The official statuses are Fully Paid and Cancelled. Cancelled rows remain in raw lineage and are excluded from analytics. Partial, Partially Paid, and other unsupported statuses remain reviewable and analytics-ineligible; multiple collection rows on a Fully Paid logical invoice represent partial-payment chains without creating a third eligible status. A Fully Paid invoice is settlement-eligible only when round(SUM(valid CR Amount) + SUM(valid recorded EWT) - SI Amount, 2) equals 0.00.
 
 Multiple collection rows do not inflate Frequency or Monetary. Blank CR Amount/EWT values remain nullable and distinct from explicitly recorded zero; aggregation treats missing values as no numeric contribution without rewriting the source fact. Settlement uses the latest valid CR date. Unresolved negative chronology is excluded from Settlement but valid SI evidence may remain RFM-eligible.
 
@@ -54,11 +54,11 @@ Candidate predictors are:
 - avg_settlement_days: all settlement evidence known by T
 - account_activity_gap: two latest pre-cutoff SI dates, otherwise missing
 - has_valid_settlement_record: explicit structural indicator
-- recent_transaction_count: (T-12 months, T], retained only with development support
+- recent_transaction_count: (T-12 months, T], evaluated as a removable candidate
 
 latest_transaction_year is diagnostic only and never enters a model matrix. Identity, RFM scores, normalized MCS fields, weights, scores, ranks, groups, and future helper fields are forbidden.
 
-Development selection reviews business relevance, eligibility, missingness, leakage, Spearman redundancy flags at abs(rho) >= 0.80, Gini importance, development-validation permutation importance, broader/reduced feature sets, temporal performance, and interpretability. No Recency, Frequency, or Monetary predictor is automatically retained; if nullable avg_settlement_days survives reduction, has_valid_settlement_record remains with it to represent structural evidence availability. Numeric missing values use training-fitted median imputation. There is no scaler, automatic imputer indicator, class weighting, or undocumented performance tolerance.
+Development selection reviews business relevance, eligibility, missingness, leakage, Spearman redundancy flags at abs(rho) >= 0.80, Gini importance, development-validation permutation importance, broader/reduced feature sets, temporal performance, and interpretability. No candidate is forcibly retained. The locked final model retains recency_days, frequency_count, monetary_value, avg_settlement_days, and account_activity_gap; it removes has_valid_settlement_record and recent_transaction_count. Numeric missing values use training-fitted median imputation. There is no scaler, automatic imputer indicator, class weighting, or undocumented performance tolerance.
 
 The exact Gini tree grid is:
 - max_depth: 3, 4, 5
@@ -71,7 +71,7 @@ Routine imports only score an active hash-verified private artifact. With no act
 
 ## Validation branch
 
-Sensitivity independently multiplies all four baseline weights by 1 + U(-p,+p), renormalizes them, and recomputes score, tied rank, and tied group. Ranges are 10%, 20%, 30%, and 40%, with exactly 100 iterations per range and seed 42. Every account/scenario persists four perturbed weights, score, rank, group, rank difference, and group movement. Summaries report mean/minimum Spearman and group reclassification without arbitrary stable/sensitive labels.
+Sensitivity independently multiplies all four baseline weights by 1 + U(-p,+p), renormalizes them, and recomputes score, tied rank, and tied group. Ranges are 10%, 20%, 30%, and 40%, with exactly 100 iterations per range and seed 42. Every account/scenario persists four perturbed weights, score, rank, group, canonical `rank_change`, and group movement. Summaries report mean/minimum Spearman and group reclassification without arbitrary stable/sensitive labels.
 
 Historical MCS backtesting uses exactly the six CART cutoffs, each with a 12-calendar-month future window. Every cutoff rebuilds the same historical four-criterion MCS using evidence known by T. The top decile expands through score ties. Random comparison uses 100 seed-42 samples of the tie-adjusted selected size from the same historical eligible universe. Future-only accounts are excluded from the denominator and random population. Zero future sales returns unavailable capture; zero mean random capture returns unavailable lift.
 
