@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextValue>(() => ({ user, loading, demo,
     async signIn(email, password) {
       const client = getSupabaseClient();
-      if (!client) throw new Error("Supabase is not configured. Use the labeled demo access instead.");
+      if (!client) throw new Error("Production sign-in is not configured. Use the labeled demo access instead.");
       const { data, error } = await client.auth.signInWithPassword({ email, password });
       if (error || !data.user) throw new Error(error?.message || "Sign-in failed.");
       setUser(mapUser(data.user, await apiFetch<Record<string, unknown>>("/auth/me")));

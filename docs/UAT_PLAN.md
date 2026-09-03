@@ -12,7 +12,7 @@ analytics validation and from any optional user-satisfaction survey.
 - Use a controlled UAT Supabase environment or the visibly labeled local demo.
 - Use a sanitized representative workbook; never commit confidential source data.
 - Apply all migrations and record the application/model versions before execution.
-- Power BI cases require a secured report connected with read-only credentials.
+- Power BI cases require a secured report connected with read-only credentials and refreshed from the same latest-successful Supabase reporting views.
 
 ## Execution
 
@@ -39,6 +39,5 @@ in the repository.
 
 ## Scope boundary
 
-UAT confirms workflow acceptance, clarity, navigation, and practical
-decision-support use. It does not prove that prioritization caused sales,
+UAT confirms the single-entry workflow, role-aware navigation, one-time source upload, Web DSS/Power BI consistency after refresh, and practical decision-support use. It does not prove that prioritization caused sales,
 projects, quotations, or conversions.

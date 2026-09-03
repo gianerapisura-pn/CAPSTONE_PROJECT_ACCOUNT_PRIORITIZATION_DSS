@@ -19,8 +19,9 @@ test("demo administrator imports future data and reaches updated decision output
   if (await override.isVisible().catch(() => false)) await override.fill("Controlled repeat for automated end-to-end verification.");
   await page.getByRole("button", { name: /Commit and run analytics/i }).click();
   await expect(page.getByText("Import and analytics publication completed")).toBeVisible({ timeout: 90_000 });
-
-  await page.goto("/accounts");
+  await expect(page.getByRole("link", { name: "Open Detailed Analytics" })).toBeVisible();
+  await page.getByRole("link", { name: "View Updated Priorities" }).click();
+  await expect(page).toHaveURL(/\/accounts/);
   await page.getByLabel("Search accounts").fill("New Future Account");
   await expect(page.getByText("No accounts match the selected filters.")).toBeVisible();
   await page.goto("/analytics/rfm");
@@ -35,6 +36,8 @@ test("demo administrator imports future data and reaches updated decision output
   await expect(page.getByText("Current rank")).toBeVisible();
 
   await page.goto("/reports");
+  await expect(page.getByRole("heading", { name: "Detailed Analytics", exact: true })).toBeVisible();
+  await expect(page.getByText("Configuration required")).toBeVisible();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "CSV" }).first().click();
   expect((await download).suggestedFilename()).toContain("priorities");

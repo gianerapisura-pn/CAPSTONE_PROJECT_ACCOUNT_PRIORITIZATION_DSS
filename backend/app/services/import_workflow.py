@@ -214,7 +214,8 @@ def commit_source(db: Session, user: AuthenticatedUser, batch_id: str, override_
         audit(db, user.user_id, "analytics_run", "analytics_run", run.analysis_run_id, {"status": run.status})
         db.commit()
         return {"status": "COMMITTED", "import_batch_id": batch_id, "analysis_run_id": run.analysis_run_id,
-                "prioritized_accounts": len(result["priorities"]), "cutoff_date": result["cutoff_date"]}
+                "prioritized_accounts": len(result["priorities"]), "cutoff_date": result["cutoff_date"],
+                "warnings": result["warnings"]}
     except HTTPException:
         raise
     except Exception as exc:

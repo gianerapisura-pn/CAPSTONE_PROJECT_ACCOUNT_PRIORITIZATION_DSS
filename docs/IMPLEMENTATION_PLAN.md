@@ -1,9 +1,7 @@
 # Implementation Status
 
-The corrective plan in `CORRECTIVE_IMPLEMENTATION_PLAN.md` has been executed through analytics, persistence, authentication, APIs, UI, Power BI marts, testing, current-data regression, and final scans.
+The corrective and final-alignment plans have been implemented for analytics, persistence, authentication, APIs, role-aware UI, reporting views, automated tests, and future-data continuity. The Web DSS is the client front door; Python/FastAPI is the official ETL and analytical engine; Supabase is the central persistence/auth/storage backbone; and Power BI is the downstream Detailed Analytics layer.
 
-Production activation still requires external Supabase project values, applying
-all four migrations, Auth users/profile roles, both private Storage buckets,
-initial controlled CART training when sufficient history exists, and an
-approved secure Power BI report URL if web integration is desired. These
-credentials and the confidential workbook are intentionally absent from Git.
+The current repository contains six forward migrations. Production activation must apply `001` through `006` in order, configure a real Supabase project, create Auth users and `administrator`/`management` profiles, create both private Storage buckets, upload/activate the validated CART artifact, and configure an approved secure Power BI organizational report URL.
+
+Automated demo-mode backend, frontend, build, and browser workflows are verified in `TEST_RESULTS.md`. The confidential official workbook regression is implemented but remains pending unless `PESLC_OFFICIAL_RAW_PATH` is supplied. Real Supabase execution, Power BI authoring/refresh, and role-based UAT also remain external deployment checks. Credentials, the confidential workbook, and private model artifacts are intentionally absent from Git.

@@ -1,6 +1,6 @@
 # PESLC Account Prioritization DSS
 
-Account Prioritization Decision Support System using Multi-Criteria Scoring and Sensitivity Analysis for Pump Equip & Systems Ltd. Co. This is one integrated web DSS: Next.js operational UI, FastAPI ETL/analytics API, Supabase Auth/PostgreSQL/private Storage, and Power BI reporting views.
+Account Prioritization Decision Support System using Multi-Criteria Scoring and Sensitivity Analysis for Pump Equip & Systems Ltd. Co. This is one integrated system: the Next.js Web DSS is the client front door, FastAPI/Python performs official ETL and analytics, Supabase provides the central Auth/PostgreSQL/private Storage backbone, and Power BI provides downstream Detailed Analytics.
 
 The DSS recommends which previous or existing accounts should receive earlier management attention based on historical sales and collection evidence. High Priority is not a guarantee of purchase, project, quotation acceptance, or revenue.
 
@@ -35,7 +35,7 @@ Supabase Auth users, and assign each user a `user_profiles` role of
 `administrator` or `management`. The service-role key and direct database
 credentials are backend-only and must never use a `NEXT_PUBLIC_` name.
 
-Administrator operations include import preview/commit, duplicate override, analytics runs, histories, templates, settings, and exports. Management can read dashboard, rankings, account details, analytics, and reports. Backend dependencies enforce these boundaries.
+Management navigation focuses on Overview, Account Prioritization, and Detailed Analytics. Administrators additionally receive grouped Data Management, System/Governance, and Analysis Details navigation. Import, run, model, and alias-governance APIs remain administrator-only; backend dependencies enforce these boundaries even when a route is requested directly.
 
 ## Controlled workflow
 
@@ -51,10 +51,7 @@ out-of-period evaluation, and stores the validated artifact privately. Normal
 imports score with the active model and do not retrain it. Monitoring can flag
 review; retraining requires the administrator training endpoint.
 
-The web application is the operational review, import, ranking, account-detail,
-and export layer. Power BI connects to the PostgreSQL reporting views with
-read-only credentials for detailed analytical storytelling. Power BI does not
-recalculate the Python methodology.
+The client uploads structured RAW data once through the Web DSS; there is no second Power BI upload. The Web DSS owns secure operational review, validation, controlled commit, ranking, account explanation, and export. Power BI connects to Supabase reporting views with read-only credentials for broader reporting and reflects published results after its configured manual or scheduled refresh. Power Query may perform light report preparation, but Power BI does not recalculate the Python methodology.
 
 ## Commands
 
@@ -87,7 +84,7 @@ python -m pytest tests/test_official_raw_regression.py -v
 - `docs/ARCHITECTURE.md`: integrated runtime and security boundaries.
 - `docs/CAPSTONE_METHOD.md`: final analytical methodology.
 - `docs/AUTH_SETUP.md` and `docs/SUPABASE_SETUP.md`: external production setup.
-- `docs/POWER_BI_SETUP.md`: reporting views and secure report integration.
+- `docs/POWER_BI_SETUP.md` and `docs/POWER_BI_REPORT_SPEC.md`: secure reporting integration and final report design.
 - `docs/CURRENT_DATA_VALIDATION_REPORT.md`: frozen PESLC workbook regression.
 - `docs/UAT_PLAN.md` and `docs/UAT_TEST_CASES.csv`: blank scenario-based acceptance materials.
 - `docs/TEST_RESULTS.md`: commands and verified counts.

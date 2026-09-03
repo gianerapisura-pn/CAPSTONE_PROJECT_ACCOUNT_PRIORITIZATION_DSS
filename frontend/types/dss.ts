@@ -41,6 +41,7 @@ export interface ImportPreview {
   cancelled_count: number;
   can_commit: boolean;
   duplicate_committed_file: boolean;
+  quality_rates: Record<string, number>;
   status: string;
   issues: Array<{
     row_number: number | null;

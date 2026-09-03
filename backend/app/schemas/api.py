@@ -32,6 +32,7 @@ class ImportCommitResponse(BaseModel):
     analysis_run_id: str
     prioritized_accounts: int
     cutoff_date: str | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 class ImportBatchResponse(BaseModel):

@@ -15,7 +15,11 @@ const forbidden = [
   "Baseline RFM weight",
   "normalized_rfm",
   "rfm_contribution",
-  "actual_rfm_weight"
+  "actual_rfm_weight",
+  "Reports & Export",
+  "Supabase authenticated",
+  "Power BI cannot clean data",
+  "Power BI cannot accept future data"
 ];
 
 function walk(dir) {

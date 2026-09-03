@@ -37,6 +37,7 @@ def test_future_file_persists_through_latest_api_payload(tmp_path, monkeypatch):
         latest=latest_successful_run(db)
         payload=run_payload(db,latest)
         assert committed["status"]=="COMMITTED"
+        assert committed["warnings"] == latest.warnings
         assert latest.cutoff_date.year==2030
         assert any(row["account"]=="New Future Account" for row in payload["rfm"])
         assert payload["priorities"]
@@ -118,5 +119,7 @@ def test_import_commit_response_preserves_prioritized_account_count():
         "analysis_run_id": "run",
         "prioritized_accounts": 0,
         "cutoff_date": None,
+        "warnings": ["Predictive context unavailable."],
     })
     assert response.model_dump()["prioritized_accounts"] == 0
+    assert response.model_dump()["warnings"] == ["Predictive context unavailable."]

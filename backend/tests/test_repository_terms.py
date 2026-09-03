@@ -97,3 +97,23 @@ def test_migration_006_exposes_locked_final_reporting_contract():
     assert "rank_difference" not in migration
     assert "normalized_rfm" not in migration
     assert "rfm_weight" not in migration
+
+def test_current_docs_preserve_one_front_door_and_reporting_boundaries():
+    docs = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [Path("../README.md"), *Path("../docs").glob("*.md")]
+    )
+    lowered = docs.lower()
+    for claim in (
+        "power bi cannot clean data",
+        "power bi cannot accept future data",
+        "all four migrations",
+        "power bi automatically updates immediately after every upload",
+    ):
+        assert claim not in lowered
+
+    setup = Path("../docs/POWER_BI_SETUP.md").read_text(encoding="utf-8")
+    assert "Power BI technically supports transformation through Power Query" in setup
+    assert "migrations `001`, `002`, `003`, `004`, `005`, and `006`" in setup
+    assert "does not upload or clean a second source copy in Power BI" in setup
+    assert "does not claim immediate automatic Power BI refresh" in setup
