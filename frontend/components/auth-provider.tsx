@@ -27,7 +27,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }, 0);
       return () => window.clearTimeout(timer);
     }
-    const client = getSupabaseClient()!;
+    const client = getSupabaseClient();
+    if (!client) {
+      const timer = window.setTimeout(() => setLoading(false), 0);
+      return () => window.clearTimeout(timer);
+    }
     client.auth.getUser().then(async ({ data }) => {
       if (data.user) setUser(mapUser(data.user, await apiFetch<Record<string, unknown>>("/auth/me")));
       setLoading(false);

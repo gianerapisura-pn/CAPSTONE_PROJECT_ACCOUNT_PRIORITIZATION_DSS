@@ -33,3 +33,21 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def validate_runtime_configuration(settings: Settings) -> None:
+    if settings.app_env.strip().lower() not in {"production", "prod"}:
+        return
+    missing = []
+    if settings.demo_mode:
+        missing.append("DEMO_MODE=false")
+    if not settings.database_url or settings.database_url.lower().startswith("sqlite"):
+        missing.append("a PostgreSQL DATABASE_URL")
+    if not settings.supabase_url.startswith("https://"):
+        missing.append("SUPABASE_URL")
+    if not settings.supabase_service_role_key:
+        missing.append("SUPABASE_SERVICE_ROLE_KEY")
+    if missing:
+        raise RuntimeError(
+            "Production configuration is incomplete: " + ", ".join(missing) + "."
+        )

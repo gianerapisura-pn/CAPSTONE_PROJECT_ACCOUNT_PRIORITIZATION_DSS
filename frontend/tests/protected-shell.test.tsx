@@ -1,13 +1,15 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, vi } from "vitest";
 
 const replace = vi.fn();
 const authState = vi.hoisted(() => ({
   role: "management" as "administrator" | "management",
+  path: "/dashboard",
 }));
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/dashboard",
+  usePathname: () => authState.path,
   useRouter: () => ({ replace }),
 }));
 vi.mock("@/components/auth-provider", () => ({
@@ -28,6 +30,7 @@ import { ProtectedShell } from "@/components/protected-shell";
 
 beforeEach(() => {
   authState.role = "management";
+  authState.path = "/dashboard";
 });
 
 test("management navigation shows only the operational decision workflow", () => {
@@ -38,20 +41,36 @@ test("management navigation shows only the operational decision workflow", () =>
   expect(screen.getByRole("link", { name: "Account Prioritization" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Detailed Analytics" })).toBeInTheDocument();
   expect(screen.getAllByRole("link")).toHaveLength(3);
+  expect(screen.queryByRole("button", { name: /Advanced/ })).not.toBeInTheDocument();
+});
 
-  for (const hidden of ["Import Data", "Import History", "Analytics Runs", "Methodology & Governance", "RFM", "Settlement", "CART", "Sensitivity"]) {
-    expect(screen.queryByRole("link", { name: hidden })).not.toBeInTheDocument();
+test("administrator advanced navigation is collapsed by default and retains every route", async () => {
+  authState.role = "administrator";
+  const user = userEvent.setup();
+  render(<ProtectedShell><div>Administrator content</div></ProtectedShell>);
+
+  for (const group of ["Decision Support", "Reporting", "Data Management"]) {
+    expect(screen.getByText(group)).toBeInTheDocument();
+  }
+  for (const link of ["Overview", "Account Prioritization", "Detailed Analytics", "Import Data", "Import History", "Analytics Runs"]) {
+    expect(screen.getByRole("link", { name: link })).toBeInTheDocument();
+  }
+  const toggle = screen.getByRole("button", { name: "Advanced / Analysis Details" });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByRole("link", { name: "Methodology & Governance" })).not.toBeInTheDocument();
+
+  await user.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  for (const link of ["Methodology & Governance", "RFM", "Settlement", "CART", "Sensitivity"]) {
+    expect(screen.getByRole("link", { name: link })).toBeInTheDocument();
   }
 });
 
-test("administrator navigation retains grouped operations and analysis details", () => {
-  authState.role = "administrator";
-  render(<ProtectedShell><div>Administrator content</div></ProtectedShell>);
+test("management direct access to an administrator route is denied before page content renders", () => {
+  authState.path = "/import";
+  render(<ProtectedShell><div>Restricted import content</div></ProtectedShell>);
 
-  for (const group of ["Decision Support", "Reporting", "Data Management", "System / Governance", "Analysis Details"]) {
-    expect(screen.getByText(group)).toBeInTheDocument();
-  }
-  for (const link of ["Overview", "Account Prioritization", "Detailed Analytics", "Import Data", "Import History", "Analytics Runs", "Methodology & Governance", "RFM", "Settlement", "CART", "Sensitivity"]) {
-    expect(screen.getByRole("link", { name: link })).toBeInTheDocument();
-  }
+  expect(screen.getByRole("alert")).toHaveTextContent("Administrator access required");
+  expect(screen.queryByText("Restricted import content")).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Return to Overview" })).toHaveAttribute("href", "/dashboard");
 });

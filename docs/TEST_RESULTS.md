@@ -6,11 +6,11 @@ Method version: 2026.09.final-alignment
 
 ## Backend
 
-Command: `cd backend; python -m pytest --basetemp=.pytest-centralization-final`
+Command: `cd backend; python -m pytest --basetemp=.pytest-final-lock`
 
 ~~~text
-collected 55 items
-54 passed, 1 skipped in 9.10s
+collected 57 items
+56 passed, 1 skipped in 10.71s
 ~~~
 
 The single skip is the environment-gated confidential official-workbook regression. It is pending, not passed, because `PESLC_OFFICIAL_RAW_PATH` was not available.
@@ -21,8 +21,8 @@ Command: `cd frontend; npm test -- --run`
 
 ~~~text
 Test Files  6 passed (6)
-Tests       12 passed (12)
-Duration    24.20s
+Tests       14 passed (14)
+Duration    18.91s
 ~~~
 
 This command also completed the production-source obsolete-methodology scan.
@@ -52,9 +52,9 @@ Exit code: 0.
 Command: `cd frontend; npm run build`
 
 ~~~text
-Compiled successfully in 61s
-Finished TypeScript in 26.2s
-Generated static pages using 3 workers (15/15) in 3.6s
+Compiled successfully in 48s
+Finished TypeScript in 6.6s
+Generated static pages using 3 workers (15/15) in 1.8s
 ~~~
 
 Exit code: 0. Fifteen application routes were generated.
@@ -66,9 +66,9 @@ Command: `cd frontend; npm run test:e2e`
 ~~~text
 Running 1 test using 1 worker
 ok 1 e2e\dss-workflow.spec.ts:4:5
-  demo administrator imports future data and reaches updated decision outputs (36.4s)
+  demo administrator imports future data and reaches updated decision outputs (56.7s)
 
-1 passed (1.9m)
+1 passed (2.5m)
 ~~~
 
 The workflow used isolated demo-mode FastAPI/Next.js servers and SQLite. It verified hydrated demo sign-in, import preview/commit, future-date handling, descriptive-versus-ranked account behavior, account details, the updated-priorities handoff, the Detailed Analytics safe state, and export.
@@ -77,7 +77,7 @@ The workflow used isolated demo-mode FastAPI/Next.js servers and SQLite. It veri
 
 Migration `006_final_capstone_alignment.sql` contains six statements, has balanced parentheses, contains no `DROP TABLE`, and preserves `security_invoker` on all three recreated reporting views. Backend contract tests verify canonical `analysis_date`, `scenario_key`, `latest_valid_si_date`, Frequency, Monetary, settlement evidence count, four normalized values, four weights, four contributions, `predicted_inactivity_risk`, sensitivity `rank_change`, and per-scenario Spearman correlation.
 
-Both future import templates and the future fixture were verified to contain exactly the canonical ten fields beginning with `ACCOUNT NAMES`. Active production code and current-documentation obsolete-methodology scans returned no findings; remaining matches are deliberate negative guards or explicit compatibility references. The read-only audit covered all 128 pre-existing tracked files with zero read failures. The two new reporting test/specification files were reviewed separately. The repository still contains exactly migrations `001` through `006`; this pass did not add a migration or change locked analytics.
+Both future import templates and the future fixture were verified to contain exactly the canonical ten fields beginning with `ACCOUNT NAMES`. Active production code and current-documentation obsolete-methodology scans returned no findings; remaining matches are deliberate negative guards or explicit compatibility references. The final-lock read-only audit covered all 130 tracked files with zero read failures. Route contracts now directly test administrator enforcement for technical analysis, model, and run-history endpoints; production configuration tests verify that deployment cannot silently use demo mode or SQLite. The repository still contains exactly migrations `001` through `006`; this pass did not add a migration or change locked analytics.
 
 ## External validation status
 

@@ -19,10 +19,8 @@ const navGroups = [
     { href: "/import/history", label: "Import History", icon: History },
     { href: "/runs", label: "Analytics Runs", icon: Boxes },
   ] },
-  { label: "System / Governance", admin: true, items: [
+  { label: "Advanced / Analysis Details", admin: true, detail: true, items: [
     { href: "/settings", label: "Methodology & Governance", icon: Settings },
-  ] },
-  { label: "Analysis Details", admin: true, detail: true, items: [
     { href: "/analytics/rfm", label: "RFM", icon: BarChart3 },
     { href: "/analytics/settlement", label: "Settlement", icon: Clock3 },
     { href: "/analytics/cart", label: "CART", icon: Activity },
@@ -30,12 +28,16 @@ const navGroups = [
   ] },
 ];
 
+const adminRoutePrefixes = ["/import", "/runs", "/settings", "/analytics/rfm", "/analytics/settlement", "/analytics/cart", "/analytics/sensitivity"];
+
 export function ProtectedShell({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(() => adminRoutePrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`)));
+  const restrictedRoute = user?.role === "management" && adminRoutePrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
   useEffect(() => { if (!loading && !user) router.replace(`/login?next=${encodeURIComponent(pathname)}`) }, [loading, pathname, router, user]);
   if (loading || !user) return <div className="auth-loading"><div className="brand-mark"><Boxes /></div><span>Securing your workspace...</span></div>;
   return <div className="app-shell">
@@ -43,8 +45,10 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
       <div className="sidebar-brand"><div className="brand-mark"><Boxes /></div><div><strong>PESLC</strong><span>Account Priority DSS</span></div><button className="icon-button mobile-close" aria-label="Close navigation" onClick={() => setMobileOpen(false)}><X /></button></div>
       {user.demo && <div className="demo-banner"><ShieldCheck size={16} /><span>Demo environment</span></div>}
       <nav aria-label="Primary navigation">{navGroups.filter(group => !group.admin || user.role === "administrator").map(group => <div className={`nav-group ${group.detail ? "analysis-detail" : ""}`} key={group.label}>
-        <span className="nav-group-label">{group.label}</span>
-        {group.items.map(item => {
+        {group.detail
+          ? <button className="nav-group-toggle" type="button" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen(open => !open)}><span>{group.label}</span><ChevronDown className={advancedOpen ? "open" : ""} size={15} /></button>
+          : <span className="nav-group-label">{group.label}</span>}
+        {(!group.detail || advancedOpen) && group.items.map(item => {
           const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
           return <Link key={item.href} href={item.href} className={active ? "active" : ""} onClick={() => setMobileOpen(false)}><item.icon size={18} /><span>{item.label}</span></Link>;
         })}
@@ -53,7 +57,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
     </aside>
     <div className="workspace">
       <header className="topbar"><button className="icon-button menu-button" aria-label="Open navigation" onClick={() => setMobileOpen(true)}><Menu /></button><div className="topbar-context"><span>Decision Support System</span><strong>Management workspace</strong></div><div className="profile-wrap"><button className="profile-button" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen}><span className="avatar">{user.displayName.slice(0, 2).toUpperCase()}</span><span><strong>{user.displayName}</strong><small>{user.role}</small></span><ChevronDown size={16} /></button>{menuOpen && <div className="profile-menu"><div><strong>{user.email}</strong><span>{user.demo ? "Local demo session" : "Secure authenticated session"}</span></div><button onClick={async () => { await signOut(); router.replace("/login") }}><LogOut size={16} />Sign out</button></div>}</div></header>
-      <main className="main">{children}</main>
+      <main className="main">{restrictedRoute ? <div className="state-panel error-state" role="alert"><ShieldCheck /><strong>Administrator access required</strong><span>Your management role does not permit access to this area.</span><Link className="button secondary" href="/dashboard">Return to Overview</Link></div> : children}</main>
     </div>
   </div>;
 }

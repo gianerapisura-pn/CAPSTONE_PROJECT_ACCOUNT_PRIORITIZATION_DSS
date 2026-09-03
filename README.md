@@ -35,7 +35,7 @@ Supabase Auth users, and assign each user a `user_profiles` role of
 `administrator` or `management`. The service-role key and direct database
 credentials are backend-only and must never use a `NEXT_PUBLIC_` name.
 
-Management navigation focuses on Overview, Account Prioritization, and Detailed Analytics. Administrators additionally receive grouped Data Management, System/Governance, and Analysis Details navigation. Import, run, model, and alias-governance APIs remain administrator-only; backend dependencies enforce these boundaries even when a route is requested directly.
+Management navigation focuses on Overview, Account Prioritization, and Detailed Analytics. Administrators additionally receive Data Management plus a collapsed Advanced / Analysis Details section for methodology governance and technical analytical pages. Import, run, technical-analysis, model, and alias-governance APIs remain administrator-only; backend dependencies enforce these boundaries even when a route is requested directly.
 
 ## Controlled workflow
 

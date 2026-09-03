@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthenticatedUser, require_admin, require_user
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
-from app.core.config import get_settings
+from app.core.config import get_settings, validate_runtime_configuration
 from app.db.models import (
     AccountAlias, AccountAliasReview, AccountPriorityResult, AnalyticsRun, DimAccount, ImportBatch,
     ImportRowIssue, InvoiceGroupRecord, ModelRun, RFMResult, SensitivityScenarioRecord,
@@ -40,6 +40,7 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    validate_runtime_configuration(settings)
     init_database()
     yield
 
@@ -240,7 +241,7 @@ def run_analytics(user: AuthenticatedUser = Depends(require_admin), db: Session 
 
 
 @app.get("/analytics/latest")
-def latest_analytics(user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+def latest_analytics(user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
     return run_payload(db, _latest_or_404(db))
 
 
@@ -323,25 +324,25 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
 
 
 @app.get("/analytics/rfm")
-def rfm_analytics(user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+def rfm_analytics(user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
     run = _latest_or_404(db)
     return {"analysis_run_id": run.analysis_run_id, "cutoff_date": run.cutoff_date, "items": run_payload(db, run)["rfm"]}
 
 
 @app.get("/analytics/settlement")
-def settlement_analytics(user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+def settlement_analytics(user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
     run = _latest_or_404(db)
     return {"analysis_run_id": run.analysis_run_id, "items": run_payload(db, run)["settlement"]}
 
 
 @app.get("/analytics/cart")
-def cart_analytics(user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+def cart_analytics(user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
     run = _latest_or_404(db)
     return run_payload(db, run)["cart"]
 
 
 @app.get("/analytics/sensitivity")
-def sensitivity_analytics(account_key: str | None = None, user: AuthenticatedUser = Depends(require_user),
+def sensitivity_analytics(account_key: str | None = None, user: AuthenticatedUser = Depends(require_admin),
                           db: Session = Depends(get_db)) -> dict:
     run = _latest_or_404(db)
     summaries = run_payload(db, run)["sensitivity"]
@@ -361,7 +362,7 @@ def run_history(user: AuthenticatedUser = Depends(require_admin), db: Session = 
 
 @app.get("/analytics/runs", response_model=list[AnalyticsRunResponse])
 def analytics_run_history(
-    user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db),
 ) -> list[dict]:
     return [serialize_run(run) for run in db.scalars(
         select(AnalyticsRun).order_by(desc(AnalyticsRun.started_at))
@@ -370,7 +371,7 @@ def analytics_run_history(
 
 @app.get("/analytics/runs/{run_id}")
 def analytics_run_detail(
-    run_id: str, user: AuthenticatedUser = Depends(require_user),
+    run_id: str, user: AuthenticatedUser = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict:
     run = db.get(AnalyticsRun, run_id)
@@ -388,7 +389,7 @@ def account_priorities(
 
 @app.get("/models/current", response_model=ModelSummaryResponse)
 def current_model(
-    user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db),
 ) -> dict:
     model = active_model_version(db)
     if not model:

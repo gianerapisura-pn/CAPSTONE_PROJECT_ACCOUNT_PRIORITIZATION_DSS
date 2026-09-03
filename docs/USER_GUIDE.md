@@ -28,7 +28,7 @@ RFM and Historical Settlement Duration are descriptive. Priority Group comes fro
 8. Review warnings, then choose **View Updated Priorities**.
 9. Open **Detailed Analytics** when broader reporting is required. Power BI reflects the published run after its configured manual or scheduled refresh; no second source upload is performed.
 10. Use Import History and Analytics Runs for traceability.
-11. Use Methodology & Governance, model controls, alias review, and Analysis Details only when required.
+11. Expand **Advanced / Analysis Details** only when Methodology & Governance, model controls, alias review, RFM, Settlement, CART, or Sensitivity details are required.
 
 Exact committed hashes require an audited override reason. Routine imports score with the active frozen CART artifact and never retrain it. Monitoring may recommend review but does not replace the model. Alias decisions govern future processing and do not rewrite historical RAW labels.
 

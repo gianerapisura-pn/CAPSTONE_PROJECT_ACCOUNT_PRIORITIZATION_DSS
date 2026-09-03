@@ -7,4 +7,4 @@
 
 Asymmetric JWTs are verified locally with Supabase JWKS, issuer, audience, expiry, and subject requirements. Legacy HS256 tokens are verified by the supported Auth user endpoint. A valid token without an approved profile role receives 403. Frontend route hiding is only presentation; backend dependencies enforce every operation.
 
-Administrator: import, commit/override, run/history, templates, methodology, and audit-oriented actions. Management: dashboard, accounts/details, analytics, reports, and allowed exports.
+Administrator: import, commit/override, run/history, templates, methodology, technical analysis details, model governance, and audit-oriented actions. Management: Overview/dashboard, account prioritization/details, Detailed Analytics, and allowed exports. Direct requests to administrator API routes receive 403.
