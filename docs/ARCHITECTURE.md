@@ -17,7 +17,7 @@ the already committed transactions.
 Settlement, Priority, active-model predictions, sensitivity scenarios,
 backtest, and business-baseline output before marking it `successful`. Failure
 retains the previous latest successful run.
-6. Web APIs and Power BI views query persisted successful outputs rather than recomputing on page load. The Web DSS reflects a successful run immediately; Power BI reflects the same run after its configured manual or scheduled refresh.
+6. Web APIs and Power BI views query persisted successful outputs rather than recomputing on page load. The current account universe is the latest successful RFM result set; Settlement and MCS are optional left-joined evidence, while CART predictions are joined independently. The Web DSS reflects a successful run immediately; Power BI reflects the same run after its configured manual or scheduled refresh.
 
 Validated CART artifacts use a separate private `model-artifacts` bucket.
 Initial/controlled training persists model and evaluation versions; routine

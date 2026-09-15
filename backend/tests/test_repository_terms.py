@@ -98,6 +98,30 @@ def test_migration_006_exposes_locked_final_reporting_contract():
     assert "normalized_rfm" not in migration
     assert "rfm_weight" not in migration
 
+def test_migration_007_uses_rfm_universe_and_least_privilege_reporting_role():
+    migration = Path("../supabase/migrations/007_targeted_system_alignment.sql").read_text(encoding="utf-8")
+    lowered = migration.lower()
+    for contract in (
+        "from fact_account_rfm f",
+        "left join fact_historical_settlement",
+        "left join account_priority_results",
+        "jsonb_each_text",
+        "mcs_eligible",
+        "mcs_ineligibility_reason",
+        "security_invoker",
+        "create role peslc_reporting_reader",
+        "nologin",
+        "for select to peslc_reporting_reader",
+    ):
+        assert contract in lowered
+    assert "grant insert" not in lowered
+    assert "grant update" not in lowered
+    assert "grant delete" not in lowered
+    assert "grant all" not in lowered
+    assert "service_role" not in lowered
+    assert " superuser" not in lowered
+    assert " bypassrls" not in lowered
+
 def test_current_docs_preserve_one_front_door_and_reporting_boundaries():
     docs = "\n".join(
         path.read_text(encoding="utf-8")
@@ -114,6 +138,6 @@ def test_current_docs_preserve_one_front_door_and_reporting_boundaries():
 
     setup = Path("../docs/POWER_BI_SETUP.md").read_text(encoding="utf-8")
     assert "Power BI technically supports transformation through Power Query" in setup
-    assert "migrations `001`, `002`, `003`, `004`, `005`, and `006`" in setup
+    assert "migrations `001`, `002`, `003`, `004`, `005`, `006`, and `007`" in setup
     assert "does not upload or clean a second source copy in Power BI" in setup
     assert "does not claim immediate automatic Power BI refresh" in setup

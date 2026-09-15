@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pandas as pd
@@ -140,6 +140,134 @@ def _logical_priority_payload(
     return row
 
 
+MCS_INELIGIBLE_REASON = (
+    "No valid Historical Settlement Duration evidence known by the analysis cutoff."
+)
+
+
+def current_account_rows(db: Session, run: AnalyticsRun) -> list[dict]:
+    """Build the current account universe from RFM, with optional MCS and CART evidence."""
+    account_by_key = {
+        item.account_key: item for item in db.scalars(select(DimAccount)).all()
+    }
+    rfm_records = db.scalars(
+        select(RFMResult).where(RFMResult.analysis_run_id == run.analysis_run_id)
+    ).all()
+    settlement_by_key = {
+        item.account_key: item.payload for item in db.scalars(
+            select(SettlementResult).where(
+                SettlementResult.analysis_run_id == run.analysis_run_id
+            )
+        ).all()
+    }
+    priority_by_key = {
+        item.account_key: item.payload for item in db.scalars(
+            select(AccountPriorityResult).where(
+                AccountPriorityResult.analysis_run_id == run.analysis_run_id
+            )
+        ).all()
+    }
+    model = db.scalar(
+        select(ModelRun).where(ModelRun.analysis_run_id == run.analysis_run_id)
+    )
+    cart = model.payload if model else {}
+    predictions = cart.get("predictions") or {}
+    model_version = cart.get("model_version") or (model.model_version if model else None)
+    if model_version == "unavailable":
+        model_version = None
+    cutoff = run.cutoff_date
+    rows: list[dict] = []
+    for record in rfm_records:
+        rfm = dict(record.payload)
+        account_record = account_by_key.get(record.account_key)
+        account = rfm.get("account") or (
+            account_record.standardized_account_name if account_record else record.account_key
+        )
+        settlement = settlement_by_key.get(record.account_key) or {}
+        settlement_count = int(settlement.get("settlement_invoice_count") or 0)
+        settlement_average = settlement.get("average_settlement_days")
+        stored_priority = priority_by_key.get(record.account_key)
+        eligible = stored_priority is not None
+        priority = (
+            _logical_priority_payload(
+                stored_priority, run.critic_weights or {}, settlement_count
+            )
+            if stored_priority
+            else {}
+        )
+        latest_si = priority.get("latest_valid_si_date")
+        if latest_si is None and cutoff is not None and rfm.get("recency_days") is not None:
+            latest_si = (cutoff - timedelta(days=int(rfm["recency_days"]))).isoformat()
+        row = {
+            "account_key": record.account_key,
+            "account": account,
+            "analysis_run_id": run.analysis_run_id,
+            "analysis_cutoff": cutoff.isoformat() if cutoff else None,
+            "latest_valid_si_date": latest_si,
+            "latest_valid_transaction_date": latest_si,
+            "recency_days": rfm.get("recency_days"),
+            "frequency": rfm.get("frequency"),
+            "frequency_count": rfm.get("frequency"),
+            "monetary": rfm.get("monetary"),
+            "monetary_value": rfm.get("monetary"),
+            "recency_score": rfm.get("recency_score"),
+            "frequency_score": rfm.get("frequency_score"),
+            "monetary_score": rfm.get("monetary_score"),
+            "rfm_score": rfm.get("rfm_score"),
+            "settlement_invoice_count": settlement_count,
+            "valid_settlement_record_count": settlement_count,
+            "average_settlement_days": settlement_average,
+            "settlement_days_avg": settlement_average,
+            "mcs_eligible": eligible,
+            "mcs_eligibility_reason": (
+                None if eligible else MCS_INELIGIBLE_REASON
+                if settlement_average is None
+                else "MCS ranking was unavailable because the current four-criterion run was non-discriminating."
+            ),
+            "predicted_inactivity_risk": predictions.get(account),
+            "inactivity_risk": predictions.get(account),
+            "model_version": model_version,
+        }
+        for field in (
+            "normalized_recency", "normalized_frequency", "normalized_monetary",
+            "normalized_settlement", "recency_contribution", "frequency_contribution",
+            "monetary_contribution", "settlement_contribution", "final_priority_score",
+            "priority_rank", "priority_group", "baseline_recency_weight",
+            "baseline_frequency_weight", "baseline_monetary_weight",
+            "baseline_settlement_weight",
+        ):
+            row[field] = priority.get(field)
+        rows.append(row)
+    rows.sort(key=lambda row: (
+        row["priority_rank"] is None,
+        row["priority_rank"] if row["priority_rank"] is not None else 0,
+        row["account"].casefold(),
+    ))
+    return rows
+
+
+def filter_current_account_rows(
+    rows: list[dict],
+    search: str = "",
+    priority_group: str | None = None,
+    predicted_inactivity_risk: str | None = None,
+    eligibility: str | None = None,
+) -> list[dict]:
+    query = search.strip().casefold()
+    filtered = [row for row in rows if not query or query in row["account"].casefold()]
+    if priority_group:
+        filtered = [row for row in filtered if row.get("priority_group") == priority_group]
+    if predicted_inactivity_risk:
+        filtered = [
+            row for row in filtered
+            if row.get("predicted_inactivity_risk") == predicted_inactivity_risk
+        ]
+    if eligibility == "ranked":
+        filtered = [row for row in filtered if row.get("mcs_eligible")]
+    elif eligibility == "not_ranked":
+        filtered = [row for row in filtered if not row.get("mcs_eligible")]
+    return filtered
+
 def run_payload(db: Session, run: AnalyticsRun) -> dict:
     stored_priorities = [item.payload for item in db.scalars(select(AccountPriorityResult).where(AccountPriorityResult.analysis_run_id == run.analysis_run_id)).all()]
     rfm = [item.payload for item in db.scalars(select(RFMResult).where(RFMResult.analysis_run_id == run.analysis_run_id)).all()]
@@ -160,7 +288,8 @@ def run_payload(db: Session, run: AnalyticsRun) -> dict:
     sensitivity = [item.payload for item in db.scalars(select(SensitivitySummaryRecord).where(SensitivitySummaryRecord.analysis_run_id == run.analysis_run_id)).all()]
     backtest = db.scalar(select(RankingBacktestRecord).where(RankingBacktestRecord.analysis_run_id == run.analysis_run_id))
     baselines = [item.payload for item in db.scalars(select(BusinessBaselineRecord).where(BusinessBaselineRecord.analysis_run_id == run.analysis_run_id).order_by(BusinessBaselineRecord.year)).all()]
-    return {**serialize_run(run), "priorities": priorities, "rfm": rfm, "settlement": settlement,
+    accounts = current_account_rows(db, run)
+    return {**serialize_run(run), "accounts": accounts, "priorities": priorities, "rfm": rfm, "settlement": settlement,
             "cart": model.payload if model else {}, "sensitivity": sensitivity,
             "backtest": backtest.payload if backtest else {}, "business_baselines": baselines,
             "context_metrics": run.context_metrics or {}}

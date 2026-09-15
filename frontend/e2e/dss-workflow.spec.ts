@@ -23,7 +23,13 @@ test("demo administrator imports future data and reaches updated decision output
   await page.getByRole("link", { name: "View Updated Priorities" }).click();
   await expect(page).toHaveURL(/\/accounts/);
   await page.getByLabel("Search accounts").fill("New Future Account");
-  await expect(page.getByText("No accounts match the selected filters.")).toBeVisible();
+  const futureRow = page.getByRole("row").filter({ hasText: "New Future Account" });
+  await expect(futureRow).toBeVisible();
+  await expect(futureRow.getByText("Not ranked").first()).toBeVisible();
+  await futureRow.getByRole("link", { name: "Open New Future Account" }).click();
+  await expect(page.getByRole("heading", { name: "New Future Account" })).toBeVisible();
+  await expect(page.getByText("Not ranked by MCS")).toBeVisible();
+  await expect(page.getByText(/No valid Historical Settlement Duration evidence/)).toBeVisible();
   await page.goto("/analytics/rfm");
   await expect(page.getByRole("heading", { name: "RFM analytics" })).toBeVisible();
   await expect(page.getByRole("table").getByText("New Future Account")).toBeVisible();

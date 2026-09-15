@@ -32,7 +32,51 @@ export interface AccountPriority {
   monetary_score: number;
   model_version?: string;
 }
-export interface ImportPreview {
+export interface AccountDecisionRow {
+  account: string;
+  account_key: string;
+  analysis_run_id: string;
+  analysis_cutoff: string | null;
+  final_priority_score: number | null;
+  priority_rank: number | null;
+  priority_group: PriorityGroup | null;
+  mcs_eligible: boolean;
+  mcs_eligibility_reason: string | null;
+  rfm_score: number;
+  average_settlement_days: number | null;
+  settlement_invoice_count: number;
+  valid_settlement_record_count: number;
+  normalized_recency: number | null;
+  normalized_frequency: number | null;
+  normalized_monetary: number | null;
+  normalized_settlement: number | null;
+  recency_contribution: number | null;
+  frequency_contribution: number | null;
+  monetary_contribution: number | null;
+  settlement_contribution: number | null;
+  predicted_inactivity_risk: InactivityRisk | null;
+  latest_valid_transaction_date: string | null;
+  latest_valid_si_date: string | null;
+  recency_days: number;
+  frequency_count: number;
+  monetary_value: number;
+  baseline_recency_weight: number | null;
+  baseline_frequency_weight: number | null;
+  baseline_monetary_weight: number | null;
+  baseline_settlement_weight: number | null;
+  recency_score: number;
+  frequency_score: number;
+  monetary_score: number;
+  model_version: string | null;
+}
+export interface AccountListResponse {
+  items: AccountDecisionRow[];
+  total: number;
+  page: number;
+  page_size: number;
+  analysis_run_id: string;
+  updated_at: string | null;
+}export interface ImportPreview {
   import_batch_id: string;
   file_name: string;
   file_hash: string;

@@ -50,7 +50,7 @@ Power BI is the downstream Detailed Analytics module of the PESLC DSS. It must u
 
 ## Reporting Rules
 
-- Use Supabase reporting views after migrations `001` through `006`.
+- Use Supabase reporting views after migrations `001` through `007`.
 - Use Power Query only for light report preparation, not official ETL or analytics.
 - Prefer Import mode with an approved manual or scheduled refresh.
 - Compare cutoff, run ID, eligible population, representative rank/FPS, Priority Groups, and totals with the Web DSS after refresh.

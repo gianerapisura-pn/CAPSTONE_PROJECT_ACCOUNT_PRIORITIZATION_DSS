@@ -53,13 +53,24 @@ def train_and_persist_model(
     invoice_groups: list[InvoiceGroup],
     config: AnalyticsConfig = DEFAULT_ANALYTICS_CONFIG,
 ) -> CartResult:
+    version = config.cart_model_version
+    existing = db.scalar(
+        select(PredictiveModelVersion).where(
+            PredictiveModelVersion.model_version == version
+        )
+    )
+    if existing is not None:
+        raise ValueError(
+            f"Model version {version} already exists; choose a new configured version "
+            "before retraining."
+        )
     trained = run_cart_analysis(invoice_groups, config, include_artifact=True)
     assert isinstance(trained, tuple)
     result, artifact = trained
     if result.status != "Validated" or artifact is None:
         return result
     now = datetime.now(timezone.utc)
-    version = f"cart-{config.version}-{now.strftime('%Y%m%d%H%M%S')}"
+
     result = replace(result, model_version=version)
     artifact["result_metadata"] = {**asdict(result), "predictions": {}}
     content = _serialize_artifact(artifact)

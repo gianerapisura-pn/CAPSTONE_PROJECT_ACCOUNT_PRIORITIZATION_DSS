@@ -2,7 +2,7 @@
 
 ## Supabase
 
-Create a project, apply migrations `001`, `002`, `003`, `004`, `005`, then `006`, create private
+Create a project, apply migrations `001`, `002`, `003`, `004`, `005`, `006`, then `007`, create private
 `source-imports` and `model-artifacts` buckets, create Auth users, and insert
 `user_profiles` roles. See `SUPABASE_SETUP.md`.
 
@@ -19,8 +19,9 @@ controlled release step. When `APP_ENV=production`, startup fails closed if demo
 1. Sign in as an administrator after committed historical invoice data is available.
 2. Use **Train / validate CART model** or call `POST /models/train-validate`; this runs the locked temporal selection/OOP validation path and persists the validated artifact in the private `model-artifacts` bucket.
 3. After the artifact is stored and the database transaction succeeds, the prior active version is retired and the new version is recorded as active with its SHA-256 artifact hash.
-4. Verify `GET /models/current` shows the active version, selected horizon, trained-through date, validation date, and no unexpected review flag. Run **Monitor matured labels** only when the required future outcome window exists.
-5. Commit a controlled compatible import and confirm the new analytical run references the same active `model_version`; routine imports load and hash-check that artifact and never invoke training automatically.
+4. Duplicate configured versions are rejected; change the explicit version in controlled configuration before another retraining action.
+5. Verify `GET /models/current` shows the active version, selected horizon, development-data cutoff, untouched OOP cutoff, artifact validation/activation date, current scoring cutoff, monitoring origin, and no unexpected review flag. Run **Monitor matured labels** only when the required future outcome window exists.
+6. Commit a controlled compatible import and confirm the new analytical run references the same active `model_version`; routine imports load and hash-check that artifact and never invoke training automatically.
 
 Do not copy private model artifacts into Git. If training cannot produce a validated artifact, keep predictive context unavailable and resolve the evidence/configuration issue rather than fabricating activation.
 ## Frontend

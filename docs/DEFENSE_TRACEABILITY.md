@@ -2,7 +2,7 @@
 
 | Business pain point | System response | Analytical method | KPI / validation |
 |---|---|---|---|
-| Manual historical review | Authenticated consolidated Web DSS and invoice lineage | Controlled ETL/account views | Generation time and workflow E2E |
+| Manual historical review | Authenticated consolidated Web DSS and invoice lineage | Controlled ETL/account views | Analytics run duration and workflow E2E |
 | Random account selection | Ranked management-attention list | CRITIC/MCS | Top-decile capture and lift over random |
 | No measurable criteria | Descriptive RFM/Settlement plus ranked attention | Four-criterion CRITIC/MCS using Recency, Frequency, Monetary, and Average Settlement Days | Formula, contribution, score, rank, and dashboard checks |
 | Ranking uncertainty | Scenario-level Sensitivity page | Relative +/-10/20/30/40%, 100 each | Spearman and group reclassification |

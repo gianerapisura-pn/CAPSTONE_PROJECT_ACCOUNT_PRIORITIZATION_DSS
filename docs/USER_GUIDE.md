@@ -6,7 +6,7 @@ The PESLC Account Prioritization DSS website is the single entry point. Normal u
 
 1. Sign in with the approved PESLC account.
 2. Open **Overview** to see the latest successful analysis cutoff, account counts, Priority Groups, risk counts, and current top accounts.
-3. Open **Account Prioritization** to review the ranked management-attention order.
+3. Open **Account Prioritization** to review all current RFM profiles. Ranked MCS accounts appear first; accounts without current MCS evidence remain visible as **Not ranked** with a reason.
 4. Search or filter by Priority Group and Predicted Inactivity Risk.
 5. Open an Account Detail to understand its RFM, Settlement, four CRITIC/MCS contributions, Final Priority Score, CART context, sensitivity evidence, and logical invoice lineage.
 6. Use the result as a review/follow-up order, not as a guarantee of purchase, project, quotation acceptance, or sales.
@@ -30,7 +30,7 @@ RFM and Historical Settlement Duration are descriptive. Priority Group comes fro
 10. Use Import History and Analytics Runs for traceability.
 11. Expand **Advanced / Analysis Details** only when Methodology & Governance, model controls, alias review, RFM, Settlement, CART, or Sensitivity details are required.
 
-Exact committed hashes require an audited override reason. Routine imports score with the active frozen CART artifact and never retrain it. Monitoring may recommend review but does not replace the model. Alias decisions govern future processing and do not rewrite historical RAW labels.
+Exact committed hashes require an audited override reason. Routine imports score with the active frozen CART artifact and never retrain it. Monitoring may recommend review but does not replace the model. Alias-review decisions are audit records only in this prototype and are not applied by ETL to historical or future labels.
 
 ## Source Rules
 

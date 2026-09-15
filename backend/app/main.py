@@ -7,20 +7,23 @@ from io import BytesIO
 import pandas as pd
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response
 from pydantic import BaseModel
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthenticatedUser, require_admin, require_user
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
 from app.core.config import get_settings, validate_runtime_configuration
 from app.db.models import (
-    AccountAlias, AccountAliasReview, AccountPriorityResult, AnalyticsRun, DimAccount, ImportBatch,
-    ImportRowIssue, InvoiceGroupRecord, ModelRun, RFMResult, SensitivityScenarioRecord,
-    PredictiveModelVersion, SensitivitySummaryRecord, SettlementResult,
+    AccountAlias, AccountAliasReview, AnalyticsRun, DimAccount, ImportBatch,
+    ImportRowIssue, InvoiceGroupRecord, RFMResult, SensitivityScenarioRecord,
+    SettlementResult,
 )
-from app.db.repository import audit, latest_successful_run, load_invoice_groups, persist_run_output, run_payload, serialize_run
+from app.db.repository import (
+    audit, current_account_rows, filter_current_account_rows, latest_successful_run,
+    load_invoice_groups, persist_run_output, run_payload, serialize_run,
+)
 from app.db.session import get_db, init_database
 from app.imports.validators import REQUIRED_COLUMNS
 from app.services.analytics_runner import run_account_prioritization
@@ -30,7 +33,7 @@ from app.services.model_lifecycle import (
     train_and_persist_model,
 )
 from app.schemas.api import (
-    AccountPriorityResponse, AnalyticsRunResponse, ImportBatchResponse,
+    AccountListResponse, AccountPriorityResponse, AnalyticsRunResponse, ImportBatchResponse,
     ImportCommitResponse, ImportDetailResponse, ImportPreviewResponse,
     ModelSummaryResponse,
 )
@@ -250,14 +253,20 @@ def dashboard(user: AuthenticatedUser = Depends(require_user), db: Session = Dep
     run = _latest_or_404(db)
     payload = run_payload(db, run)
     priorities = payload["priorities"]
-    group_counts = {group: sum(row["priority_group"] == group for row in priorities) for group in ("High", "Medium", "Low")}
-    risk_counts = {risk: sum(row.get("predicted_inactivity_risk") == risk for row in priorities)
-                   for risk in ("Lower", "Higher")}
-    total_accounts = db.scalar(select(func.count()).select_from(DimAccount)) or 0
+    account_profiles = payload["accounts"]
+    group_counts = {
+        group: sum(row["priority_group"] == group for row in priorities)
+        for group in ("High", "Medium", "Low")
+    }
+    risk_counts = {
+        risk: sum(row.get("predicted_inactivity_risk") == risk for row in account_profiles)
+        for risk in ("Lower", "Higher")
+    }
+    total_accounts = len(account_profiles)
     total_sales = sum(row.get("valid_si_sales", 0) for row in payload["business_baselines"])
     return {
         "run": serialize_run(run), "total_standardized_accounts": total_accounts,
-        "mcs_eligible_accounts": int((run.eligible_account_counts or {}).get("mcs", len(priorities))), "priority_group_counts": group_counts,
+        "mcs_eligible_accounts": sum(row["mcs_eligible"] for row in account_profiles), "priority_group_counts": group_counts,
         "risk_counts": risk_counts, "total_valid_historical_sales": total_sales,
         "critic_weights": run.critic_weights, "mcs_status": run.mcs_status, "cart_status": payload["cart"].get("status", "Unavailable"),
         "cart_horizon": payload["cart"].get("outcome_window_months"),
@@ -267,61 +276,115 @@ def dashboard(user: AuthenticatedUser = Depends(require_user), db: Session = Dep
     }
 
 
-@app.get("/accounts")
+@app.get("/accounts", response_model=AccountListResponse)
 def accounts(
-    search: str = "", priority_group: str | None = None, predicted_inactivity_risk: str | None = None,
-    inactivity_risk: str | None = None,
-    page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=100),
+    search: str = "", priority_group: str | None = None,
+    predicted_inactivity_risk: str | None = None, inactivity_risk: str | None = None,
+    eligibility: str | None = Query(None, pattern="^(ranked|not_ranked)$"),
+    page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=500),
     user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db),
 ) -> dict:
     run = _latest_or_404(db)
-    rows = run_payload(db, run)["priorities"]
-    if search:
-        rows = [row for row in rows if search.lower() in row["account"].lower()]
-    if priority_group:
-        rows = [row for row in rows if row["priority_group"] == priority_group]
-    risk_filter = predicted_inactivity_risk or inactivity_risk
-    if risk_filter:
-        rows = [row for row in rows if row.get("predicted_inactivity_risk") == risk_filter]
+    rows = filter_current_account_rows(
+        current_account_rows(db, run),
+        search=search,
+        priority_group=priority_group,
+        predicted_inactivity_risk=predicted_inactivity_risk or inactivity_risk,
+        eligibility=eligibility,
+    )
     start = (page - 1) * page_size
-    return {"items": rows[start:start + page_size], "total": len(rows), "page": page,
-            "page_size": page_size, "analysis_run_id": run.analysis_run_id,
-            "updated_at": run.completed_at.isoformat() if run.completed_at else None}
+    return {
+        "items": rows[start:start + page_size], "total": len(rows), "page": page,
+        "page_size": page_size, "analysis_run_id": run.analysis_run_id,
+        "updated_at": run.completed_at.isoformat() if run.completed_at else None,
+    }
 
 
 @app.get("/accounts/{account_key}")
-def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db)) -> dict:
+def account_detail(
+    account_key: str, user: AuthenticatedUser = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> dict:
     account = db.get(DimAccount, account_key)
     if not account:
-        account = db.scalar(select(DimAccount).where(DimAccount.standardized_account_name == account_key))
+        account = db.scalar(
+            select(DimAccount).where(DimAccount.standardized_account_name == account_key)
+        )
     if not account:
         raise HTTPException(404, "Account not found.")
     run = _latest_or_404(db)
-    priority = db.scalar(select(AccountPriorityResult).where(AccountPriorityResult.analysis_run_id == run.analysis_run_id,
-                                                               AccountPriorityResult.account_key == account.account_key))
-    rfm = db.scalar(select(RFMResult).where(RFMResult.analysis_run_id == run.analysis_run_id, RFMResult.account_key == account.account_key))
-    settlement = db.scalar(select(SettlementResult).where(SettlementResult.analysis_run_id == run.analysis_run_id,
-                                                           SettlementResult.account_key == account.account_key))
-    transactions = db.scalars(select(InvoiceGroupRecord).where(InvoiceGroupRecord.account_key == account.account_key)
-                              .order_by(desc(InvoiceGroupRecord.si_date))).all()
-    scenarios = db.scalars(select(SensitivityScenarioRecord).where(SensitivityScenarioRecord.analysis_run_id == run.analysis_run_id,
-                                                                    SensitivityScenarioRecord.account_key == account.account_key)).all()
+    decision = next(
+        (
+            row for row in current_account_rows(db, run)
+            if row["account_key"] == account.account_key
+        ),
+        None,
+    )
+    if decision is None:
+        raise HTTPException(404, "Account is not part of the latest analytical run.")
+    rfm_record = db.scalar(
+        select(RFMResult).where(
+            RFMResult.analysis_run_id == run.analysis_run_id,
+            RFMResult.account_key == account.account_key,
+        )
+    )
+    settlement_record = db.scalar(
+        select(SettlementResult).where(
+            SettlementResult.analysis_run_id == run.analysis_run_id,
+            SettlementResult.account_key == account.account_key,
+        )
+    )
+    transactions = db.scalars(
+        select(InvoiceGroupRecord)
+        .where(InvoiceGroupRecord.account_key == account.account_key)
+        .order_by(desc(InvoiceGroupRecord.si_date))
+    ).all()
+    scenarios = db.scalars(
+        select(SensitivityScenarioRecord).where(
+            SensitivityScenarioRecord.analysis_run_id == run.analysis_run_id,
+            SensitivityScenarioRecord.account_key == account.account_key,
+        )
+    ).all()
     ranks = [row.payload["scenario_rank"] for row in scenarios]
-    movement = sum(row.payload["group_changed"] for row in scenarios) / len(scenarios) if scenarios else 0
+    sensitivity = None
+    if scenarios:
+        sensitivity = {
+            "minimum_rank": min(ranks),
+            "maximum_rank": max(ranks),
+            "group_movement_rate": (
+                sum(bool(row.payload["group_changed"]) for row in scenarios) / len(scenarios)
+            ),
+        }
     return {
-        "account_key": account.account_key, "account": account.standardized_account_name,
-        "priority": priority.payload if priority else None, "rfm": rfm.payload if rfm else None,
-        "settlement": settlement.payload if settlement else None,
-        "critic_weights": run.critic_weights,
-        "sensitivity": {"minimum_rank": min(ranks) if ranks else None, "maximum_rank": max(ranks) if ranks else None,
-                        "group_movement_rate": movement},
-        "transactions": [{"invoice_group_id": row.invoice_group_id, "si_no": row.si_no,
-                           "si_date": row.si_date.isoformat(), "si_amount": float(row.si_amount),
-                           "final_cr_date": row.final_cr_date.isoformat() if row.final_cr_date else None,
-                           "payment_status": row.payment_status, "reconciled": row.reconciled,
-                           "review_reason": row.review_reason, "import_batch_id": row.import_batch_id} for row in transactions],
+        "account_key": account.account_key,
+        "account": account.standardized_account_name,
+        "decision": decision,
+        "priority": decision if decision["mcs_eligible"] else None,
+        "rfm": rfm_record.payload if rfm_record else None,
+        "settlement": settlement_record.payload if settlement_record else {
+            "account": account.standardized_account_name,
+            "settlement_invoice_count": 0,
+            "average_settlement_days": None,
+            "final_collection_days_max": None,
+        },
+        "cart": {
+            "predicted_inactivity_risk": decision["predicted_inactivity_risk"],
+            "model_version": decision["model_version"],
+        },
+        "critic_weights": run.critic_weights or {},
+        "sensitivity": sensitivity,
+        "transactions": [
+            {
+                "invoice_group_id": row.invoice_group_id, "si_no": row.si_no,
+                "si_date": row.si_date.isoformat(), "si_amount": float(row.si_amount),
+                "final_cr_date": row.final_cr_date.isoformat() if row.final_cr_date else None,
+                "payment_status": row.payment_status, "reconciled": row.reconciled,
+                "review_reason": row.review_reason,
+                "import_batch_id": row.import_batch_id,
+            }
+            for row in transactions
+        ],
     }
-
 
 @app.get("/analytics/rfm")
 def rfm_analytics(user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
@@ -394,9 +457,15 @@ def current_model(
     model = active_model_version(db)
     if not model:
         return {"status": "model_unavailable", "model_version": None}
+    current_run = latest_successful_run(db)
     return {
         "status": model.status, "model_version": model.model_version,
-        "created_at": model.created_at, "trained_through_date": model.trained_through_date,
+        "created_at": model.created_at,
+        "development_data_through": DEFAULT_ANALYTICS_CONFIG.cart_development_cutoffs[-1],
+        "untouched_oop_cutoff": model.oop_cutoff or DEFAULT_ANALYTICS_CONFIG.cart_oop_cutoff,
+        "artifact_validation_date": model.created_at.date() if model.created_at else None,
+        "current_scoring_cutoff": current_run.cutoff_date if current_run else None,
+        "monitoring_origin_date": model.trained_through_date,
         "selected_outcome_horizon": model.selected_outcome_horizon,
         "retained_features": model.retained_features,
         "last_validation_date": model.last_validation_date,
@@ -412,11 +481,15 @@ def train_validate_model(
     groups = load_invoice_groups(db)
     if not groups:
         raise HTTPException(422, "No committed invoice data is available.")
-    result = train_and_persist_model(db, groups)
-    audit(db, user.user_id, "model_train_validate", "predictive_model", result.model_version,
-          {"status": result.status})
-    db.commit()
-    return asdict(result)
+    try:
+        result = train_and_persist_model(db, groups)
+        audit(db, user.user_id, "model_train_validate", "predictive_model", result.model_version,
+              {"status": result.status})
+        db.commit()
+        return asdict(result)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409, str(exc)) from exc
 
 
 @app.post("/models/monitor")
@@ -454,12 +527,20 @@ def methodology(user: AuthenticatedUser = Depends(require_admin)) -> dict:
 
 
 @app.get("/exports/{dataset}.{format}")
-def export_dataset(dataset: str, format: str, user: AuthenticatedUser = Depends(require_user),
-                   db: Session = Depends(get_db)) -> Response:
+def export_dataset(
+    dataset: str, format: str, search: str = "", priority_group: str | None = None,
+    predicted_inactivity_risk: str | None = None, inactivity_risk: str | None = None,
+    eligibility: str | None = Query(None, pattern="^(ranked|not_ranked)$"),
+    user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db),
+) -> Response:
     run = _latest_or_404(db)
     payload = run_payload(db, run)
     sources = {
-        "priorities": payload["priorities"], "rfm": payload["rfm"], "settlement": payload["settlement"],
+        "priorities": filter_current_account_rows(
+            payload["accounts"], search=search, priority_group=priority_group,
+            predicted_inactivity_risk=predicted_inactivity_risk or inactivity_risk,
+            eligibility=eligibility,
+        ), "rfm": payload["rfm"], "settlement": payload["settlement"],
         "sensitivity": payload["sensitivity"], "runs": [serialize_run(run)],
         "cart": [payload["cart"]], "transactions": [{"account": row.standardized_account_name,
             "si_no": row.si_no, "si_date": row.si_date, "si_amount": float(row.si_amount),
@@ -470,8 +551,10 @@ def export_dataset(dataset: str, format: str, user: AuthenticatedUser = Depends(
         raise HTTPException(404, "Export dataset or format not found.")
     rows = [{key: _safe_sheet_value(value) for key, value in row.items()} for row in sources[dataset]]
     frame = pd.json_normalize(rows)
-    frame.insert(0, "analysis_run_id", run.analysis_run_id)
-    frame.insert(1, "analysis_cutoff", run.cutoff_date)
+    if "analysis_run_id" not in frame.columns:
+        frame.insert(0, "analysis_run_id", run.analysis_run_id)
+    if "analysis_cutoff" not in frame.columns:
+        frame.insert(1, "analysis_cutoff", run.cutoff_date)
     audit(db, user.user_id, "export", dataset, run.analysis_run_id, {"format": format})
     db.commit()
     filename = f"peslc-{dataset}-{run.analysis_run_id}.{format}"
@@ -505,8 +588,14 @@ def export_dataset(dataset: str, format: str, user: AuthenticatedUser = Depends(
 
 @app.get("/exports/priorities")
 def export_priorities_query(
-    format: str = Query("csv", pattern="^(csv|xlsx)$"),
+    format: str = Query("csv", pattern="^(csv|xlsx)$"), search: str = "",
+    priority_group: str | None = None, predicted_inactivity_risk: str | None = None,
+    inactivity_risk: str | None = None,
+    eligibility: str | None = Query(None, pattern="^(ranked|not_ranked)$"),
     user: AuthenticatedUser = Depends(require_user),
     db: Session = Depends(get_db),
 ) -> Response:
-    return export_dataset("priorities", format, user, db)
+    return export_dataset(
+        "priorities", format, search, priority_group, predicted_inactivity_risk,
+        inactivity_risk, eligibility, user, db,
+    )

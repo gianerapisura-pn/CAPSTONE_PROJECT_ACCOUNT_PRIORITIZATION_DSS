@@ -112,11 +112,65 @@ class AccountPriorityResponse(BaseModel):
     model_version: str | None = None
 
 
+class AccountDecisionRowResponse(BaseModel):
+    account_key: str
+    account: str
+    analysis_run_id: str
+    analysis_cutoff: str | None = None
+    latest_valid_si_date: str | None = None
+    latest_valid_transaction_date: str | None = None
+    recency_days: int
+    frequency: int
+    frequency_count: int
+    monetary: float
+    monetary_value: float
+    recency_score: int
+    frequency_score: int
+    monetary_score: int
+    rfm_score: float
+    settlement_invoice_count: int
+    valid_settlement_record_count: int
+    average_settlement_days: float | None = None
+    settlement_days_avg: float | None = None
+    mcs_eligible: bool
+    mcs_eligibility_reason: str | None = None
+    normalized_recency: float | None = None
+    normalized_frequency: float | None = None
+    normalized_monetary: float | None = None
+    normalized_settlement: float | None = None
+    recency_contribution: float | None = None
+    frequency_contribution: float | None = None
+    monetary_contribution: float | None = None
+    settlement_contribution: float | None = None
+    final_priority_score: float | None = None
+    priority_rank: int | None = None
+    priority_group: str | None = None
+    baseline_recency_weight: float | None = None
+    baseline_frequency_weight: float | None = None
+    baseline_monetary_weight: float | None = None
+    baseline_settlement_weight: float | None = None
+    predicted_inactivity_risk: str | None = None
+    inactivity_risk: str | None = None
+    model_version: str | None = None
+
+
+class AccountListResponse(BaseModel):
+    items: list[AccountDecisionRowResponse]
+    total: int
+    page: int
+    page_size: int
+    analysis_run_id: str
+    updated_at: str | None = None
+
 class ModelSummaryResponse(BaseModel):
     status: str
     model_version: str | None = None
     created_at: Any = None
-    trained_through_date: Any = None
+    development_data_through: Any = None
+    untouched_oop_cutoff: Any = None
+    artifact_validation_date: Any = None
+    current_scoring_cutoff: Any = None
+    monitoring_origin_date: Any = None
     selected_outcome_horizon: int | None = None
     retained_features: list[str] = Field(default_factory=list)
     last_validation_date: Any = None

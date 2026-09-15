@@ -8,7 +8,7 @@ The DSS recommends which previous or existing accounts should receive management
 
 The canonical source has exactly ten fields: ACCOUNT NAMES, SI NO., SI DATE, SI AMOUNT, CR NO., CR DATE, CR AMOUNT, EWT, PAYMENT MODE, and PAYMENT STATUS. `CUSTOMER NAME` is an optional compatibility input alias that is immediately mapped to `ACCOUNT NAMES`; a file containing both is rejected as ambiguous. Years and accounts are data, not system constants.
 
-Rows are grouped to a logical Sales Invoice by the whitespace-cleaned supplied account label, SI number, SI date, and cent-quantized SI amount. Batch, file, worksheet, and source row are lineage only. Technical account cleanup trims outer whitespace and collapses repeated whitespace while preserving the supplied display case. Fuzzy matching never merges accounts. Alias review is future-input governance only: explicit administrator decisions do not rewrite historical RAW labels or source facts.
+Rows are grouped to a logical Sales Invoice by the whitespace-cleaned supplied account label, SI number, SI date, and cent-quantized SI amount. Batch, file, worksheet, and source row are lineage only. Technical account cleanup trims outer whitespace and collapses repeated whitespace while preserving the supplied display case. Fuzzy matching never merges accounts. The alias review register is currently non-transformative: administrator decisions are audited but ETL does not apply them to historical or future labels. No fuzzy or reviewed alias is merged automatically.
 
 The official statuses are Fully Paid and Cancelled. Cancelled rows remain in raw lineage and are excluded from analytics. Partial, Partially Paid, and other unsupported statuses remain reviewable and analytics-ineligible; multiple collection rows on a Fully Paid logical invoice represent partial-payment chains without creating a third eligible status. A Fully Paid invoice is settlement-eligible only when round(SUM(valid CR Amount) + SUM(valid recorded EWT) - SI Amount, 2) equals 0.00.
 
@@ -40,7 +40,7 @@ A constant criterion has zero information and zero weight. On discriminatory dat
 
 Final Priority Score = w_R*N_R + w_F*N_F + w_M*N_M + w_S*N_S.
 
-Each account persists all four normalized values, weights at run level, four contributions, Final Priority Score, analytical rank, and Priority Group. Equal scores share rank. Groups target ranked thirds and move boundaries to keep equal-score ties together; account name is only a deterministic display-order fallback.
+Each account persists all four normalized values, weights at run level, four contributions, Final Priority Score, analytical rank, and Priority Group. Equal scores share rank. For N ranked accounts the untied targets are High = ceil(N/3), Low = ceil(N/3), and Medium = the remainder. The High/Medium boundary extends equal-score ties into High; the Medium/Low boundary extends equal-score ties into Medium. Thus 83 distinct scores produce 28 High, 27 Medium, and 28 Low. Equal scores share analytical rank; an all-equal run remains non-discriminating rather than fabricating groups. Account name is only a deterministic display-order fallback.
 
 ## Predictive CART branch
 
@@ -66,6 +66,8 @@ The exact Gini tree grid is:
 - min_samples_leaf: 2, 4, 6
 
 Selection maximizes mean development macro F1, then minimizes mean classification error, then prefers lower depth, larger leaf, and larger split. Horizon ties use mean error and deterministic candidate order. The development-fitted artifact evaluated on OOP is persisted unchanged; OOP labels are never used for a refit.
+
+The configured artifact identifier is explicit (currently `cart_final_data_run_v3`) and duplicate version activation is rejected before retraining can overwrite it. Lifecycle displays distinguish development data through 2022-12-31, untouched OOP cutoff 2023-12-31, artifact validation/activation date, current scoring cutoff, and monitoring origin. Artifact activation does not mutate an old analytical run.
 
 Routine imports only score an active hash-verified private artifact. With no active model or an artifact failure, predictive context is unavailable while descriptive/prescriptive publication continues. Training/validation and monitoring are explicit administrator actions; monitoring never retrains automatically.
 

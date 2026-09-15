@@ -108,3 +108,44 @@ def test_no_active_model_returns_unavailable_without_training(monkeypatch):
         result = model_lifecycle.cart_for_current_run(db, invoice_groups())
         assert result.status == "model_unavailable"
         assert result.predictions == {}
+
+
+def test_training_uses_exact_configured_version_and_rejects_duplicate(monkeypatch):
+    from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
+
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    calls = {"training": 0}
+
+    def trained_result(*args, **kwargs):
+        calls["training"] += 1
+        return (
+            CartResult(
+                status="Validated",
+                outcome_window_months=12,
+                feature_columns=["recency_days"],
+                report={"macro_f1": 0.8},
+                predictions={},
+                development_periods=list(DEFAULT_ANALYTICS_CONFIG.cart_development_cutoffs),
+                oop_period=DEFAULT_ANALYTICS_CONFIG.cart_oop_cutoff,
+                hyperparameters={"max_depth": 3},
+            ),
+            {"imputation_values": {"recency_days": 0}},
+        )
+
+    monkeypatch.setattr(model_lifecycle, "run_cart_analysis", trained_result)
+    monkeypatch.setattr(
+        model_lifecycle,
+        "ModelStorage",
+        lambda: SimpleNamespace(put=lambda version, content: f"private/{version}.joblib"),
+    )
+    with Session(engine) as db:
+        result = model_lifecycle.train_and_persist_model(db, invoice_groups())
+        db.flush()
+        record = db.query(PredictiveModelVersion).one()
+        assert result.model_version == DEFAULT_ANALYTICS_CONFIG.cart_model_version
+        assert record.model_version == DEFAULT_ANALYTICS_CONFIG.cart_model_version
+        assert record.trained_through_date == pd.Timestamp("2030-01-01").date()
+        with pytest.raises(ValueError, match="already exists"):
+            model_lifecycle.train_and_persist_model(db, invoice_groups())
+        assert calls["training"] == 1

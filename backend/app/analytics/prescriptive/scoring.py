@@ -73,24 +73,25 @@ def analytical_ranks(scored: list[tuple[str, float]]) -> dict[str, int]:
 
 
 def assign_priority_groups(scored: list[tuple[str, float]]) -> dict[str, str]:
-    """Assign approximate thirds while keeping equal-score boundaries intact."""
+    """Assign high/medium/low thirds while keeping equal-score boundaries intact."""
     if not scored:
         return {}
     ordered = sorted(scored, key=lambda item: (-item[1], item[0]))
     if len({score for _, score in ordered}) == 1:
         return {account: "Medium" for account, _ in ordered}
     total = len(ordered)
-    boundaries: list[int] = []
-    for target in (int(np.ceil(total / 3)), int(np.ceil(2 * total / 3))):
-        boundary = min(target, total)
-        while boundary < total and np.isclose(
-            ordered[boundary - 1][1], ordered[boundary][1], rtol=0, atol=1e-12
-        ):
-            boundary += 1
-        boundaries.append(boundary)
-    first, second = boundaries
-    if second == first:
-        second = total
+    high_target = int(np.ceil(total / 3))
+    low_target = int(np.ceil(total / 3))
+    first = high_target
+    while first < total and np.isclose(
+        ordered[first - 1][1], ordered[first][1], rtol=0, atol=1e-12
+    ):
+        first += 1
+    second = max(first, total - low_target)
+    while second < total and np.isclose(
+        ordered[second - 1][1], ordered[second][1], rtol=0, atol=1e-12
+    ):
+        second += 1
     return {
         account: "High" if index < first else "Medium" if index < second else "Low"
         for index, (account, _) in enumerate(ordered)

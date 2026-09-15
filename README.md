@@ -29,6 +29,7 @@ in order:
 4. `supabase/migrations/004_four_criterion_final_alignment.sql`
 5. `supabase/migrations/005_final_hardening.sql`
 6. `supabase/migrations/006_final_capstone_alignment.sql`
+7. `supabase/migrations/007_targeted_system_alignment.sql`
 
 Create private `source-imports` and `model-artifacts` Storage buckets, create
 Supabase Auth users, and assign each user a `user_profiles` role of
@@ -45,11 +46,13 @@ CSV/XLSX imports use the canonical template in `sample_data/`. Repeated payment 
 
 The canonical ten-field source starts with `ACCOUNT NAMES`. `CUSTOMER NAME` is accepted only as a compatibility input alias and is immediately mapped to `ACCOUNT NAMES`; files containing both are rejected as ambiguous. Official analytics eligibility recognizes `Fully Paid` and excludes `Cancelled`; partial or unsupported statuses are retained for administrator review but excluded from analytics.
 
+The Accounts view uses every RFM profile from the latest successful run. MCS-eligible accounts are ranked first with their original published rank; profiles without cutoff-known settlement evidence remain visible as Not ranked with nullable MCS fields. CART risk remains independent supporting context.
+
 The first controlled training action evaluates CART candidate horizons and
 features chronologically, freezes development decisions, performs final
 out-of-period evaluation, and stores the validated artifact privately. Normal
 imports score with the active model and do not retrain it. Monitoring can flag
-review; retraining requires the administrator training endpoint.
+review; retraining requires the administrator training endpoint and a new explicit configured model version. Activating an artifact does not mutate an already-published analytical run; run analytics separately to publish current CART context.
 
 The client uploads structured RAW data once through the Web DSS; there is no second Power BI upload. The Web DSS owns secure operational review, validation, controlled commit, ranking, account explanation, and export. Power BI connects to Supabase reporting views with read-only credentials for broader reporting and reflects published results after its configured manual or scheduled refresh. Power Query may perform light report preparation, but Power BI does not recalculate the Python methodology.
 

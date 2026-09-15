@@ -20,7 +20,7 @@ export function AliasReviewPanel() {
     } finally { setBusy(null); }
   }
   return <section className="data-section">
-    <div className="section-heading"><h2><Link2/>Account alias review</h2><span>Future input governance</span></div><p className="fine-print">Administrator decisions govern future processing only. Historical source labels remain unchanged, and no fuzzy match is merged automatically.</p>
+    <div className="section-heading"><h2><Link2/>Account alias review</h2><span>Review record only</span></div><p className="fine-print">This review register is currently non-transformative: decisions are audited but are not applied by ETL. Historical and future imported labels remain unchanged, and no fuzzy match is merged automatically.</p>
     {loading && <div className="table-empty">Loading alias candidates...</div>}
     {error && <div className="table-empty">{error} <button className="button secondary" onClick={reload}>Retry</button></div>}
     {!loading && !error && !data?.length && <div className="table-empty">No account aliases are awaiting review.</div>}

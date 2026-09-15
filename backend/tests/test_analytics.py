@@ -252,6 +252,17 @@ def test_priority_ranks_and_both_group_boundaries_preserve_ties():
     assert second["D"] == second["E"] == "Medium"
 
 
+def test_priority_group_remainder_is_assigned_to_medium_generically():
+    for total, expected in ((5, (2, 1, 2)), (8, (3, 2, 3)), (83, (28, 27, 28))):
+        scored = [(f"Account {index:03d}", float(total - index)) for index in range(total)]
+        groups = assign_priority_groups(scored)
+        counts = tuple(sum(group == name for group in groups.values()) for name in ("High", "Medium", "Low"))
+        assert counts == expected
+
+
+def test_all_equal_priority_scores_remain_medium():
+    assert set(assign_priority_groups([("A", 1.0), ("B", 1.0), ("C", 1.0)]).values()) == {"Medium"}
+
 def test_sensitivity_perturbs_four_weights_reproducibly_for_all_ranges():
     groups = group_invoices([
         row("A", "A1", "2026-01-01", "100", "A1", "2026-01-10", "100"),

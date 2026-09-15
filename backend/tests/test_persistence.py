@@ -4,10 +4,10 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from pathlib import Path
 
-from app.db.models import AnalyticsRun, Base, RawSourceRow
+from app.db.models import AnalyticsRun, Base, ModelRun, RawSourceRow
 from app.auth.dependencies import AuthenticatedUser
 from app.core.config import get_settings
-from app.db.repository import latest_successful_run, run_payload
+from app.db.repository import current_account_rows, latest_successful_run, run_payload
 from app.services.import_workflow import commit_source, preview_source
 from fastapi import HTTPException
 import pytest
@@ -46,6 +46,53 @@ def test_future_file_persists_through_latest_api_payload(tmp_path, monkeypatch):
         from app.schemas.api import AccountPriorityResponse
         AccountPriorityResponse.model_validate(payload["priorities"][0])
         assert payload["cart"]["status"]=="model_unavailable"
+        profiles = current_account_rows(db, latest)
+        future = next(row for row in profiles if row["account"] == "New Future Account")
+        assert len(profiles) == len(payload["rfm"])
+        assert not future["mcs_eligible"]
+        assert future["priority_rank"] is None
+        assert future["priority_group"] is None
+        assert future["final_priority_score"] is None
+        assert future["average_settlement_days"] is None
+        assert future["settlement_invoice_count"] == 0
+        assert "No valid Historical Settlement Duration" in future["mcs_eligibility_reason"]
+        assert future["rfm_score"] is not None
+
+        model_run = db.scalar(
+            select(ModelRun).where(ModelRun.analysis_run_id == latest.analysis_run_id)
+        )
+        model_run.payload = {
+            **model_run.payload,
+            "model_version": "cart-test-current",
+            "predictions": {"New Future Account": "Higher"},
+        }
+        db.flush()
+
+        from app.main import account_detail, accounts, dashboard, export_dataset
+        listed = accounts(
+            search="New Future", priority_group=None,
+            predicted_inactivity_risk="Higher", inactivity_risk=None,
+            eligibility="not_ranked", page=1, page_size=25, user=user, db=db,
+        )
+        assert listed["total"] == 1
+        assert listed["items"][0]["account_key"] == future["account_key"]
+        detail = account_detail(future["account_key"], user=user, db=db)
+        assert detail["rfm"]["account"] == "New Future Account"
+        assert detail["priority"] is None
+        assert detail["settlement"]["average_settlement_days"] is None
+        assert detail["cart"]["predicted_inactivity_risk"] == "Higher"
+        assert detail["sensitivity"] is None
+        summary = dashboard(user=user, db=db)
+        assert summary["total_standardized_accounts"] == len(payload["rfm"])
+        assert sum(summary["priority_group_counts"].values()) == len(payload["priorities"])
+        assert summary["risk_counts"]["Higher"] == 1
+        exported = export_dataset(
+            "priorities", "csv", "New Future", None, "Higher", None,
+            "not_ranked", user, db,
+        )
+        exported_text = exported.body.decode()
+        assert "New Future Account" in exported_text
+        assert "Alpha Infra Corp" not in exported_text
         duplicate=preview_source(db,user,"future_valid.csv",content)
         assert duplicate["duplicate_committed_file"] and not duplicate["can_commit"]
         with pytest.raises(HTTPException) as blocked:

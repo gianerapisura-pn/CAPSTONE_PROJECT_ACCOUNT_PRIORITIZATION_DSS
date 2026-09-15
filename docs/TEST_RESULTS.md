@@ -1,6 +1,22 @@
 # Test Results
 
-Execution date: 2026-09-03
+## Current execution: 2026-09-15
+
+Environment: Windows, Python 3.13.3, Node.js 24.11.1
+Method version: 2026.09.final-alignment
+
+- Backend: `python -m pytest -q --basetemp=.pytest-tmp-full-20260915` -> 60 passed and 1 skipped in 17.20s.
+- Frontend unit: `npm test -- --run` -> 7 files and 17 tests passed in 27.35s.
+- Lint: `npm run lint` -> passed.
+- TypeScript: `npm run typecheck` -> passed.
+- Production build: `npm run build` -> passed and generated 15 application routes.
+- Playwright: `npm run test:e2e` -> 1 workflow passed; the future account remained visible as Not ranked and its reason/detail were verified.
+
+The single backend skip is the environment-gated confidential official-workbook regression. `PESLC_OFFICIAL_RAW_PATH` was not supplied, so official numerical reproduction is pending and is not reported as passed.
+
+Automated tests cover generic third allocation including 83 -> 28/27/28, tie handling, the latest-RFM all-profile universe, nullable MCS evidence, independent CART risk, current dashboard counts, shared filtered export, future-account detail, explicit CART model versioning, duplicate rejection, and static migration-007 security/reporting contracts. Migration `007_targeted_system_alignment.sql` was not executed against a real Supabase project in this environment. Real Power BI connection/refresh, remote database role verification, and the 14 blank-execution-field UAT cases remain deployment activities.
+
+## Historical execution: 2026-09-03
 Environment: Windows, Python 3.13.3, Node.js 24.11.1
 Method version: 2026.09.final-alignment
 
@@ -77,7 +93,7 @@ The workflow used isolated demo-mode FastAPI/Next.js servers and SQLite. It veri
 
 Migration `006_final_capstone_alignment.sql` contains six statements, has balanced parentheses, contains no `DROP TABLE`, and preserves `security_invoker` on all three recreated reporting views. Backend contract tests verify canonical `analysis_date`, `scenario_key`, `latest_valid_si_date`, Frequency, Monetary, settlement evidence count, four normalized values, four weights, four contributions, `predicted_inactivity_risk`, sensitivity `rank_change`, and per-scenario Spearman correlation.
 
-Both future import templates and the future fixture were verified to contain exactly the canonical ten fields beginning with `ACCOUNT NAMES`. Active production code and current-documentation obsolete-methodology scans returned no findings; remaining matches are deliberate negative guards or explicit compatibility references. The final-lock read-only audit covered all 130 tracked files with zero read failures. Route contracts now directly test administrator enforcement for technical analysis, model, and run-history endpoints; production configuration tests verify that deployment cannot silently use demo mode or SQLite. The repository still contains exactly migrations `001` through `006`; this pass did not add a migration or change locked analytics.
+Both future import templates and the future fixture were verified to contain exactly the canonical ten fields beginning with `ACCOUNT NAMES`. Active production code and current-documentation obsolete-methodology scans returned no findings; remaining matches are deliberate negative guards or explicit compatibility references. The final-lock read-only audit covered all 130 tracked files with zero read failures. Route contracts now directly test administrator enforcement for technical analysis, model, and run-history endpoints; production configuration tests verify that deployment cannot silently use demo mode or SQLite. At the 2026-09-03 checkpoint the repository contained six migrations and that earlier pass added no migration.
 
 ## External validation status
 
