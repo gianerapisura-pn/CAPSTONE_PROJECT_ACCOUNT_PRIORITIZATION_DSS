@@ -11,7 +11,7 @@ The PESLC Account Prioritization DSS website is the single entry point. Normal u
 5. Open an Account Detail to understand its RFM, Settlement, four CRITIC/MCS contributions, Final Priority Score, CART context, sensitivity evidence, and logical invoice lineage.
 6. Use the result as a review/follow-up order, not as a guarantee of purchase, project, quotation acceptance, or sales.
 7. Open **Detailed Analytics** for broader reporting from the same published data.
-8. Export approved CSV/XLSX datasets when needed.
+8. Export the approved current Account Prioritization/Profile output as CSV or XLSX when needed.
 9. Sign out from the profile menu.
 
 RFM and Historical Settlement Duration are descriptive. Priority Group comes from CRITIC/MCS. Binary CART Inactivity Risk is separate supporting context and does not enter the Final Priority Score.
@@ -38,4 +38,4 @@ The template begins with `ACCOUNT NAMES`. A legacy `CUSTOMER NAME` header is map
 
 ## Detailed Analytics
 
-The page displays the latest Web DSS cutoff/run context, exports, and a secure organizational Power BI action when configured. Absence of a report URL produces a safe setup state. Public Publish-to-Web links are not supported. The Web DSS updates immediately after successful publication; Detailed Analytics updates after its configured Power BI refresh.
+The page displays the latest Web DSS cutoff/run/refresh context, one approved Account Prioritization export area, and a secure organizational Power BI action when configured. Absence of a report URL produces a safe setup state. Public Publish-to-Web links are not supported. The Web DSS updates immediately after successful publication; Detailed Analytics updates after its configured Power BI refresh.

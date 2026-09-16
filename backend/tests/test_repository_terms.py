@@ -122,6 +122,41 @@ def test_migration_007_uses_rfm_universe_and_least_privilege_reporting_role():
     assert " superuser" not in lowered
     assert " bypassrls" not in lowered
 
+def test_migration_008_defines_certified_latest_successful_reporting_contract():
+    migration = Path("../supabase/migrations/008_power_bi_reporting_alignment.sql").read_text(encoding="utf-8")
+    lowered = migration.lower()
+    for contract in (
+        "reporting_latest_business_baseline",
+        "reporting_latest_rfm",
+        "reporting_latest_settlement",
+        "reporting_latest_critic_weights",
+        "reporting_latest_sensitivity_summary",
+        "reporting_latest_sensitivity_iterations",
+        "reporting_latest_backtest",
+        "reporting_latest_cart_validation",
+        "reporting_latest_cart_class_metrics",
+        "reporting_latest_cart_confusion_matrix",
+        "reporting_latest_cart_feature_evidence",
+        "reporting_latest_cart_horizon_evidence",
+        "active_account_count",
+        "valid_si_sales",
+        "is_partial_year",
+        "recency_weight",
+        "frequency_weight",
+        "monetary_weight",
+        "settlement_weight",
+        "jsonb_array_elements",
+        "v.model_version = r.model_version",
+        "security_invoker",
+        "peslc_reporting_reader",
+    ):
+        assert contract in lowered
+    assert "grant select on raw_source_rows" not in lowered
+    assert "grant insert" not in lowered
+    assert "grant update" not in lowered
+    assert "grant delete" not in lowered
+    assert "grant all" not in lowered
+    assert "nobypassrls" not in lowered or "alter role" not in lowered
 def test_current_docs_preserve_one_front_door_and_reporting_boundaries():
     docs = "\n".join(
         path.read_text(encoding="utf-8")
@@ -138,6 +173,6 @@ def test_current_docs_preserve_one_front_door_and_reporting_boundaries():
 
     setup = Path("../docs/POWER_BI_SETUP.md").read_text(encoding="utf-8")
     assert "Power BI technically supports transformation through Power Query" in setup
-    assert "migrations `001`, `002`, `003`, `004`, `005`, `006`, and `007`" in setup
+    assert "Apply migrations 001 through 008" in setup
     assert "does not upload or clean a second source copy in Power BI" in setup
     assert "does not claim immediate automatic Power BI refresh" in setup

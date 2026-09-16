@@ -34,7 +34,7 @@ vi.mock("@/lib/use-api", () => ({
     const eligibility = params.get("eligibility");
     if (eligibility === "ranked") filtered = filtered.filter(row => row.mcs_eligible);
     if (eligibility === "not_ranked") filtered = filtered.filter(row => !row.mcs_eligible);
-    return { data: { items: filtered, total: filtered.length, page: 1, page_size: 15, analysis_run_id: "run-12345678", updated_at: "2030-06-10T00:00:00Z" }, error: "", loading: false, reload: vi.fn() };
+    return { data: { items: filtered, total: filtered.length, page: 1, page_size: 15, analysis_run_id: "run-12345678", analysis_cutoff: "2030-06-10", updated_at: "2030-06-10T00:00:00Z" }, error: "", loading: false, reload: vi.fn() };
   },
 }));
 
@@ -43,9 +43,13 @@ test("search and priority filters operate on the unified API account data", asyn
   render(<AccountPriorityTable />);
   expect(screen.getByText("ALPHA")).toBeInTheDocument();
   expect(screen.getByText("NEW FUTURE")).toBeInTheDocument();
+  expect(screen.getByText("Analysis cutoff")).toBeInTheDocument();
+  expect(screen.getByText("2030-06-10")).toBeInTheDocument();
+  expect(screen.getByText("Last successful refresh")).toBeInTheDocument();
   await user.type(screen.getByLabelText("Search accounts"), "beta");
   expect(screen.queryByText("ALPHA")).not.toBeInTheDocument();
   expect(screen.getByText("BETA")).toBeInTheDocument();
+  expect(screen.getByText("#2")).toBeInTheDocument();
   await user.clear(screen.getByLabelText("Search accounts"));
   await user.selectOptions(screen.getByLabelText("Priority Group"), "High");
   expect(screen.getByText("ALPHA")).toBeInTheDocument();

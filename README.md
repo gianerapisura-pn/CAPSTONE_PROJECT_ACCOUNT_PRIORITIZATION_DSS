@@ -30,13 +30,14 @@ in order:
 5. `supabase/migrations/005_final_hardening.sql`
 6. `supabase/migrations/006_final_capstone_alignment.sql`
 7. `supabase/migrations/007_targeted_system_alignment.sql`
+8. `supabase/migrations/008_power_bi_reporting_alignment.sql`
 
 Create private `source-imports` and `model-artifacts` Storage buckets, create
 Supabase Auth users, and assign each user a `user_profiles` role of
 `administrator` or `management`. The service-role key and direct database
 credentials are backend-only and must never use a `NEXT_PUBLIC_` name.
 
-Management navigation focuses on Overview, Account Prioritization, and Detailed Analytics. Administrators additionally receive Data Management plus a collapsed Advanced / Analysis Details section for methodology governance and technical analytical pages. Import, run, technical-analysis, model, and alias-governance APIs remain administrator-only; backend dependencies enforce these boundaries even when a route is requested directly.
+Management navigation focuses on the compact Overview, Account Prioritization, approved profile exports, and Detailed Analytics. Administrators additionally receive Data Management plus a collapsed Advanced / Analysis Details section for methodology governance and technical analytical pages. Import, run, technical-analysis, model, and alias-governance APIs remain administrator-only; backend dependencies enforce these boundaries even when a route is requested directly.
 
 ## Controlled workflow
 

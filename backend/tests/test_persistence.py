@@ -75,7 +75,22 @@ def test_future_file_persists_through_latest_api_payload(tmp_path, monkeypatch):
             eligibility="not_ranked", page=1, page_size=25, user=user, db=db,
         )
         assert listed["total"] == 1
+        assert listed["analysis_run_id"] == latest.analysis_run_id
+        assert listed["analysis_cutoff"] == latest.cutoff_date.isoformat()
+        assert listed["updated_at"] == latest.completed_at.isoformat()
         assert listed["items"][0]["account_key"] == future["account_key"]
+        all_rows = accounts(
+            search="", priority_group=None, predicted_inactivity_risk=None,
+            inactivity_risk=None, eligibility=None, page=1, page_size=500,
+            user=user, db=db,
+        )
+        published_ranks = {row["account_key"]: row["priority_rank"] for row in all_rows["items"]}
+        high_rows = accounts(
+            search="", priority_group="High", predicted_inactivity_risk=None,
+            inactivity_risk=None, eligibility=None, page=1, page_size=500,
+            user=user, db=db,
+        )
+        assert all(row["priority_rank"] == published_ranks[row["account_key"]] for row in high_rows["items"])
         detail = account_detail(future["account_key"], user=user, db=db)
         assert detail["rfm"]["account"] == "New Future Account"
         assert detail["priority"] is None
@@ -93,6 +108,19 @@ def test_future_file_persists_through_latest_api_payload(tmp_path, monkeypatch):
         exported_text = exported.body.decode()
         assert "New Future Account" in exported_text
         assert "Alpha Infra Corp" not in exported_text
+        management = AuthenticatedUser("demo-management", "management", demo=True)
+        for format in ("csv", "xlsx"):
+            allowed = export_dataset(
+                "priorities", format, "", None, None, None, None, management, db,
+            )
+            assert allowed.status_code == 200
+        for technical_dataset in ("cart", "sensitivity", "runs", "transactions", "rfm", "settlement"):
+            with pytest.raises(HTTPException) as forbidden:
+                export_dataset(
+                    technical_dataset, "csv", "", None, None, None, None, management, db,
+                )
+            assert forbidden.value.status_code == 403
+        assert export_dataset("cart", "csv", "", None, None, None, None, user, db).status_code == 200
         duplicate=preview_source(db,user,"future_valid.csv",content)
         assert duplicate["duplicate_committed_file"] and not duplicate["can_commit"]
         with pytest.raises(HTTPException) as blocked:

@@ -264,15 +264,21 @@ def dashboard(user: AuthenticatedUser = Depends(require_user), db: Session = Dep
     }
     total_accounts = len(account_profiles)
     total_sales = sum(row.get("valid_si_sales", 0) for row in payload["business_baselines"])
+    sensitivity = payload["sensitivity"]
+    stability = None
+    if sensitivity:
+        stability = {
+            "minimum_spearman": min(row["min_spearman"] for row in sensitivity),
+            "maximum_group_movement_rate": max(
+                row["max_group_movement_rate"] for row in sensitivity
+            ),
+        }
     return {
         "run": serialize_run(run), "total_standardized_accounts": total_accounts,
         "mcs_eligible_accounts": sum(row["mcs_eligible"] for row in account_profiles), "priority_group_counts": group_counts,
         "risk_counts": risk_counts, "total_valid_historical_sales": total_sales,
-        "critic_weights": run.critic_weights, "mcs_status": run.mcs_status, "cart_status": payload["cart"].get("status", "Unavailable"),
-        "cart_horizon": payload["cart"].get("outcome_window_months"),
         "warnings": run.warnings or [],
-        "top_accounts": priorities[:8], "sales_trend": payload["business_baselines"],
-        "sensitivity": payload["sensitivity"],
+        "top_accounts": priorities[:8], "stability": stability,
     }
 
 
@@ -296,6 +302,7 @@ def accounts(
     return {
         "items": rows[start:start + page_size], "total": len(rows), "page": page,
         "page_size": page_size, "analysis_run_id": run.analysis_run_id,
+        "analysis_cutoff": run.cutoff_date.isoformat() if run.cutoff_date else None,
         "updated_at": run.completed_at.isoformat() if run.completed_at else None,
     }
 
@@ -533,6 +540,11 @@ def export_dataset(
     eligibility: str | None = Query(None, pattern="^(ranked|not_ranked)$"),
     user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db),
 ) -> Response:
+    supported_datasets = {"priorities", "rfm", "settlement", "sensitivity", "runs", "cart", "transactions"}
+    if dataset not in supported_datasets or format not in {"csv", "xlsx"}:
+        raise HTTPException(404, "Export dataset or format not found.")
+    if dataset != "priorities" and user.role != "administrator":
+        raise HTTPException(403, "Administrator permission is required for this technical export.")
     run = _latest_or_404(db)
     payload = run_payload(db, run)
     sources = {
@@ -547,8 +559,6 @@ def export_dataset(
             "final_cr_date": row.final_cr_date, "import_batch_id": row.import_batch_id}
             for row in db.scalars(select(InvoiceGroupRecord)).all()],
     }
-    if dataset not in sources or format not in {"csv", "xlsx"}:
-        raise HTTPException(404, "Export dataset or format not found.")
     rows = [{key: _safe_sheet_value(value) for key, value in row.items()} for row in sources[dataset]]
     frame = pd.json_normalize(rows)
     if "analysis_run_id" not in frame.columns:

@@ -75,6 +75,7 @@ export interface AccountListResponse {
   page: number;
   page_size: number;
   analysis_run_id: string;
+  analysis_cutoff: string | null;
   updated_at: string | null;
 }export interface ImportPreview {
   import_batch_id: string;
@@ -113,12 +114,10 @@ export interface DashboardData {
   priority_group_counts: Record<PriorityGroup, number>;
   risk_counts: Record<string, number>;
   total_valid_historical_sales: number;
-  critic_weights: Record<string, number>;
-  mcs_status: string;
-  cart_status: string;
-  cart_horizon?: number | null;
   warnings: string[];
   top_accounts: AccountPriority[];
-  sales_trend: Array<Record<string, number | boolean | null>>;
-  sensitivity: Array<Record<string, number>>;
+  stability: {
+    minimum_spearman: number;
+    maximum_group_movement_rate: number;
+  } | null;
 }

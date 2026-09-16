@@ -60,15 +60,16 @@ const filters = useMemo(
         <select aria-label="MCS eligibility" value={eligibility} onChange={(event) => { setEligibility(event.target.value as "" | "ranked" | "not_ranked"); setPage(1); }}>
           <option value="">All accounts</option><option value="ranked">Ranked</option><option value="not_ranked">Not ranked</option>
         </select>
-        <button className="button secondary" onClick={() => downloadExport(exportPath("csv"), "peslc-account-profiles.csv")}><Download size={17} />CSV</button>
-        <button className="button secondary" onClick={() => downloadExport(exportPath("xlsx"), "peslc-account-profiles.xlsx")}><Download size={17} />XLSX</button>
+        <button className="button secondary" onClick={() => downloadExport(exportPath("csv"), "peslc-account-priorities.csv")}><Download size={17} />CSV</button>
+        <button className="button secondary" onClick={() => downloadExport(exportPath("xlsx"), "peslc-account-priorities.xlsx")}><Download size={17} />XLSX</button>
       </div>
       <PageState loading={loading} error={error} onRetry={reload}>
         <>
           {data && <>
             <div className="data-meta">
+              <span>Analysis cutoff <strong>{data.analysis_cutoff ?? "Unavailable"}</strong></span>
               <span>Latest run <strong>{data.analysis_run_id.slice(0, 8)}</strong></span>
-              <span>{data.updated_at ? `Refreshed ${new Date(data.updated_at).toLocaleString()}` : ""}</span>
+              <span>Last successful refresh <strong>{data.updated_at ? new Date(data.updated_at).toLocaleString() : "Unavailable"}</strong></span>
             </div>
             <div className="table-wrap">
               <table>

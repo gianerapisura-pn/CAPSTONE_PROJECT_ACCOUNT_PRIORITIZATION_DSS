@@ -1,6 +1,22 @@
 # Test Results
 
-## Current execution: 2026-09-15
+## Current execution: 2026-09-16
+
+Environment: Windows, Python 3.13.3, Node.js 24.11.1
+Method version: 2026.09.final-alignment
+
+- Backend: `python -m pytest -q --basetemp=.pytest-tmp-reporting-alignment-final-20260916` -> 61 passed and 1 skipped in 31.13s.
+- Frontend unit: `npm test -- --run` -> 7 files and 17 tests passed in 49.84s.
+- Lint: `npm run lint` -> passed.
+- TypeScript: `npm run typecheck` -> passed.
+- Production build: `npm run build` -> passed and generated 15 application routes.
+- Playwright: `npm run test:e2e` -> 1 workflow passed in 58.2s, including the approved prioritization CSV download.
+
+The single backend skip is the environment-gated confidential official-workbook regression. `PESLC_OFFICIAL_RAW_PATH` was not supplied, so official numerical reproduction is pending and is not reported as passed.
+
+Automated coverage now includes the compact management dashboard contract, the account-list analysis cutoff and latest-successful metadata, filter-without-reranking behavior, management CSV/XLSX priority-export access, server-side denial of technical exports to management, retained administrator technical access, approved-versus-Publish-to-Web URL handling, and the static migration-008 reporting/security contract. Migration `008_power_bi_reporting_alignment.sql` was not executed against a real Supabase project in this environment. Real Power BI connection/refresh and remote database-role verification remain pending, as do the blank-execution-field User UAT and Technical/System Validation cases.
+
+## Previous execution: 2026-09-15
 
 Environment: Windows, Python 3.13.3, Node.js 24.11.1
 Method version: 2026.09.final-alignment

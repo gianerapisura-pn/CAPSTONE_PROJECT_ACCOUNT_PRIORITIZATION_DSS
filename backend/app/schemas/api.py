@@ -160,6 +160,7 @@ class AccountListResponse(BaseModel):
     page: int
     page_size: int
     analysis_run_id: str
+    analysis_cutoff: str | None = None
     updated_at: str | None = None
 
 class ModelSummaryResponse(BaseModel):

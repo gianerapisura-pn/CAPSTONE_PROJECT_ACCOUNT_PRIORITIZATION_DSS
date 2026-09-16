@@ -50,7 +50,6 @@ for (const term of ["Normalized Recency", "Normalized Frequency", "Normalized Mo
   if (!details.includes(term)) throw new Error(`Account Details is missing: ${term}`);
 }
 for (const relative of [
-  ["app", "(protected)", "dashboard", "page.tsx"],
   ["app", "(protected)", "analytics", "sensitivity", "page.tsx"],
   ["app", "(protected)", "runs", "page.tsx"],
 ]) {

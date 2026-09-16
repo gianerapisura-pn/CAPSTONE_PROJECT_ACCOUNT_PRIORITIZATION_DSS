@@ -6,16 +6,6 @@ import { downloadExport } from "@/lib/api";
 import { useApi } from "@/lib/use-api";
 import type { DashboardData } from "@/types/dss";
 
-const exports = [
-  { id: "priorities", title: "Account Prioritization", text: "Latest score, rank, group, criteria, and predictive context." },
-  { id: "rfm", title: "RFM Analytics", text: "Account-level metrics, component scores, and descriptive RFM Score." },
-  { id: "settlement", title: "Historical Settlement", text: "Eligible invoice count and average observed settlement duration." },
-  { id: "cart", title: "CART Inactivity Risk", text: "Frozen model configuration, validation metrics, and selection evidence." },
-  { id: "sensitivity", title: "Sensitivity Summary", text: "Multiplicative range stability and group reclassification." },
-  { id: "transactions", title: "Transaction History", text: "Logical invoice records with analytical and source lineage." },
-  { id: "runs", title: "Analysis Run Metadata", text: "Current successful run identity, cutoff, weights, and warnings." },
-];
-
 export function approvedPowerBiReportUrl(value: string | undefined): string | null {
   if (!value) return null;
   try {
@@ -31,6 +21,7 @@ export function approvedPowerBiReportUrl(value: string | undefined): string | nu
 export default function ReportsPage() {
   const reportUrl = approvedPowerBiReportUrl(process.env.NEXT_PUBLIC_POWER_BI_REPORT_URL);
   const { data: dashboard } = useApi<DashboardData>("/dashboard");
+
   return <div className="page-stack">
     <PageHeader
       eyebrow="Broader management reporting"
@@ -41,9 +32,10 @@ export default function ReportsPage() {
       {dashboard ? <>
         <span>Analysis cutoff <strong>{dashboard.run.cutoff_date ?? "Unavailable"}</strong></span>
         <span>Latest run <strong className="mono">{dashboard.run.analysis_run_id.slice(0, 12)}</strong></span>
-        <span>Eligible accounts <strong>{dashboard.mcs_eligible_accounts}</strong></span>
+        <span>Last successful refresh <strong>{dashboard.run.completed_at ? new Date(dashboard.run.completed_at).toLocaleString() : "Unavailable"}</strong></span>
       </> : <span>Latest successful analysis metadata is not available yet.</span>}
     </div>
+
     <section className="powerbi-band">
       <div className="powerbi-icon"><BarChart3 /></div>
       <div>
@@ -58,16 +50,19 @@ export default function ReportsPage() {
         ? <a className="button primary" href={reportUrl} target="_blank" rel="noreferrer">Open Detailed Analytics<ExternalLink size={17} /></a>
         : <span className="config-state"><LockKeyhole />Configuration required</span>}
     </section>
+
     <section>
-      <div className="section-heading"><div><span className="eyebrow">Analysis-ready downloads</span><h2>Export datasets</h2></div><span>CSV and XLSX include run metadata</span></div>
-      <div className="export-grid">{exports.map(item => <article className="export-card" key={item.id}>
-        <span><FileSpreadsheet /></span>
-        <div><h3>{item.title}</h3><p>{item.text}</p></div>
-        <div>
-          <button className="button secondary" onClick={() => downloadExport(`/exports/${item.id}.csv`, `peslc-${item.id}.csv`)}><Download size={16} />CSV</button>
-          <button className="button secondary" onClick={() => downloadExport(`/exports/${item.id}.xlsx`, `peslc-${item.id}.xlsx`)}><Download size={16} />XLSX</button>
-        </div>
-      </article>)}</div>
+      <div className="section-heading"><div><span className="eyebrow">Approved operational output</span><h2>Account Prioritization export</h2></div><span>Same validated current account profile output</span></div>
+      <div className="export-grid">
+        <article className="export-card">
+          <span><FileSpreadsheet /></span>
+          <div><h3>Account Prioritization</h3><p>Current account profiles with published score, rank, Priority Group, criteria, eligibility, and separate predictive context.</p></div>
+          <div>
+            <button className="button secondary" onClick={() => downloadExport("/exports/priorities.csv", "peslc-account-priorities.csv")}><Download size={16} />CSV</button>
+            <button className="button secondary" onClick={() => downloadExport("/exports/priorities.xlsx", "peslc-account-priorities.xlsx")}><Download size={16} />XLSX</button>
+          </div>
+        </article>
+      </div>
     </section>
   </div>;
 }
