@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (demo) {
       const timer = window.setTimeout(() => {
-        if (sessionStorage.getItem("peslc-demo-session")) setUser({ userId: "demo-administrator", email: "demo@local.invalid", role: "administrator", displayName: "Demo Administrator", demo: true });
+        if (sessionStorage.getItem("peslc-demo-session")) setUser({ userId: "00000000-0000-4000-8000-000000000001", email: "demo@local.invalid", role: "administrator", displayName: "Demo Administrator", demo: true });
         setLoading(false);
       }, 0);
       return () => window.clearTimeout(timer);
@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error || !data.user) throw new Error(error?.message || "Sign-in failed.");
       setUser(mapUser(data.user, await apiFetch<Record<string, unknown>>("/auth/me")));
     },
-    demoSignIn() { sessionStorage.setItem("peslc-demo-session", "administrator"); setUser({ userId: "demo-administrator", email: "demo@local.invalid", role: "administrator", displayName: "Demo Administrator", demo: true }) },
+    demoSignIn() { sessionStorage.setItem("peslc-demo-session", "administrator"); setUser({ userId: "00000000-0000-4000-8000-000000000001", email: "demo@local.invalid", role: "administrator", displayName: "Demo Administrator", demo: true }) },
     async signOut() { sessionStorage.removeItem("peslc-demo-session"); if (!demo) await getSupabaseClient()!.auth.signOut(); setUser(null) },
   }), [demo, loading, user]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

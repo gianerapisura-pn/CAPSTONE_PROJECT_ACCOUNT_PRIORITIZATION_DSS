@@ -119,8 +119,9 @@ select r.analysis_run_id,
        v.retained_features,
        v.tree_hyperparameters,
        (o.payload->'report'->>'accuracy')::numeric accuracy,
-       (o.payload->'report'->'macro avg'->>'f1-score')::numeric macro_f1,
+       (o.payload->'report'->>'macro_f1')::numeric macro_f1,
        (o.payload->'majority_baseline_report'->>'accuracy')::numeric majority_baseline_accuracy,
+       (o.payload->'majority_baseline_report'->>'macro_f1')::numeric majority_baseline_macro_f1,
        (o.payload->>'tree_depth')::integer tree_depth,
        (o.payload->>'leaf_count')::integer leaf_count
 from reporting_latest_run_summary r
@@ -132,10 +133,10 @@ create or replace view reporting_latest_cart_class_metrics with (security_invoke
 select r.analysis_run_id,
        r.model_version,
        class_label,
-       (o.payload->'report'->class_label->>'precision')::numeric precision,
-       (o.payload->'report'->class_label->>'recall')::numeric recall,
-       (o.payload->'report'->class_label->>'f1-score')::numeric f1_score,
-       (o.payload->'report'->class_label->>'support')::integer support
+       (o.payload->'report'->'per_class'->class_label->>'precision')::numeric precision,
+       (o.payload->'report'->'per_class'->class_label->>'recall')::numeric recall,
+       (o.payload->'report'->'per_class'->class_label->>'f1')::numeric f1_score,
+       (o.payload->'report'->'per_class'->class_label->>'support')::integer support
 from reporting_latest_run_summary r
 join predictive_model_versions v on v.model_version = r.model_version
 join predictive_oop_evaluations o

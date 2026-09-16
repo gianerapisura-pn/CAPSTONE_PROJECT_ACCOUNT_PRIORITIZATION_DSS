@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 
 
@@ -157,6 +158,45 @@ def test_migration_008_defines_certified_latest_successful_reporting_contract():
     assert "grant delete" not in lowered
     assert "grant all" not in lowered
     assert "nobypassrls" not in lowered or "alter role" not in lowered
+
+    producer = Path("app/analytics/predictive/cart.py").read_text(encoding="utf-8")
+    assert '"macro_f1"' in producer
+    assert '"per_class"' in producer
+    for path in (
+        "o.payload->'report'->>'macro_f1'",
+        "o.payload->'majority_baseline_report'->>'macro_f1'",
+        "o.payload->'report'->'per_class'->class_label->>'precision'",
+        "o.payload->'report'->'per_class'->class_label->>'recall'",
+        "o.payload->'report'->'per_class'->class_label->>'f1'",
+        "o.payload->'report'->'per_class'->class_label->>'support'",
+    ):
+        assert path in migration
+    assert "majority_baseline_macro_f1" in lowered
+    assert "'macro avg'" not in lowered
+    assert "'f1-score'" not in lowered
+def test_uat_contract_retains_client_and_system_validation_boundaries():
+    with Path("../docs/UAT_TEST_CASES.csv").open(
+        encoding="utf-8", newline=""
+    ) as source:
+        rows = list(csv.DictReader(source))
+
+    assert len(rows) == 14
+    assert sum(row["Test Type"] == "User UAT" for row in rows) == 6
+    assert sum(row["Test Type"] == "System Validation" for row in rows) == 8
+    execution_fields = (
+        "Actual Result", "Pass/Fail", "Tester", "Date", "Comments", "Evidence",
+    )
+    assert all(not row[field] for row in rows for field in execution_fields)
+
+    uat_012 = next(row for row in rows if row["Test Case ID"] == "UAT-012")
+    assert uat_012["Test Type"] == "User UAT"
+    assert uat_012["Executor / Applicable Role"] == "Sales Operations Manager / Management"
+    assert "Detailed Analytics" in uat_012["Scenario"]
+    assert "Account Prioritization" in uat_012["Expected Result"]
+    technical_terms = ("RLS", "SELECT raw", "PostgreSQL role", "write permission")
+    assert not any(term.casefold() in " ".join(uat_012.values()).casefold() for term in technical_terms)
+
+
 def test_current_docs_preserve_one_front_door_and_reporting_boundaries():
     docs = "\n".join(
         path.read_text(encoding="utf-8")

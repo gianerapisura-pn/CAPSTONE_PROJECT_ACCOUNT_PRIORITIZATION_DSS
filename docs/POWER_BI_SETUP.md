@@ -28,7 +28,7 @@ Power BI technically supports transformation through Power Query. Power Query an
    - reporting_latest_cart_horizon_evidence
 6. Verify certified-view SELECT succeeds, representative writes fail, and direct RAW/private model storage remains inaccessible.
 
-All current analytical views resolve through the latest successful run. A failed run never replaces published reporting. CART validation joins the model version stored on that successful run rather than a separately activated model. Filtering is display-only and never reranks accounts.
+All current analytical views resolve through the latest successful run. A failed run never replaces published reporting. CART validation joins the model version stored on that successful run rather than a separately activated model. Filtering is display-only and never reranks accounts. The certified CART validation view exposes the persisted OOP `macro_f1` and `majority_baseline_macro_f1`; Power BI compares these stored values and does not recompute them.
 
 Use Import mode with an approved manual or scheduled refresh. After refresh, compare run ID, cutoff, current RFM and MCS-eligible populations, representative rank/FPS/Group, priority and risk counts, business-baseline totals, backtest rows, and CART model version with the Web DSS or persisted run. Preserve NULL analytical values as unavailable rather than converting them to zero.
 

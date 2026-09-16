@@ -16,7 +16,10 @@
   and hash, frozen features/preprocessing/tree settings, OOP metrics, validation
   date, and review flag.
 - `predictive_horizon_evaluations`, `predictive_feature_decisions`, and
-  `predictive_oop_evaluations`: focused evidence tied to one model version.
+  `predictive_oop_evaluations`: focused evidence tied to one model version. The
+  certified CART validation views expose persisted OOP `macro_f1`, per-class
+  precision/recall/F1/support, and `majority_baseline_macro_f1` without SQL or
+  Power BI recalculation.
 - `predictive_monitoring_evaluations`: future validation/review evidence; it
   does not authorize automatic retraining.
 - `fact_sensitivity_analysis`: one account result per perturbation range/iteration with analysis date, scenario key, four perturbed weights, canonical `rank_change`, and the iteration Spearman correlation.

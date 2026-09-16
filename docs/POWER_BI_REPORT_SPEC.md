@@ -37,7 +37,7 @@ Purpose: report the frozen model validation used by the latest successful analyt
 - Untouched out-of-period cutoff and confusion matrix
 - Lower/Higher class precision, recall, F1, and support
 - Overall accuracy as supplementary context
-- Macro F1 and majority-class baseline comparison
+- Persisted CART OOP `macro_f1` and development-trained majority-class baseline `majority_baseline_macro_f1` comparison
 - Retained-feature and horizon-selection evidence
 - Supported feature-importance context only where persisted
 

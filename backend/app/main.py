@@ -78,6 +78,17 @@ def _safe_sheet_value(value: object) -> object:
     return value
 
 
+def _is_currency_column(column: str) -> bool:
+    leaf = column.rsplit(".", 1)[-1].lower()
+    if leaf.endswith("_contribution"):
+        return False
+    return (
+        leaf in {"monetary", "monetary_value", "valid_si_sales"}
+        or leaf.endswith("_amount")
+        or leaf.endswith("_sales")
+    )
+
+
 def _serialize_import_batch(row: ImportBatch) -> dict:
     return {
         "import_batch_id": row.import_batch_id, "file_name": row.file_name,
@@ -568,11 +579,7 @@ def export_dataset(
     audit(db, user.user_id, "export", dataset, run.analysis_run_id, {"format": format})
     db.commit()
     filename = f"peslc-{dataset}-{run.analysis_run_id}.{format}"
-    currency_markers = ("amount", "monetary", "sales", "contribution")
-    currency_columns = [
-        column for column in frame.columns
-        if any(marker in column.lower() for marker in currency_markers)
-    ]
+    currency_columns = [column for column in frame.columns if _is_currency_column(column)]
     if format == "csv":
         csv_frame = frame.copy()
         for column in currency_columns:

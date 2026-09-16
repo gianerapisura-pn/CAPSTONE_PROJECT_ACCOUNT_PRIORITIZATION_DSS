@@ -1,16 +1,32 @@
+import csv
 from datetime import datetime, timezone
+from io import StringIO
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from pathlib import Path
 
 from app.db.models import AnalyticsRun, Base, ModelRun, RawSourceRow
-from app.auth.dependencies import AuthenticatedUser
+from app.auth.dependencies import AuthenticatedUser, DEMO_ADMIN_USER_ID, DEMO_MANAGEMENT_USER_ID
 from app.core.config import get_settings
 from app.db.repository import current_account_rows, latest_successful_run, run_payload
 from app.services.import_workflow import commit_source, preview_source
 from fastapi import HTTPException
 import pytest
+
+
+def test_export_currency_classification_preserves_analytical_semantics():
+    from app.main import _is_currency_column
+
+    for column in (
+        "recency_contribution",
+        "frequency_contribution",
+        "monetary_contribution",
+        "settlement_contribution",
+    ):
+        assert not _is_currency_column(column)
+    for column in ("monetary", "monetary_value", "si_amount"):
+        assert _is_currency_column(column)
 
 
 def test_latest_successful_run_ignores_newer_failed_run():
@@ -31,7 +47,7 @@ def test_future_file_persists_through_latest_api_payload(tmp_path, monkeypatch):
     Base.metadata.create_all(engine)
     content=Path("../sample_data/test_fixtures/future_valid.csv").read_bytes()
     with Session(engine) as db:
-        user=AuthenticatedUser("demo-administrator","administrator",demo=True)
+        user=AuthenticatedUser(DEMO_ADMIN_USER_ID,"administrator",demo=True)
         preview=preview_source(db,user,"future_valid.csv",content)
         committed=commit_source(db,user,preview["import_batch_id"])
         latest=latest_successful_run(db)
@@ -108,7 +124,7 @@ def test_future_file_persists_through_latest_api_payload(tmp_path, monkeypatch):
         exported_text = exported.body.decode()
         assert "New Future Account" in exported_text
         assert "Alpha Infra Corp" not in exported_text
-        management = AuthenticatedUser("demo-management", "management", demo=True)
+        management = AuthenticatedUser(DEMO_MANAGEMENT_USER_ID, "management", demo=True)
         for format in ("csv", "xlsx"):
             allowed = export_dataset(
                 "priorities", format, "", None, None, None, None, management, db,
@@ -121,6 +137,28 @@ def test_future_file_persists_through_latest_api_payload(tmp_path, monkeypatch):
                 )
             assert forbidden.value.status_code == 403
         assert export_dataset("cart", "csv", "", None, None, None, None, user, db).status_code == 200
+
+        priority_csv = export_dataset(
+            "priorities", "csv", "", None, None, None, None, management, db,
+        )
+        exported_rows = list(csv.DictReader(StringIO(priority_csv.body.decode())))
+        source_ranked = next(row for row in profiles if row["mcs_eligible"])
+        exported_ranked = next(
+            row for row in exported_rows if row["account"] == source_ranked["account"]
+        )
+        contribution_fields = (
+            "recency_contribution",
+            "frequency_contribution",
+            "monetary_contribution",
+            "settlement_contribution",
+        )
+        for field in contribution_fields:
+            assert float(exported_ranked[field]) == pytest.approx(source_ranked[field])
+        assert any(
+            exported_ranked[field] != f"{source_ranked[field]:.2f}"
+            for field in contribution_fields
+        )
+        assert exported_ranked["monetary"] == f"{source_ranked['monetary']:.2f}"
         duplicate=preview_source(db,user,"future_valid.csv",content)
         assert duplicate["duplicate_committed_file"] and not duplicate["can_commit"]
         with pytest.raises(HTTPException) as blocked:
@@ -141,7 +179,7 @@ def test_raw_collection_blanks_are_preserved_through_commit(tmp_path, monkeypatc
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
-        user = AuthenticatedUser("demo-administrator", "administrator", demo=True)
+        user = AuthenticatedUser(DEMO_ADMIN_USER_ID, "administrator", demo=True)
         preview = preview_source(db, user, "collection-values.csv", content)
         commit_source(db, user, preview["import_batch_id"])
         raw_rows = db.scalars(select(RawSourceRow).order_by(RawSourceRow.source_row_number)).all()
@@ -175,7 +213,7 @@ def test_preview_counts_unique_rows_by_sheet_not_issue_objects(tmp_path, monkeyp
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
-        user = AuthenticatedUser("demo-administrator", "administrator", demo=True)
+        user = AuthenticatedUser(DEMO_ADMIN_USER_ID, "administrator", demo=True)
         preview = preview_source(db, user, "rows.xlsx", output.getvalue())
         batch = db.get(ImportBatch, preview["import_batch_id"])
         assert batch.rows_discovered == 2

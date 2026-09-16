@@ -1,6 +1,24 @@
 # Test Results
 
-## Current execution: 2026-09-16
+## Current execution: 2026-09-16 (contract hardening)
+
+Environment: Windows, Python 3.13.3, Node.js 24.11.1
+Method version: 2026.09.final-alignment
+
+- Backend: `python -m pytest -q --basetemp=.pytest-tmp-surgical-final` -> 65 passed and 1 skipped in 7.68s.
+- Frontend unit: `npm test -- --run` -> 10 files and 30 tests passed in 49.99s.
+- Lint: `npm run lint` -> passed.
+- TypeScript: `npm run typecheck` -> passed.
+- Production build: `npm run build` -> passed and generated 15 application routes.
+- Playwright: `npm run test:e2e` -> 1 workflow passed in 56.2s after in-place compatibility normalization of the pre-existing demo SQLite UUID representation.
+
+The single backend skip is the environment-gated confidential official-workbook regression. `PESLC_OFFICIAL_RAW_PATH` was not supplied, so official numerical reproduction remains pending and is not reported as passed.
+
+Focused regression coverage verifies canonical persisted CART JSON paths and majority-baseline Macro F1 reporting, PostgreSQL-native/SQLite-portable string UUID behavior, safe internal login redirects, contribution-versus-currency export precision, newest-request-wins API state, truthful missing/zero CRITIC weight display, and the 6 User UAT / 8 System Validation / 14-case contract with user-observable UAT-012 wording. No analytical formula, locked result, role, or accepted methodology was changed.
+
+Migration `008_power_bi_reporting_alignment.sql` was corrected in place because repository evidence still identifies it as unapplied in a real Supabase environment. Applying migrations to real Supabase, production PostgreSQL verification, private model-artifact activation, secure Power BI connection/refresh, final role-based Client UAT, and confidential-workbook regression remain external checks.
+
+## Prior execution: 2026-09-16 (reporting alignment)
 
 Environment: Windows, Python 3.13.3, Node.js 24.11.1
 Method version: 2026.09.final-alignment

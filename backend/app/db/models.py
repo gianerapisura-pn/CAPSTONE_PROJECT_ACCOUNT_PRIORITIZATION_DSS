@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -19,9 +19,12 @@ class Base(DeclarativeBase):
     pass
 
 
+UUID_STRING = Uuid(as_uuid=False)
+
+
 class UserProfile(Base):
     __tablename__ = "user_profiles"
-    user_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True)
     role: Mapped[str] = mapped_column(String(32), nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(160))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
@@ -29,10 +32,10 @@ class UserProfile(Base):
 
 class ImportBatch(Base):
     __tablename__ = "import_batches"
-    import_batch_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    import_batch_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     file_name: Mapped[str] = mapped_column(String(255))
     file_hash: Mapped[str] = mapped_column(String(64), index=True)
-    uploaded_by: Mapped[str | None] = mapped_column(String(36))
+    uploaded_by: Mapped[str | None] = mapped_column(UUID_STRING)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     committed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(32))
@@ -43,12 +46,12 @@ class ImportBatch(Base):
     cancelled_count: Mapped[int] = mapped_column(Integer, default=0)
     storage_path: Mapped[str | None] = mapped_column(Text)
     override_reason: Mapped[str | None] = mapped_column(Text)
-    analysis_run_id: Mapped[str | None] = mapped_column(String(36))
+    analysis_run_id: Mapped[str | None] = mapped_column(UUID_STRING)
 
 
 class ImportRowIssue(Base):
     __tablename__ = "import_row_issues"
-    import_row_issue_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    import_row_issue_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     import_batch_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_batch_id"), index=True)
     source_sheet: Mapped[str | None] = mapped_column(String(255))
     row_number: Mapped[int | None] = mapped_column(Integer)
@@ -60,7 +63,7 @@ class ImportRowIssue(Base):
 
 class RawSourceRow(Base):
     __tablename__ = "raw_source_rows"
-    raw_source_row_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    raw_source_row_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     import_batch_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_batch_id"), index=True)
     source_sheet: Mapped[str] = mapped_column(String(255))
     source_row_number: Mapped[int] = mapped_column(Integer)
@@ -80,7 +83,7 @@ class RawSourceRow(Base):
 
 class DimAccount(Base):
     __tablename__ = "dim_account"
-    account_key: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    account_key: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     standardized_account_name: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
@@ -88,21 +91,21 @@ class DimAccount(Base):
 
 class AccountAlias(Base):
     __tablename__ = "account_aliases"
-    account_alias_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    account_alias_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     alias_name: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     canonical_account_name: Mapped[str] = mapped_column(String(255), index=True)
-    approved_by: Mapped[str | None] = mapped_column(String(36))
+    approved_by: Mapped[str | None] = mapped_column(UUID_STRING)
     approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     reason: Mapped[str | None] = mapped_column(Text)
 
 
 class AccountAliasReview(Base):
     __tablename__ = "account_alias_review"
-    alias_review_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    alias_review_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     candidate_name: Mapped[str] = mapped_column(String(255), index=True)
     possible_canonical_name: Mapped[str | None] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
-    reviewed_by: Mapped[str | None] = mapped_column(String(36))
+    reviewed_by: Mapped[str | None] = mapped_column(UUID_STRING)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reason: Mapped[str | None] = mapped_column(Text)
 
@@ -143,11 +146,11 @@ class InvoiceGroupLineage(Base):
 
 class AnalyticsRun(Base):
     __tablename__ = "analytics_runs"
-    analysis_run_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    analysis_run_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     cutoff_date: Mapped[datetime | None] = mapped_column(Date)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    latest_import_batch_id: Mapped[str | None] = mapped_column(String(36))
+    latest_import_batch_id: Mapped[str | None] = mapped_column(UUID_STRING)
     status: Mapped[str] = mapped_column(String(40), index=True)
     mcs_status: Mapped[str | None] = mapped_column(String(40))
     critic_weights: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -165,7 +168,7 @@ class AnalyticsRun(Base):
 
 class RFMResult(Base):
     __tablename__ = "fact_account_rfm"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     analysis_run_id: Mapped[str] = mapped_column(ForeignKey("analytics_runs.analysis_run_id"), index=True)
     account_key: Mapped[str] = mapped_column(ForeignKey("dim_account.account_key"), index=True)
     payload: Mapped[dict] = mapped_column(JSON)
@@ -174,7 +177,7 @@ class RFMResult(Base):
 
 class SettlementResult(Base):
     __tablename__ = "fact_historical_settlement"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     analysis_run_id: Mapped[str] = mapped_column(ForeignKey("analytics_runs.analysis_run_id"), index=True)
     account_key: Mapped[str] = mapped_column(ForeignKey("dim_account.account_key"), index=True)
     payload: Mapped[dict] = mapped_column(JSON)
@@ -183,7 +186,7 @@ class SettlementResult(Base):
 
 class AccountPriorityResult(Base):
     __tablename__ = "account_priority_results"
-    account_priority_result_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    account_priority_result_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     analysis_run_id: Mapped[str] = mapped_column(ForeignKey("analytics_runs.analysis_run_id"), index=True)
     account_key: Mapped[str] = mapped_column(ForeignKey("dim_account.account_key"), index=True)
     standardized_account_name: Mapped[str] = mapped_column(String(255))
@@ -193,7 +196,7 @@ class AccountPriorityResult(Base):
 
 class ModelRun(Base):
     __tablename__ = "model_runs"
-    model_run_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    model_run_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     analysis_run_id: Mapped[str] = mapped_column(ForeignKey("analytics_runs.analysis_run_id"), index=True)
     model_version: Mapped[str] = mapped_column(String(120))
     status: Mapped[str] = mapped_column(String(80))
@@ -202,7 +205,7 @@ class ModelRun(Base):
 
 class PredictiveModelVersion(Base):
     __tablename__ = "predictive_model_versions"
-    predictive_model_version_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    predictive_model_version_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     model_version: Mapped[str] = mapped_column(String(120), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     status: Mapped[str] = mapped_column(String(40), index=True)
@@ -227,7 +230,7 @@ class PredictiveModelVersion(Base):
 
 class PredictiveMonitoringEvaluation(Base):
     __tablename__ = "predictive_monitoring_evaluations"
-    predictive_monitoring_evaluation_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    predictive_monitoring_evaluation_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     predictive_model_version_id: Mapped[str] = mapped_column(
         ForeignKey("predictive_model_versions.predictive_model_version_id"), index=True
     )
@@ -240,7 +243,7 @@ class PredictiveMonitoringEvaluation(Base):
 
 class PredictiveHorizonEvaluation(Base):
     __tablename__ = "predictive_horizon_evaluations"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     predictive_model_version_id: Mapped[str] = mapped_column(
         ForeignKey("predictive_model_versions.predictive_model_version_id"), index=True
     )
@@ -250,7 +253,7 @@ class PredictiveHorizonEvaluation(Base):
 
 class PredictiveFeatureDecision(Base):
     __tablename__ = "predictive_feature_decisions"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     predictive_model_version_id: Mapped[str] = mapped_column(
         ForeignKey("predictive_model_versions.predictive_model_version_id"), index=True
     )
@@ -261,7 +264,7 @@ class PredictiveFeatureDecision(Base):
 
 class PredictiveOOPEvaluation(Base):
     __tablename__ = "predictive_oop_evaluations"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     predictive_model_version_id: Mapped[str] = mapped_column(
         ForeignKey("predictive_model_versions.predictive_model_version_id"), index=True
     )
@@ -271,7 +274,7 @@ class PredictiveOOPEvaluation(Base):
 
 class SensitivitySummaryRecord(Base):
     __tablename__ = "sensitivity_results"
-    sensitivity_result_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    sensitivity_result_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     analysis_run_id: Mapped[str] = mapped_column(ForeignKey("analytics_runs.analysis_run_id"), index=True)
     weight_range: Mapped[float] = mapped_column(Float)
     payload: Mapped[dict] = mapped_column(JSON)
@@ -279,7 +282,7 @@ class SensitivitySummaryRecord(Base):
 
 class SensitivityScenarioRecord(Base):
     __tablename__ = "fact_sensitivity_analysis"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     analysis_run_id: Mapped[str] = mapped_column(ForeignKey("analytics_runs.analysis_run_id"), index=True)
     weight_range: Mapped[float] = mapped_column(Float, index=True)
     iteration: Mapped[int] = mapped_column(Integer)
@@ -289,14 +292,14 @@ class SensitivityScenarioRecord(Base):
 
 class RankingBacktestRecord(Base):
     __tablename__ = "ranking_backtests"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     analysis_run_id: Mapped[str] = mapped_column(ForeignKey("analytics_runs.analysis_run_id"), index=True)
     payload: Mapped[dict] = mapped_column(JSON)
 
 
 class BusinessBaselineRecord(Base):
     __tablename__ = "business_baseline_results"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     analysis_run_id: Mapped[str] = mapped_column(ForeignKey("analytics_runs.analysis_run_id"), index=True)
     year: Mapped[int] = mapped_column(Integer)
     payload: Mapped[dict] = mapped_column(JSON)
@@ -304,8 +307,8 @@ class BusinessBaselineRecord(Base):
 
 class AuditLog(Base):
     __tablename__ = "audit_log"
-    audit_log_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
-    actor_user_id: Mapped[str | None] = mapped_column(String(36))
+    audit_log_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
+    actor_user_id: Mapped[str | None] = mapped_column(UUID_STRING)
     action: Mapped[str] = mapped_column(String(80), index=True)
     entity_type: Mapped[str] = mapped_column(String(80))
     entity_id: Mapped[str | None] = mapped_column(String(80))

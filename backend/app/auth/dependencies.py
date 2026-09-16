@@ -22,6 +22,10 @@ class AuthenticatedUser:
     demo: bool = False
 
 
+DEMO_ADMIN_USER_ID = "00000000-0000-4000-8000-000000000001"
+DEMO_MANAGEMENT_USER_ID = "00000000-0000-4000-8000-000000000002"
+
+
 def _verify_supabase_token(token: str) -> dict:
     settings = get_settings()
     try:
@@ -54,7 +58,7 @@ async def require_user(
 ) -> AuthenticatedUser:
     settings = get_settings()
     if settings.demo_mode:
-        return AuthenticatedUser("demo-administrator", "administrator", "demo@local.invalid", "Demo Administrator", True)
+        return AuthenticatedUser(DEMO_ADMIN_USER_ID, "administrator", "demo@local.invalid", "Demo Administrator", True)
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
     claims = _verify_supabase_token(authorization.split(" ", 1)[1].strip())
