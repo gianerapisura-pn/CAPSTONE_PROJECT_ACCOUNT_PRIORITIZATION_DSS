@@ -1,5 +1,24 @@
 # Test Results
 
+## Current execution: 2026-09-16 (final surgical hardening)
+
+Environment: Windows, Python 3.13.3, Node.js 24.11.1
+Method version: 2026.09.final-alignment
+
+- Focused backend: `python -m pytest -q tests/test_import_validation.py tests/test_analytics.py tests/test_persistence.py --basetemp=.pytest-tmp-final-surgical-focused-2` -> 45 passed in 8.71s.
+- Backend: `python -m pytest -q --basetemp=.pytest-tmp-final-surgical-full` -> 76 passed and 1 skipped in 12.27s.
+- Frontend unit: `npm test -- --run` -> 10 files and 30 tests passed in 69.70s.
+- Lint: `npm run lint` -> passed.
+- TypeScript: `npm run typecheck` -> passed.
+- Production build: `npm run build` -> passed and generated 15 application routes.
+- Playwright: `npm run test:e2e` -> 1 workflow passed in 1.8m (test duration 42.4s).
+
+The single backend skip is the environment-gated confidential official-workbook regression. `PESLC_OFFICIAL_RAW_PATH` was not supplied, so official numerical reproduction remains pending and is not reported as passed.
+
+This hardening rejects non-finite monetary inputs through ordinary import validation, applies the existing spreadsheet-safe convention to Import Issues CSV values, excludes constant criteria from CRITIC conflict calculations while preserving explicit non-discriminating behavior, and corrects one stale data-dictionary phrase. Existing analytical formulas for all-varying data, migrations 001-008, frontend behavior, Power BI contracts, roles, and UAT remain unchanged.
+
+Real Supabase execution, Power BI refresh, client UAT, deployment verification, and confidential-workbook regression remain external checks.
+
 ## Current execution: 2026-09-16 (contract hardening)
 
 Environment: Windows, Python 3.13.3, Node.js 24.11.1

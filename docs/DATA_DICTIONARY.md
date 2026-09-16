@@ -23,7 +23,7 @@
 - `predictive_monitoring_evaluations`: future validation/review evidence; it
   does not authorize automatic retraining.
 - `fact_sensitivity_analysis`: one account result per perturbation range/iteration with analysis date, scenario key, four perturbed weights, canonical `rank_change`, and the iteration Spearman correlation.
-- `ranking_backtests`: one payload containing all six fixed historical cutoff evaluations; reporting migration 004 expands one row per cutoff.
+- `ranking_backtests`: one payload containing all six fixed historical cutoff evaluations; the certified reporting view expands one row per cutoff.
 - `business_baseline_results`: annual dynamic sales/account context.
 
 ## Operational

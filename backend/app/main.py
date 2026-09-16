@@ -180,11 +180,15 @@ def import_history(user: AuthenticatedUser = Depends(require_admin), db: Session
 @app.get("/imports/{batch_id}/issues.csv")
 def import_issues(batch_id: str, user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db)) -> Response:
     rows = db.scalars(select(ImportRowIssue).where(ImportRowIssue.import_batch_id == batch_id)).all()
-    frame = pd.DataFrame([{
+    exported_rows = [{
         "source_sheet": row.source_sheet, "row_number": row.row_number,
         "column": row.column_name, "issue_type": row.issue_type,
         "severity": row.severity, "message": row.message,
-    } for row in rows])
+    } for row in rows]
+    frame = pd.DataFrame([
+        {key: _safe_sheet_value(value) for key, value in row.items()}
+        for row in exported_rows
+    ])
     return Response(frame.to_csv(index=False), media_type="text/csv",
                     headers={"Content-Disposition": f'attachment; filename="import-{batch_id}-issues.csv"'})
 

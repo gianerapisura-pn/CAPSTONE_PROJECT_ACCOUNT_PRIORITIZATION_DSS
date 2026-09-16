@@ -126,7 +126,8 @@ def parse_decimal(value: object) -> Decimal | None:
     if cleaned.startswith("(") and cleaned.endswith(")"):
         cleaned = f"-{cleaned[1:-1]}"
     try:
-        return Decimal(cleaned)
+        parsed = Decimal(cleaned)
+        return parsed if parsed.is_finite() else None
     except InvalidOperation:
         return None
 

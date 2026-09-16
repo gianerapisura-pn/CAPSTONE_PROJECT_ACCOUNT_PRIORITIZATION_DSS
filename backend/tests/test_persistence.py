@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from pathlib import Path
 
-from app.db.models import AnalyticsRun, Base, ModelRun, RawSourceRow
+from app.db.models import AnalyticsRun, Base, ImportBatch, ImportRowIssue, ModelRun, RawSourceRow
 from app.auth.dependencies import AuthenticatedUser, DEMO_ADMIN_USER_ID, DEMO_MANAGEMENT_USER_ID
 from app.core.config import get_settings
 from app.db.repository import current_account_rows, latest_successful_run, run_payload
@@ -27,6 +27,44 @@ def test_export_currency_classification_preserves_analytical_semantics():
         assert not _is_currency_column(column)
     for column in ("monetary", "monetary_value", "si_amount"):
         assert _is_currency_column(column)
+
+
+def test_import_issues_csv_uses_spreadsheet_safe_values():
+    from app.main import import_issues
+
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        batch = ImportBatch(
+            file_name="issues.xlsx", file_hash="0" * 64,
+            uploaded_by=DEMO_ADMIN_USER_ID, status="previewed",
+        )
+        db.add(batch)
+        db.flush()
+        db.add_all([
+            ImportRowIssue(
+                import_batch_id=batch.import_batch_id,
+                source_sheet='=HYPERLINK("https://example.invalid","x")',
+                row_number=2, column_name="SI AMOUNT", issue_type="invalid_si_amount",
+                severity="error", message="Invalid amount.",
+            ),
+            ImportRowIssue(
+                import_batch_id=batch.import_batch_id, source_sheet="Ordinary Sheet",
+                row_number=3, column_name="EWT", issue_type="invalid_money",
+                severity="error", message="Ordinary message.",
+            ),
+        ])
+        db.commit()
+
+        response = import_issues(
+            batch.import_batch_id,
+            AuthenticatedUser(DEMO_ADMIN_USER_ID, "administrator", demo=True),
+            db,
+        )
+        exported = list(csv.DictReader(StringIO(response.body.decode())))
+
+    assert exported[0]["source_sheet"] == "'=HYPERLINK(\"https://example.invalid\",\"x\")"
+    assert exported[1]["source_sheet"] == "Ordinary Sheet"
 
 
 def test_latest_successful_run_ignores_newer_failed_run():

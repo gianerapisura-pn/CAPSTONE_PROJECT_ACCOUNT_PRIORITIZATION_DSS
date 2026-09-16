@@ -195,7 +195,9 @@ def test_current_mcs_uses_latest_si_cutoff_for_settlement_evidence():
     ]))
     assert advanced.cutoff_date == "2026-04-01"
     assert {item["account"] for item in advanced.settlement} == {"A", "B"}
-    assert any(item["account"] == "A" for item in advanced.priorities)
+    assert advanced.mcs_eligible_account_count == 2
+    assert advanced.mcs_status == "non_discriminating"
+    assert advanced.priorities == []
 
 
 def test_rfm_average_rank_formula_ties_direction_and_constant_component():
@@ -237,8 +239,15 @@ def test_constant_criterion_has_zero_weight_and_all_constant_is_non_discriminati
         "settlement": [0.5, 0.5, 0.5],
     })
     weights = critic_weights(frame)
-    assert weights["settlement"] == 0
+    informative = frame.loc[:, ["recency", "frequency", "monetary"]]
+    std = informative.std(axis=0, ddof=0)
+    information = std * (1.0 - informative.corr(method="pearson")).sum(axis=0)
+    expected = information / information.sum()
+
+    assert weights["settlement"] == 0.0
     assert abs(sum(weights.values()) - 1) < 1e-12
+    for criterion in informative.columns:
+        assert abs(weights[criterion] - expected[criterion]) < 1e-12
     assert critic_weights(pd.DataFrame({name: [0.5, 0.5] for name in CRITERIA})) == {}
 
 

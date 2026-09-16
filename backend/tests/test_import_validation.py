@@ -1,8 +1,10 @@
+from decimal import Decimal
 from io import BytesIO
 
 import pandas as pd
+import pytest
 
-from app.imports.validators import REQUIRED_COLUMNS, parse_source_file, validate_rows
+from app.imports.validators import REQUIRED_COLUMNS, parse_decimal, parse_source_file, validate_rows
 
 
 def valid_row(**changes):
@@ -83,3 +85,29 @@ def test_blank_si_and_invalid_collection_values_are_typed():
     frame["source_row_number"] = 2
     issue_types = {issue.issue_type for issue in validate_rows(frame)}
     assert {"missing_si_number", "invalid_cr_date", "invalid_money"} <= issue_types
+
+
+@pytest.mark.parametrize("value", ["NaN", "sNaN", "Infinity", "+Infinity", "-Infinity", "Inf", "+Inf", "-Inf"])
+def test_parse_decimal_rejects_non_finite_values(value):
+    assert parse_decimal(value) is None
+
+
+def test_non_finite_monetary_values_produce_normal_validation_issues():
+    frame = pd.DataFrame([
+        valid_row(**{"SI AMOUNT": "NaN"}),
+        valid_row(**{"CR AMOUNT": "Infinity"}),
+        valid_row(**{"EWT": "-Inf"}),
+    ])
+    frame["source_sheet"] = "CSV"
+    frame["source_row_number"] = [2, 3, 4]
+
+    issues = validate_rows(frame)
+
+    assert any(issue.row_number == 2 and issue.issue_type == "invalid_si_amount" for issue in issues)
+    assert any(issue.row_number == 3 and issue.column == "CR AMOUNT" and issue.issue_type == "invalid_money" for issue in issues)
+    assert any(issue.row_number == 4 and issue.column == "EWT" and issue.issue_type == "invalid_money" for issue in issues)
+
+
+def test_parse_decimal_preserves_blank_and_explicit_zero_distinction():
+    assert parse_decimal("") is None
+    assert parse_decimal("0.00") == Decimal("0.00")

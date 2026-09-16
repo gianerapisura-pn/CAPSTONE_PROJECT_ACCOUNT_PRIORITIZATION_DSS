@@ -50,12 +50,18 @@ def critic_weights(criteria_frame: pd.DataFrame) -> dict[str, float]:
         return {}
     frame = criteria_frame.loc[:, list(CRITERIA)]
     std = frame.std(axis=0, ddof=0).fillna(0.0)
-    corr = frame.corr(method="pearson").fillna(0.0)
-    information = std * (1.0 - corr).sum(axis=0)
+    informative = [criterion for criterion in CRITERIA if std[criterion] > 0.0]
+    if not informative:
+        return {}
+    corr = frame.loc[:, informative].corr(method="pearson")
+    information = std.loc[informative] * (1.0 - corr).sum(axis=0)
     total = float(information.sum())
     if np.isclose(total, 0.0, rtol=0.0, atol=1e-15):
         return {}
-    return {criterion: float(information[criterion] / total) for criterion in CRITERIA}
+    return {
+        criterion: float(information[criterion] / total) if criterion in informative else 0.0
+        for criterion in CRITERIA
+    }
 
 
 def analytical_ranks(scored: list[tuple[str, float]]) -> dict[str, int]:
