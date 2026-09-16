@@ -16,4 +16,5 @@ The DSS does not claim to causally solve sales decline or guarantee a sale. It p
 The evidence chain is `Problem -> Evidence -> Insight -> Decision -> Action ->
 Evaluation/Impact`. Dashboard, model, recommendation, and published report are
 decision-support outputs, not final business impact. The Web DSS handles
-the single operational front door; the client uploads once there. Power BI handles broader detailed reporting from the same persisted outputs after its configured refresh and never computes a competing ranking.
+the single operational front door; an authorized DSS administrator/data
+custodian uploads there. Power BI handles broader detailed reporting from the same persisted outputs after its configured refresh and never computes a competing ranking.

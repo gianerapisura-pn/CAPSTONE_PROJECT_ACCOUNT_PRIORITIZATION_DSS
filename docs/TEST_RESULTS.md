@@ -14,7 +14,7 @@ Method version: 2026.09.final-alignment
 
 The single backend skip is the environment-gated confidential official-workbook regression. `PESLC_OFFICIAL_RAW_PATH` was not supplied, so official numerical reproduction is pending and is not reported as passed.
 
-Automated tests cover generic third allocation including 83 -> 28/27/28, tie handling, the latest-RFM all-profile universe, nullable MCS evidence, independent CART risk, current dashboard counts, shared filtered export, future-account detail, explicit CART model versioning, duplicate rejection, and static migration-007 security/reporting contracts. Migration `007_targeted_system_alignment.sql` was not executed against a real Supabase project in this environment. Real Power BI connection/refresh, remote database role verification, and the 14 blank-execution-field UAT cases remain deployment activities.
+Automated tests cover generic third allocation including 83 -> 28/27/28, tie handling, the latest-RFM all-profile universe, nullable MCS evidence, independent CART risk, current dashboard counts, shared filtered export, future-account detail, explicit CART model versioning, duplicate rejection, and static migration-007 security/reporting contracts. Migration `007_targeted_system_alignment.sql` was not executed against a real Supabase project in this environment. Real Power BI connection/refresh and remote database role verification remain pending, as do the blank-execution-field User UAT and Technical/System Validation cases.
 
 ## Historical execution: 2026-09-03
 Environment: Windows, Python 3.13.3, Node.js 24.11.1

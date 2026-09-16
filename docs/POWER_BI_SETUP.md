@@ -1,6 +1,6 @@
 # Power BI Setup
 
-Power BI is the downstream Detailed Analytics layer of the integrated PESLC DSS. Python/FastAPI remains the official validation, ETL, and analytical source of truth. The client uploads structured RAW data once through the Web DSS and does not upload or clean a second source copy in Power BI. Power BI reads published Supabase PostgreSQL reporting views after a configured manual or scheduled refresh.
+Power BI is the downstream Detailed Analytics layer of the integrated PESLC DSS. Python/FastAPI remains the official validation, ETL, and analytical source of truth. An authorized DSS administrator/data custodian uploads structured RAW data once through the Web DSS and does not upload or clean a second source copy in Power BI. Power BI reads published Supabase PostgreSQL reporting views after a configured manual or scheduled refresh.
 
 Power BI technically supports transformation through Power Query, but this capstone limits it to display types, labels, relationships, harmless shaping, and hiding technical columns. It must not redefine logical-invoice eligibility, RFM, Settlement, CART, CRITIC, Final Priority Score, Priority Group, sensitivity, or backtesting.
 

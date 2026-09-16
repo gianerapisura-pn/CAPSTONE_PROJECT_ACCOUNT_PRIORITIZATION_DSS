@@ -54,7 +54,7 @@ out-of-period evaluation, and stores the validated artifact privately. Normal
 imports score with the active model and do not retrain it. Monitoring can flag
 review; retraining requires the administrator training endpoint and a new explicit configured model version. Activating an artifact does not mutate an already-published analytical run; run analytics separately to publish current CART context.
 
-The client uploads structured RAW data once through the Web DSS; there is no second Power BI upload. The Web DSS owns secure operational review, validation, controlled commit, ranking, account explanation, and export. Power BI connects to Supabase reporting views with read-only credentials for broader reporting and reflects published results after its configured manual or scheduled refresh. Power Query may perform light report preparation, but Power BI does not recalculate the Python methodology.
+An authorized DSS administrator/data custodian uploads structured RAW data once through the Web DSS; there is no second Power BI upload. The Web DSS owns secure operational review, validation, controlled commit, ranking, account explanation, and export. Power BI connects to Supabase reporting views with read-only credentials for broader reporting and reflects published results after its configured manual or scheduled refresh. Power Query may perform light report preparation, but Power BI does not recalculate the Python methodology.
 
 ## Commands
 
