@@ -23,7 +23,14 @@ from app.db.models import (
     InvoiceGroupRecord,
     RawSourceRow,
 )
-from app.db.repository import audit, ensure_accounts, load_invoice_groups, persist_run_output
+from app.db.repository import (
+    audit,
+    b2b_analytical_accounts,
+    current_actionable_accounts,
+    ensure_accounts,
+    load_invoice_groups,
+    persist_run_output,
+)
 from app.etl.invoices import SourceRow, dataframe_to_source_rows, group_invoices
 from app.etl.status import standardize_payment_status
 from app.imports.validators import REQUIRED_COLUMNS, parse_source_file, validate_rows
@@ -417,18 +424,16 @@ def commit_source(
         batch.status = "committed"
         batch.committed_at = datetime.now(timezone.utc)
         db.flush()
-        eligible_accounts = set(db.scalars(
-            select(DimAccount.standardized_account_name).where(
-                DimAccount.b2b_priority_eligible.is_(True)
-            )
-        ).all())
+        b2b_accounts = b2b_analytical_accounts(db)
+        actionable_accounts = current_actionable_accounts(db)
         predictive = future_transaction_for_current_run(
-            db, cumulative_groups, pd.Timestamp(analysis_reference_date), eligible_accounts,
+            db, cumulative_groups, pd.Timestamp(analysis_reference_date), b2b_accounts,
         )
         result = asdict(run_account_prioritization(
             cumulative_groups,
             pd.Timestamp(analysis_reference_date),
-            eligible_accounts,
+            b2b_accounts,
+            actionable_accounts,
             predictive_result=predictive,
         ))
         run = AnalyticsRun(

@@ -44,6 +44,11 @@ export interface AccountDecisionRow {
   b2b_priority_eligible: boolean;
   account_status: string | null;
   last_verified: string | null;
+  verification_type: string | null;
+  verification_date: string | null;
+  verification_basis: string | null;
+  current_actionable: boolean;
+  criteria_complete: boolean;
   analysis_run_id: string;
   analysis_reference_date: string | null;
   final_priority_score: number | null;
@@ -133,6 +138,9 @@ export interface RunSummary {
 
 export interface DashboardData {
   run: RunSummary;
+  historical_identities: number;
+  b2b_analytical_accounts: number;
+  current_actionable_accounts: number;
   total_standardized_accounts: number;
   mcs_eligible_accounts: number;
   ranked_accounts: number;

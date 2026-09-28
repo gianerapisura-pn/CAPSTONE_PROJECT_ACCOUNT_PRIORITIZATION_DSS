@@ -11,7 +11,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Seed locked supplementary prescriptive robustness evidence for reporting."
     )
-    parser.add_argument("package", help="PESLC_PRESCRIPTIVE_ROBUSTNESS_COMPLETE.zip")
+    parser.add_argument("package", help="PESLC_FINAL_ANALYTICS_LOCKED.zip")
     parser.add_argument("--actor", default=None, help="Administrator UUID for audit attribution")
     args = parser.parse_args()
     init_database()

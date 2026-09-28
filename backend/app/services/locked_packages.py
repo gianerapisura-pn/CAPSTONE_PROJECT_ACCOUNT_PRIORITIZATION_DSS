@@ -8,8 +8,8 @@ from zipfile import ZipFile
 
 import pandas as pd
 
-FINAL_PACKAGE_SHA256 = "f1728c5ddc3e72c36e26497d8c746119dfa068de945e563cb0bb4d43b90e32eb"
-PRESCRIPTIVE_PACKAGE_SHA256 = "44c87746b976398ae77a23942a2b05dd7497678d4c228580fc6e6c16f641cf57"
+FINAL_PACKAGE_SHA256 = "e78b2670dfe4c739d20c83039ea7f16a14c4aca1a48b4a4f050c74ec481fb324"
+
 
 
 def verified_package(path: str | Path, expected_sha256: str) -> tuple[Path, bytes]:

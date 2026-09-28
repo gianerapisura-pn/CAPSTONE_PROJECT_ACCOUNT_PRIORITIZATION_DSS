@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import (
     AccountAlias,
+    AccountContextSnapshot,
     AccountAliasReview,
     AccountPriorityResult,
     AnalyticsRun,
@@ -44,6 +45,7 @@ UUID_COLUMNS = {
     InvoiceGroupRecord: ("import_batch_id", "account_key"),
     InvoiceGroupLineage: ("raw_source_row_id",),
     AnalyticsRun: ("analysis_run_id", "latest_import_batch_id"),
+    AccountContextSnapshot: ("account_context_id", "analysis_run_id", "account_key"),
     RFMResult: ("id", "analysis_run_id", "account_key"),
     SettlementResult: ("id", "analysis_run_id", "account_key"),
     AccountPriorityResult: ("account_priority_result_id", "analysis_run_id", "account_key"),

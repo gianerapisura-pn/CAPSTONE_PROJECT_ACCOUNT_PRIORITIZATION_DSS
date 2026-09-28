@@ -35,9 +35,9 @@ export default function DashboardPage() {
         </div>
 
         <section className="kpi-grid">
-          <div className="kpi-card"><span className="kpi-icon teal"><Users /></span><div><span>Current account profiles</span><strong>{data.total_standardized_accounts}</strong><small>{data.mcs_eligible_accounts} MCS eligible; {data.ranked_accounts} ranked</small></div></div>
+          <div className="kpi-card"><span className="kpi-icon teal"><Users /></span><div><span>Historical identities</span><strong>{data.historical_identities}</strong><small>{data.b2b_analytical_accounts} B2B analytical profiles</small></div></div>
           <div className="kpi-card"><span className="kpi-icon amber"><CircleDollarSign /></span><div><span>Valid historical sales</span><strong>{money.format(data.total_valid_historical_sales)}</strong><small>Compact business context</small></div></div>
-          <div className="kpi-card"><span className="kpi-icon blue"><CalendarDays /></span><div><span>Ranked population</span><strong>{data.ranked_accounts}</strong><small>Latest successful publication</small></div></div>
+          <div className="kpi-card"><span className="kpi-icon blue"><CalendarDays /></span><div><span>Current actionable / ranked</span><strong>{data.current_actionable_accounts} / {data.ranked_accounts}</strong><small>{data.mcs_eligible_accounts} MCS eligible</small></div></div>
         </section>
 
         <section className="dashboard-grid">

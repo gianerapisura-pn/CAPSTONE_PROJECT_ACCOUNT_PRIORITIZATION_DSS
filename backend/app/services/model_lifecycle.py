@@ -39,7 +39,7 @@ from app.db.models import (
 from app.etl.invoices import InvoiceGroup
 from app.services.locked_packages import (
     FINAL_PACKAGE_SHA256,
-    csv_members_under,
+    read_package_csv,
     read_package_json,
     read_package_member,
     verified_package,
@@ -173,84 +173,35 @@ def seed_locked_predictive_evidence(
     record: PredictiveModelVersion,
     package_content: bytes,
 ) -> dict:
-    db.execute(delete(PredictiveHorizonEvaluation).where(
-        PredictiveHorizonEvaluation.predictive_model_version_id == record.predictive_model_version_id
-    ))
-    db.execute(delete(PredictiveBenchmarkRecord).where(
-        PredictiveBenchmarkRecord.predictive_model_version_id == record.predictive_model_version_id
-    ))
-    db.execute(delete(PredictiveOOPEvaluation).where(
-        PredictiveOOPEvaluation.predictive_model_version_id == record.predictive_model_version_id
-    ))
+    db.execute(delete(PredictiveHorizonEvaluation).where(PredictiveHorizonEvaluation.predictive_model_version_id == record.predictive_model_version_id))
+    db.execute(delete(PredictiveBenchmarkRecord).where(PredictiveBenchmarkRecord.predictive_model_version_id == record.predictive_model_version_id))
+    db.execute(delete(PredictiveOOPEvaluation).where(PredictiveOOPEvaluation.predictive_model_version_id == record.predictive_model_version_id))
 
-    horizon_payloads: dict[int, list[dict]] = {3: [], 6: [], 12: []}
-    for name, frame in csv_members_under(package_content, "01_DATA/05_PREDICTIVE/02_HORIZON"):
-        horizon_column = _find_column(frame, {"horizon", "horizon_months", "outcome_horizon_months"})
-        for row in _rows(frame):
-            value = row.get(horizon_column) if horizon_column else None
-            match = re.search(r"(?:^|\D)(3|6|12)(?:\D|$)", name)
-            horizon = int(value) if value is not None and str(value).isdigit() else int(match.group(1)) if match else None
-            if horizon in horizon_payloads:
-                horizon_payloads[horizon].append({"source_member": name, **row})
-    for horizon, evidence in horizon_payloads.items():
-        if not evidence:
-            raise ValueError(f"Locked package is missing {horizon}-month horizon evidence.")
-        db.add(PredictiveHorizonEvaluation(
-            predictive_model_version_id=record.predictive_model_version_id,
-            horizon_months=horizon,
-            payload={"evidence": evidence},
-        ))
+    horizon = read_package_csv(package_content, "01_DATA/05_PREDICTIVE/02_HORIZON/horizon_summary.csv")
+    if len(horizon) != 3 or set(horizon["horizon_months"].astype(int)) != {3, 6, 12}:
+        raise ValueError("Locked horizon summary must contain exactly the 3-, 6-, and 12-month rows.")
+    for source in _rows(horizon):
+        db.add(PredictiveHorizonEvaluation(predictive_model_version_id=record.predictive_model_version_id, horizon_months=int(source["horizon_months"]), payload={"source_member": "horizon_summary.csv", **source}))
 
-    canonical: dict[str, list[dict]] = {}
-    for name, frame in csv_members_under(package_content, "01_DATA/05_PREDICTIVE/05_BENCHMARK"):
-        model_column = _find_column(frame, {"model", "model_name", "classifier", "estimator"})
-        if model_column is None:
-            continue
-        for row in _rows(frame):
-            model_name = str(row.get(model_column) or "").strip()
-            if model_name:
-                canonical.setdefault(model_name, []).append({"source_member": name, **row})
-    if len(canonical) != 22:
-        raise ValueError(
-            f"Canonical locked benchmark must contain 22 entries; found {len(canonical)}."
-        )
-    for model_name, evidence in canonical.items():
-        db.add(PredictiveBenchmarkRecord(
-            predictive_model_version_id=record.predictive_model_version_id,
-            benchmark_scope="canonical_21_classifiers_plus_majority",
-            model_name=model_name,
-            payload={"evidence": evidence},
-        ))
+    canonical = read_package_csv(package_content, "01_DATA/05_PREDICTIVE/05_BENCHMARK/model_benchmark.csv")
+    if len(canonical) != 22 or "family" not in canonical or canonical["family"].nunique() != 22:
+        raise ValueError("Canonical locked benchmark must contain 22 unique classifier families.")
+    for source in _rows(canonical):
+        db.add(PredictiveBenchmarkRecord(predictive_model_version_id=record.predictive_model_version_id, benchmark_scope="canonical_21_classifiers_plus_majority", model_name=str(source["family"]), payload={"source_member": "model_benchmark.csv", **source}))
 
-    for directory, scope in (
-        ("01_DATA/05_PREDICTIVE/06_MODEL_SELECTION", "model_selection_evidence"),
-        ("01_DATA/05_PREDICTIVE/08_EXTENDED_AUDIT", "supplemental_nine_classifier_audit"),
-    ):
-        for name, frame in csv_members_under(package_content, directory):
-            model_column = _find_column(frame, {"model", "model_name", "classifier", "estimator"})
-            for index, row in enumerate(_rows(frame), start=1):
-                model_name = str(row.get(model_column) or Path(name).stem) if model_column else Path(name).stem
-                db.add(PredictiveBenchmarkRecord(
-                    predictive_model_version_id=record.predictive_model_version_id,
-                    benchmark_scope=scope,
-                    model_name=model_name,
-                    payload={"source_member": name, "row": index, **row},
-                ))
+    supplemental = read_package_csv(package_content, "01_DATA/05_PREDICTIVE/08_EXTENDED_AUDIT/supplemental_model_benchmark.csv")
+    if len(supplemental) != 9 or "family" not in supplemental or supplemental["family"].nunique() != 9:
+        raise ValueError("Supplemental locked benchmark must contain nine unique models.")
+    for source in _rows(supplemental):
+        db.add(PredictiveBenchmarkRecord(predictive_model_version_id=record.predictive_model_version_id, benchmark_scope="supplemental_nine_classifier_audit", model_name=str(source["family"]), payload={"source_member": "supplemental_model_benchmark.csv", **source}))
 
-    later_count = 0
-    for name, frame in csv_members_under(package_content, "01_DATA/05_PREDICTIVE/07_LATER_CHECKS"):
-        cutoff_column = _find_column(frame, {"cutoff", "cutoff_date", "evaluation_cutoff"})
-        for row in _rows(frame):
-            parsed = pd.to_datetime(row.get(cutoff_column), errors="coerce") if cutoff_column else pd.NaT
-            db.add(PredictiveOOPEvaluation(
-                predictive_model_version_id=record.predictive_model_version_id,
-                oop_cutoff=None if pd.isna(parsed) else parsed.date(),
-                payload={"source_member": name, **row},
-            ))
-            later_count += 1
-    if later_count == 0:
-        raise ValueError("Locked package contains no later-period predictive checks.")
-    return {"horizons": 3, "canonical_benchmarks": 22, "later_checks": later_count}
+    later = read_package_csv(package_content, "01_DATA/05_PREDICTIVE/07_LATER_CHECKS/later_period_summary.csv")
+    if len(later) != 3:
+        raise ValueError("Locked later-period summary must contain exactly three periods.")
+    for source in _rows(later):
+        parsed = pd.to_datetime(source.get("cutoff_date"), errors="coerce")
+        db.add(PredictiveOOPEvaluation(predictive_model_version_id=record.predictive_model_version_id, oop_cutoff=None if pd.isna(parsed) else parsed.date(), payload={"source_member": "later_period_summary.csv", **source}))
+    return {"horizons": 3, "canonical_benchmarks": 22, "supplemental_benchmarks": 9, "later_checks": 3}
 
 
 def _metadata_date(metadata: dict, *keys: str) -> date | None:
@@ -301,8 +252,17 @@ def register_frozen_model(
     )).all():
         prior.status = "retired"
     imputer = artifact.named_steps["imputer"]
-    validation_metrics = metadata.get("oop_metrics") or metadata.get("validation_report") or {}
-    development_metrics = metadata.get("development_metrics") or LOCKED_DEVELOPMENT_METRICS
+    stage7 = metadata.get("stage7_selection_metrics") or {}
+    validation_metrics = {
+        "macro_f1": stage7.get("mean_macro_f1"),
+        "classification_error": stage7.get("mean_classification_error"),
+        "accuracy": stage7.get("mean_accuracy"),
+        "balanced_accuracy": stage7.get("mean_balanced_accuracy"),
+        "future_transaction_f1": stage7.get("mean_future_f1"),
+        "future_transaction_recall": stage7.get("mean_future_recall"),
+        "mcc": stage7.get("mean_mcc"),
+    } if stage7 else (metadata.get("oop_metrics") or metadata.get("validation_report") or {})
+    development_metrics = metadata.get("development_metrics") or validation_metrics or LOCKED_DEVELOPMENT_METRICS
     record = PredictiveModelVersion(
         model_version=config.model_version,
         model_family=config.model_family,

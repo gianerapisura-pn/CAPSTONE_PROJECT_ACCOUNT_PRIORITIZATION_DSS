@@ -15,10 +15,13 @@ const data = {
     warnings: [],
     duration_seconds: 2.25,
   },
+  historical_identities: 85,
+  b2b_analytical_accounts: 84,
+  current_actionable_accounts: 83,
   total_standardized_accounts: 84,
-  mcs_eligible_accounts: 84,
-  ranked_accounts: 84,
-  priority_group_counts: { High: 28, Medium: 28, Low: 28 },
+  mcs_eligible_accounts: 83,
+  ranked_accounts: 83,
+  priority_group_counts: { High: 28, Medium: 27, Low: 28 },
   prediction_class_counts: { "Future Transaction": 0, "No Future Transaction": 84 },
   total_valid_historical_sales: 167467524.93,
   warnings: [],
@@ -43,9 +46,12 @@ test("management overview keeps current decision context and a compact stability
   expect(screen.getByText("Analysis reference")).toBeInTheDocument();
   expect(screen.getByText("2026-09-21")).toBeInTheDocument();
   expect(screen.getByText("Last successful refresh")).toBeInTheDocument();
-  expect(screen.getByText("Current account profiles")).toBeInTheDocument();
-  expect(screen.getAllByText("84")[0]).toBeInTheDocument();
-  expect(screen.getByText("84 ranked accounts")).toBeInTheDocument();
+  expect(screen.getByText("Historical identities")).toBeInTheDocument();
+  expect(screen.getByText("85")).toBeInTheDocument();
+  expect(screen.getByText("84 B2B analytical profiles")).toBeInTheDocument();
+  expect(screen.getByText("83 ranked accounts")).toBeInTheDocument();
+  expect(screen.getByText("83 / 83")).toBeInTheDocument();
+  expect(screen.getByText("83 MCS eligible")).toBeInTheDocument();
   expect(screen.getByText("Future Transaction")).toBeInTheDocument();
   expect(screen.getByText("No Future Transaction")).toBeInTheDocument();
   expect(screen.getByText("Top prioritized accounts")).toBeInTheDocument();

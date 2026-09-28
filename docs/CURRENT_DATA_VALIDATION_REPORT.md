@@ -1,6 +1,6 @@
-﻿# Current Data Validation Report
+# Current Data Validation Report
 
-Status: acceptance contract prepared; private final inputs were not available in this workspace and current locked values were not recomputed here.
+Status: the supplied final ZIP hash was verified. Safe production parsing/bootstrap/evidence validation passed, and the explicitly authorized frozen-model regression passed under pinned scikit-learn 1.8.0 without warnings.
 
 | Anchor | Locked value |
 |---|---:|
@@ -8,16 +8,19 @@ Status: acceptance contract prepared; private final inputs were not available in
 | Physical rows | 363 |
 | Fully Paid / Cancelled | 292 / 71 |
 | Logical invoices | 282 |
-| Valid SI sales | PHP 167,467,524.93 |
-| Historical identities / verified B2B | 85 / 84 |
-| Current RFM / MCS eligible | 84 / 84 |
+| All-valid SI sales | PHP 167,467,524.93 |
+| Historical identities | 85 |
+| B2B descriptive/predictive | 84 |
+| Current actionable / MCS / ranked | 83 / 83 / 83 |
 | Prediction | 0 Future / 84 No Future Transaction |
-| Priority groups | 28 / 28 / 28 |
-| Sensitivity | 400 scenarios / 33,600 detail rows |
+| Priority groups | 28 / 27 / 28 |
+| Sensitivity | 400 scenarios / 33,200 detail rows |
 | Backtests | 7 annual cutoffs |
 
-Locked CRITIC weights are Recency 0.374388292558304, Frequency 0.19126358898879575, Monetary 0.17978654445098569, and Settlement 0.2545615740019145.
+ROD DE GUIA is retained historically and excluded from B2B analytics. ROSTRAM PROTECTIVE SYSTEM METIER COMPANY remains in B2B descriptive, predictive, and historical evidence but is Client-Confirmed Closed and has no current FPS, rank, or Priority Group.
 
-Locked top five are MEGAWORLD CORPORATION, LOXON PHILIPPINES INC, METRO WORX PROPERTIES INC, RYXEN INC, and EXQUADRA INC.
+Current CRITIC weights are Recency 0.3744267906167242, Frequency 0.1837992490377663, Monetary 0.1755208018503358, and Average Settlement Days 0.2662531584951738.
 
-These values become locally verified only after the private regression runs from RAW + confirmed account master + genuine frozen artifact. Final output CSVs are comparison references, not computational inputs.
+Current top ten are MEGAWORLD CORPORATION; LOXON PHILIPPINES INC; METRO WORX PROPERTIES INC; RYXEN INC; EXQUADRA INC; WILL DECENA AND ASSOCIATES, INC.; BCE PROPERTIES INC; WEE COMMUNITY DEVELOPERS INC; EXECUTIVE GENESIS SERVICES INC; and WEECOMM CENTRE PROPERTIES, INC.
+
+Package output CSVs are acceptance references, not production runtime inputs. Production reruns recompute from committed data and the registered hash-verified Extra Trees artifact.

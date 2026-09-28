@@ -124,6 +124,11 @@ class AccountDecisionRowResponse(BaseModel):
     b2b_priority_eligible: bool
     account_status: str | None = None
     last_verified: str | None = None
+    verification_type: str | None = None
+    verification_date: str | None = None
+    verification_basis: str | None = None
+    current_actionable: bool
+    criteria_complete: bool
     analysis_run_id: str
     analysis_reference_date: str | None = None
     latest_valid_si_date: str | None = None

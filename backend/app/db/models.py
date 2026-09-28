@@ -106,6 +106,9 @@ class DimAccount(Base):
     b2b_priority_eligible: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     account_status: Mapped[str | None] = mapped_column(String(80))
     last_verified: Mapped[datetime | None] = mapped_column(Date)
+    verification_type: Mapped[str | None] = mapped_column(String(120))
+    verification_date: Mapped[datetime | None] = mapped_column(Date)
+    verification_basis: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
@@ -188,6 +191,25 @@ class AnalyticsRun(Base):
     errors: Mapped[list] = mapped_column(JSON, default=list)
     duration_seconds: Mapped[float | None] = mapped_column(Float)
     code_version: Mapped[str | None] = mapped_column(String(80))
+
+
+class AccountContextSnapshot(Base):
+    __tablename__ = "fact_account_context"
+    account_context_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
+    analysis_run_id: Mapped[str] = mapped_column(ForeignKey("analytics_runs.analysis_run_id"), index=True)
+    account_key: Mapped[str] = mapped_column(ForeignKey("dim_account.account_key"), index=True)
+    standardized_account_name: Mapped[str] = mapped_column(String(255))
+    entity_type: Mapped[str | None] = mapped_column(String(80))
+    business_category: Mapped[str | None] = mapped_column(String(160))
+    primary_business_type: Mapped[str | None] = mapped_column(String(160))
+    b2b_priority_eligible: Mapped[bool] = mapped_column(Boolean)
+    account_status: Mapped[str | None] = mapped_column(String(80))
+    last_verified: Mapped[datetime | None] = mapped_column(Date)
+    verification_type: Mapped[str | None] = mapped_column(String(120))
+    verification_date: Mapped[datetime | None] = mapped_column(Date)
+    verification_basis: Mapped[str | None] = mapped_column(Text)
+    current_actionable: Mapped[bool] = mapped_column(Boolean)
+    __table_args__ = (UniqueConstraint("analysis_run_id", "account_key"),)
 
 
 class RFMResult(Base):

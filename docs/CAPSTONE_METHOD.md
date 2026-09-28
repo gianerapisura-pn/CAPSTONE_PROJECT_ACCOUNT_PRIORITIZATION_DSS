@@ -4,7 +4,7 @@ Methodology version: 2026.09-final-locked. Predictive model version: extra_trees
 
 ## Data and eligibility
 
-Cancelled rows are identified first and retained for audit but excluded from analytics. Multiple collection rows are grouped to one logical Sales Invoice. Reconciliation uses SI - total CR - total EWT with PHP 0.01 tolerance. The current reference is selected explicitly and cannot precede accepted SI or final CR evidence. Only confirmed b2b_priority_eligible=true accounts enter analytics; unknown context is never guessed.
+Cancelled rows are identified first and retained for audit but excluded from analytics. Multiple collection rows are grouped to one logical Sales Invoice. Reconciliation uses SI - total CR - total EWT with PHP 0.01 tolerance. The current reference is selected explicitly and cannot precede accepted SI or final CR evidence. Only confirmed `b2b_priority_eligible=true` accounts enter descriptive and predictive analytics; unknown context is never guessed. Current prescriptive eligibility additionally requires Client-Confirmed Active status and complete RFM/Settlement criteria. Status is a gate, not a criterion.
 
 ## Descriptive branch
 

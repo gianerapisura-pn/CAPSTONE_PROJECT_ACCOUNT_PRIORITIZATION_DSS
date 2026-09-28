@@ -20,8 +20,18 @@ from app.db.models import (
     SettlementResult,
 )
 from app.db.repository import (
-    audit, current_account_rows, eligible_b2b_accounts, filter_current_account_rows,
-    latest_successful_run, load_invoice_groups, persist_run_output, run_payload, serialize_run,
+    CLIENT_CONFIRMED_ACTIVE,
+    CLIENT_CONFIRMED_CLOSED,
+    audit,
+    b2b_analytical_accounts,
+    current_account_rows,
+    current_actionable_accounts,
+    filter_current_account_rows,
+    latest_successful_run,
+    load_invoice_groups,
+    persist_run_output,
+    run_payload,
+    serialize_run,
 )
 from app.db.session import get_db, init_database
 from app.imports.validators import REQUIRED_COLUMNS
@@ -81,6 +91,24 @@ class AccountContextRequest(BaseModel):
     b2b_priority_eligible: bool
     account_status: str | None = None
     last_verified: date | None = None
+    verification_type: str | None = None
+    verification_date: date | None = None
+    verification_basis: str | None = None
+
+
+ACCOUNT_ENTITY_TYPES = {
+    "Company",
+    "Property/Building",
+    "Condominium Association",
+    "Educational Institution",
+    "Religious/Nonprofit Institution",
+    "Individual/Personal",
+    "Other Business/Organization",
+}
+VERIFIED_ACCOUNT_STATUSES = {
+    CLIENT_CONFIRMED_ACTIVE,
+    CLIENT_CONFIRMED_CLOSED,
+}
 
 
 def _latest_or_404(db):
@@ -218,13 +246,21 @@ def account_context_queue(
     rows = db.scalars(select(DimAccount).order_by(DimAccount.standardized_account_name)).all()
     items = []
     for row in rows:
-        pending = any(value in (None, "") for value in (
+        basic_pending = any(value in (None, "") for value in (
             row.entity_type,
             row.business_category,
             row.primary_business_type,
-            row.account_status,
-            row.last_verified,
         ))
+        verified_b2b_pending = row.b2b_priority_eligible and any(
+            value in (None, "") for value in (
+                row.account_status,
+                row.last_verified,
+                row.verification_type,
+                row.verification_date,
+                row.verification_basis,
+            )
+        )
+        pending = basic_pending or verified_b2b_pending
         if status == "pending" and not pending:
             continue
         items.append({
@@ -236,7 +272,16 @@ def account_context_queue(
             "primary_business_type": row.primary_business_type,
             "account_status": row.account_status,
             "last_verified": row.last_verified.isoformat() if row.last_verified else None,
+            "verification_type": row.verification_type,
+            "verification_date": (
+                row.verification_date.isoformat() if row.verification_date else None
+            ),
+            "verification_basis": row.verification_basis,
             "b2b_priority_eligible": row.b2b_priority_eligible,
+            "current_actionable": (
+                row.b2b_priority_eligible
+                and row.account_status == CLIENT_CONFIRMED_ACTIVE
+            ),
             "verification_status": "pending" if pending else "verified",
         })
     return {
@@ -256,11 +301,28 @@ def update_account_context(account_key: str, request: AccountContextRequest,
     if not row:
         raise HTTPException(404, "Account not found.")
     values = request.model_dump()
-    required = ("entity_type", "business_category", "primary_business_type", "account_status", "last_verified")
+    required = ("entity_type", "business_category", "primary_business_type")
     if any(values.get(field) in (None, "") for field in required):
-        raise HTTPException(422, "Complete verified account context and last_verified are required.")
+        raise HTTPException(422, "Complete account identity context is required.")
+    if values["entity_type"] not in ACCOUNT_ENTITY_TYPES:
+        raise HTTPException(422, "Entity type is outside the controlled taxonomy.")
     if values["b2b_priority_eligible"] and values["entity_type"] == "Individual/Personal":
         raise HTTPException(422, "Individual/Personal context cannot be marked B2B eligible.")
+    if values["account_status"] and values["account_status"] not in VERIFIED_ACCOUNT_STATUSES:
+        raise HTTPException(422, "Account status is outside the controlled verified statuses.")
+    if values["b2b_priority_eligible"]:
+        provenance = (
+            "account_status", "last_verified", "verification_type",
+            "verification_date", "verification_basis",
+        )
+        if any(values.get(field) in (None, "") for field in provenance):
+            raise HTTPException(
+                422, "Verified B2B context requires status, dates, and provenance."
+            )
+        if values["verification_type"] != "Client confirmation":
+            raise HTTPException(
+                422, "Current verified status requires Client confirmation provenance."
+            )
     previous = {
         field: getattr(row, field).isoformat() if isinstance(getattr(row, field), date)
         else getattr(row, field)
@@ -361,12 +423,13 @@ def run_analytics(request: RunRequest, user: AuthenticatedUser = Depends(require
         raise HTTPException(422, "No committed invoice data is available.")
     try:
         validate_analysis_reference(groups, pd.Timestamp(request.analysis_reference_date))
-        eligible = eligible_b2b_accounts(db)
+        b2b_accounts = b2b_analytical_accounts(db)
+        actionable_accounts = current_actionable_accounts(db)
         predictive = future_transaction_for_current_run(
-            db, groups, pd.Timestamp(request.analysis_reference_date), eligible)
+            db, groups, pd.Timestamp(request.analysis_reference_date), b2b_accounts)
         result = asdict(run_account_prioritization(
-            groups, pd.Timestamp(request.analysis_reference_date), eligible,
-            predictive_result=predictive))
+            groups, pd.Timestamp(request.analysis_reference_date), b2b_accounts,
+            actionable_accounts, predictive_result=predictive))
         run = AnalyticsRun(status="running",
                            analysis_reference_date=request.analysis_reference_date,
                            methodology_version=DEFAULT_ANALYTICS_CONFIG.version,
@@ -400,6 +463,11 @@ def dashboard(user: AuthenticatedUser = Depends(require_user), db: Session = Dep
     classes = ("Future Transaction", "No Future Transaction")
     return {
         "run": serialize_run(run),
+        "historical_identities": int(
+            payload["context_metrics"].get("historical_account_count", 0)
+        ),
+        "b2b_analytical_accounts": len(accounts),
+        "current_actionable_accounts": sum(x["current_actionable"] for x in accounts),
         "total_standardized_accounts": len(accounts),
         "mcs_eligible_accounts": sum(x["mcs_eligible"] for x in accounts),
         "ranked_accounts": sum(x["is_ranked"] for x in accounts),
@@ -467,10 +535,12 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
         SensitivityScenarioRecord.account_key == account.account_key)).all()
     ranks = [x.payload["scenario_rank"] for x in scenarios]
     return {
-        "account_key": account.account_key, "account": account.standardized_account_name,
+        "account_key": account.account_key, "account": decision["account"],
         "context": {key: decision.get(key) for key in (
             "entity_type", "business_category", "primary_business_type",
-            "b2b_priority_eligible", "account_status", "last_verified")},
+            "b2b_priority_eligible", "account_status", "last_verified",
+            "verification_type", "verification_date", "verification_basis",
+            "current_actionable")},
         "decision": decision, "priority": decision if decision["is_ranked"] else None,
         "rfm": rfm.payload if rfm else None,
         "settlement": settlement.payload if settlement else None,
@@ -584,7 +654,9 @@ def methodology(user: AuthenticatedUser = Depends(require_admin)):
         "source_schema": list(REQUIRED_COLUMNS),
         "analytics_config": DEFAULT_ANALYTICS_CONFIG.serializable(),
         "analysis_reference_date": "Administrator-selected and not earlier than accepted SI/CR evidence.",
-        "eligibility": "Only explicitly verified B2B accounts enter RFM, prediction, and MCS.",
+        "eligibility": ("Explicitly verified B2B accounts enter RFM and prediction; "
+                        "current MCS additionally requires Client-Confirmed Active status "
+                        "and complete decision criteria."),
         "rfm": "q20/q40/q60/q80 empirical quintiles with linear interpolation and ties preserved.",
         "settlement": "Observed SI-to-final-valid-CR duration using only cutoff-known, reconciled, nonnegative evidence.",
         "predictive": "Frozen Extra Trees stage-8 artifact; 12-month Future Transaction target; seven cutoff-safe predictors.",

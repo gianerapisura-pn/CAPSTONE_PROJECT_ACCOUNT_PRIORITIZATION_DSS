@@ -46,6 +46,19 @@ export default function AccountDetailsPage() {
         </section>
         <section className="detail-grid">
           <div className="data-section">
+            <div className="section-heading"><h2><Info />Account context</h2><span>Run snapshot</span></div>
+            <dl className="method-facts">
+              <div><dt>Entity Type</dt><dd>{String(data.context.entity_type ?? "Pending")}</dd></div>
+              <div><dt>Business Category</dt><dd>{String(data.context.business_category ?? "Pending")}</dd></div>
+              <div><dt>Primary Business Type</dt><dd>{String(data.context.primary_business_type ?? "Pending")}</dd></div>
+              <div><dt>Account Status</dt><dd>{String(data.context.account_status ?? "Pending")}</dd></div>
+              <div><dt>Verification Type</dt><dd>{String(data.context.verification_type ?? "Pending")}</dd></div>
+              <div><dt>Verification Date / Last Verified</dt><dd>{String(data.context.verification_date ?? "Pending")} / {String(data.context.last_verified ?? "Pending")}</dd></div>
+              <div><dt>Verification Basis</dt><dd>{String(data.context.verification_basis ?? "Pending")}</dd></div>
+              <div><dt>Current Actionability</dt><dd>{data.context.current_actionable ? "Actionable" : "Not actionable"}</dd></div>
+            </dl>
+          </div>
+          <div className="data-section">
             <div className="section-heading"><h2><Calculator />RFM profile</h2><span>Descriptive</span></div>
             <dl className="method-facts">
               <div><dt>Recency</dt><dd>{rfm?.recency_days ?? "N/A"} days / score {rfm?.r_score ?? "N/A"}</dd></div>

@@ -7,7 +7,7 @@ Production-style capstone prototype with a Next.js Web DSS, FastAPI analytics/ET
 - Source rows remain immutable and traceable.
 - Sales Invoices are reconstructed at logical-invoice grain so multiple CR rows do not inflate Frequency or Monetary.
 - An administrator supplies an explicit analysis reference date; it is not inferred from the latest SI.
-- Historical personal/unknown identities remain preserved, while only verified B2B accounts enter RFM, prediction, and MCS.
+- Historical identities remain preserved. Verified B2B accounts enter descriptive and predictive analytics; current CRITIC/MCS additionally requires Client-Confirmed Active status and complete criteria.
 - RFM uses q20/q40/q60/q80 empirical quintiles with linear interpolation and tie preservation.
 - The separate predictive branch uses the frozen extra_trees_stage8 artifact and seven cutoff-safe predictors for a 12-month Future Transaction class.
 - CRITIC objectively weights Recency, Frequency, Monetary, and Historical Settlement Duration. Prediction and business category never enter FPS.
@@ -24,10 +24,10 @@ Backend defaults to http://127.0.0.1:8000; frontend defaults to http://localhost
 
 ## Private artifact and data
 
-The genuine final model, RAW workbook, and account master are confidential and must not be committed. Prefer python -m scripts.register_frozen_model --package FINAL_LOCKED.zip and set PESLC_FINAL_ANALYTICS_PACKAGE_PATH for the opt-in private regression; the complete package SHA is verified before any member is read. Bootstrap account context with python -m scripts.bootstrap_account_context FINAL_LOCKED.zip. Seed reporting-only robustness evidence with python -m scripts.seed_prescriptive_evidence PRESCRIPTIVE_ROBUSTNESS.zip.
+The private `PESLC_FINAL_ANALYTICS_LOCKED.zip` is the single active package for model registration, account-context bootstrap, predictive evidence, final-v2 robustness evidence, and the opt-in regression. Every workflow verifies SHA-256 `e78b2670dfe4c739d20c83039ea7f16a14c4aca1a48b4a4f050c74ec481fb324`; the ZIP must never be committed.
 
 ## Deployment status
 
-Migrations 009 and 010, application code, and reporting specifications are prepared locally. Applying them to live Supabase, registering/seeding the private authorized packages, refreshing/reconciling the actual PBIX, production-like later-year import, generation-time measurement, and role-based UAT remain pending until executed with authorized external access.
+Migrations through 011, application code, and reporting specifications are prepared locally. Applying migration 011 to live Supabase, registering/seeding the private authorized package, refreshing/reconciling the actual PBIX, production-like later-year import, generation-time measurement, and role-based UAT remain pending until executed with authorized external access.
 
 Supplementary Entropy, Equal Weighting, and CRITIC-weighted TOPSIS comparisons are locked methodological robustness evidence for Power BI only. Production FPS, ranks, and groups remain CRITIC plus additive MCS.

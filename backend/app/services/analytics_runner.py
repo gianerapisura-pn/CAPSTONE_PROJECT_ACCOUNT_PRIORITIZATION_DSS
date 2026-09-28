@@ -31,7 +31,9 @@ class AnalyticsRunResult:
     completed_at: str
     status: str
     mcs_status: str
+    current_actionable_account_count: int
     mcs_eligible_account_count: int
+    ranked_account_count: int
     critic_weights: dict[str, float]
     rfm: list[dict]
     settlement: list[dict]
@@ -71,25 +73,38 @@ def validate_analysis_reference(
 def run_account_prioritization(
     invoice_groups: list[InvoiceGroup],
     analysis_reference_date: pd.Timestamp,
-    eligible_accounts: set[str],
+    b2b_accounts: set[str],
+    current_actionable_accounts: set[str] | None = None,
     config: AnalyticsConfig = DEFAULT_ANALYTICS_CONFIG,
     predictive_result: FutureTransactionResult | None = None,
 ) -> AnalyticsRunResult:
     started = datetime.now(timezone.utc)
     reference = pd.Timestamp(analysis_reference_date)
     latest_si, latest_cr = validate_analysis_reference(invoice_groups, reference)
+    actionable_accounts = (
+        set(b2b_accounts)
+        if current_actionable_accounts is None
+        else set(current_actionable_accounts) & set(b2b_accounts)
+    )
     analytical_groups = [
         group for group in invoice_groups
-        if group.standardized_account_name in eligible_accounts
+        if group.standardized_account_name in b2b_accounts
     ]
     warnings: list[str] = []
-    rfm = compute_rfm(analytical_groups, reference, eligible_accounts)
+    rfm = compute_rfm(analytical_groups, reference, b2b_accounts)
+    actionable_accounts &= {item.account for item in rfm}
     settlement = compute_settlement_metrics(analytical_groups, cutoff_date=reference)
-    priorities, weights = compute_priorities(rfm, settlement)
+    actionable_rfm = [item for item in rfm if item.account in actionable_accounts]
+    actionable_settlement = [
+        item for item in settlement if item.account in actionable_accounts
+    ]
+    priorities, weights = compute_priorities(actionable_rfm, actionable_settlement)
     eligible_mcs_accounts = {
-        item.account for item in rfm
+        item.account for item in actionable_rfm
     } & {
-        item.account for item in settlement if item.average_settlement_days is not None
+        item.account
+        for item in actionable_settlement
+        if item.average_settlement_days is not None
     }
     if priorities:
         mcs_status = "ranked"
@@ -101,7 +116,7 @@ def run_account_prioritization(
     else:
         mcs_status = "no_eligible_accounts"
         warnings.append(
-            "No verified B2B accounts had all four defensible MCS criteria."
+            "No current actionable B2B accounts had all four defensible MCS criteria."
         )
     sensitivity = [
         asdict(summary) for summary in run_sensitivity_suite(
@@ -112,7 +127,12 @@ def run_account_prioritization(
             config.random_seed,
         )
     ] if priorities else []
-    influence = run_leave_one_out_influence(rfm, settlement, priorities, weights) if priorities else []
+    influence = (
+        run_leave_one_out_influence(
+            actionable_rfm, actionable_settlement, priorities, weights
+        )
+        if priorities else []
+    )
     predictive = predictive_result or unavailable_prediction(config)
     rfm_by_account = {item.account: item for item in rfm}
     settlement_by_account = {item.account: item for item in settlement}
@@ -159,7 +179,9 @@ def run_account_prioritization(
         completed_at=completed.isoformat(),
         status="successful",
         mcs_status=mcs_status,
+        current_actionable_account_count=len(actionable_accounts),
         mcs_eligible_account_count=len(eligible_mcs_accounts),
+        ranked_account_count=len(priorities),
         critic_weights=weights,
         rfm=[{**asdict(item), "monetary": float(item.monetary)} for item in rfm],
         settlement=[asdict(item) for item in settlement],
@@ -168,17 +190,21 @@ def run_account_prioritization(
         critic_influence=influence,
         predictive=asdict(predictive),
         backtest=asdict(run_historical_backtest(
-            analytical_groups, config=config, eligible_accounts=eligible_accounts,
+            analytical_groups, config=config, eligible_accounts=b2b_accounts,
         )),
         business_baselines=annual_business_baselines(
-            invoice_groups, reference, eligible_accounts,
+            invoice_groups, reference, b2b_accounts,
         ),
         context_metrics={
             "historical_account_count": len({
                 group.standardized_account_name
                 for group in invoice_groups if group.rfm_eligible
             }),
-            "verified_b2b_account_count": len(rfm),
+            "b2b_analytical_account_count": len(rfm),
+            "current_actionable_account_count": len(actionable_accounts),
+            "mcs_eligible_account_count": len(eligible_mcs_accounts),
+            "ranked_account_count": len(priorities),
+            "prediction_account_count": len(predictive.predictions),
             "prediction_class_counts": {
                 label: sum(value == label for value in predictive.predictions.values())
                 for label in ("Future Transaction", "No Future Transaction")

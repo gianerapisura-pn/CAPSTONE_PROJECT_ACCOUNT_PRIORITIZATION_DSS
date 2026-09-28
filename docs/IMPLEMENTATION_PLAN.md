@@ -2,20 +2,20 @@
 
 ## Code complete locally
 
-- Explicit analysis reference and B2B context.
+- Explicit analysis reference, separate B2B/current-actionability rules, and status provenance.
 - Cumulative logical-invoice reconstruction, duplicate no-op, late CR handling, and cent tolerance.
 - Final RFM field/scoring contract.
 - Frozen Extra Trees registration, hash/version validation, scoring registry, and maturity monitoring without retraining.
 - Four-criterion CRITIC/MCS, 400 sensitivity scenarios, leave-one-out influence, and seven exact-baseline backtests.
 - Canonical API/UI terminology and role restrictions.
-- Immutable migrations 001-009 plus forward-only migration 010 for correction review, the corrected baseline view, registration timestamp, and read-only prescriptive robustness evidence.
+- Immutable migrations 001-010 plus forward-only migration 011 for provenance, run-scoped account context, latest-run reporting, and final-v2 evidence access.
 - Environment-gated private regression.
 
 ## External evidence pending
 
-1. Apply migrations 009 and 010 and validate production RLS/reader grants.
-2. Register the genuine authorized FINAL_LOCKED Pipeline and seed its locked predictive evidence.
-3. Bootstrap the confirmed account master/status from the verified package and execute the private official-data regression.
+1. Apply migrations through 011 and validate production RLS/reader grants.
+2. Register the genuine authorized `PESLC_FINAL_ANALYTICS_LOCKED.zip` Pipeline and seed its locked predictive and final-v2 robustness evidence.
+3. Bootstrap master/status/provenance from the verified package and execute the private final-package regression.
 4. Refresh and reconcile the actual PBIX against canonical views.
 5. Execute controlled later-year + new-account production-like import.
 6. Measure prioritized-list generation time in the target environment.

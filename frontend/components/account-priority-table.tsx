@@ -73,10 +73,11 @@ const filters = useMemo(
             </div>
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Rank</th><th>Account</th><th>Priority</th><th>Final score</th><th>Recency</th><th>Frequency</th><th>Monetary</th><th>Avg. settlement</th><th>12-Month Transaction Class</th><th>Latest valid SI</th><th aria-label="Open details" /></tr></thead>
+                <thead><tr><th>Rank</th><th>Account</th><th>Current Status</th><th>Priority</th><th>Final score</th><th>Recency</th><th>Frequency</th><th>Monetary</th><th>Avg. settlement</th><th>12-Month Transaction Class</th><th>Latest valid SI</th><th aria-label="Open details" /></tr></thead>
                 <tbody>{data.items.map((row: AccountDecisionRow) => <tr key={row.account_key}>
                   <td className="rank-cell">{row.priority_rank === null ? "Not ranked" : `#${row.priority_rank}`}</td>
                   <td><strong>{row.account}</strong></td>
+                  <td><Badge tone={row.account_status === "Client-Confirmed Active" ? "positive" : "neutral"}>{row.account_status ?? "Pending"}</Badge></td>
                   <td><Badge tone={row.priority_group ?? "neutral"}>{row.priority_group ?? "Not ranked"}</Badge></td>
                   <td>{row.final_priority_score === null ? "N/A" : row.final_priority_score.toFixed(4)}</td>
                   <td>{row.recency_days} days</td><td>{row.frequency_count}</td><td>{money.format(row.monetary_value)}</td>

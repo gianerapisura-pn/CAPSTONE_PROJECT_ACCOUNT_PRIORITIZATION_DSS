@@ -1,4 +1,4 @@
-﻿# PESLC Account Prioritization DSS
+# PESLC Account Prioritization DSS
 
 Read docs/ARCHITECTURE.md, docs/CAPSTONE_METHOD.md, docs/FUTURE_DATA_CONTINUITY.md, docs/POWER_BI_SETUP.md, and docs/IMPLEMENTATION_PLAN.md first.
 
@@ -28,3 +28,5 @@ Non-negotiable rules:
 17. Routine imports score only with the active hash-verified extra_trees_stage8 artifact; retraining is separate and controlled.
 18. Analysis reference date is explicit and must cover accepted SI and final CR evidence.
 19. Only explicitly verified B2B accounts enter the analytical population.
+20. B2B descriptive/predictive eligibility and current Client-Confirmed Active prescriptive actionability remain separate.
+21. Published runs read immutable run-scoped account context, not mutable live account context.

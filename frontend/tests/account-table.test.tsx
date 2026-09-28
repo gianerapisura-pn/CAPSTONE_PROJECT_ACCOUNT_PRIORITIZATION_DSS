@@ -5,7 +5,7 @@ import { AccountPriorityTable } from "@/components/account-priority-table";
 import type { AccountDecisionRow } from "@/types/dss";
 
 const base = {
-  account_key: "key", display_name: "Account", entity_type: "Business", business_category: "Corporate", primary_business_type: "Developer", b2b_priority_eligible: true, account_status: "Verified", last_verified: "2030-01-01", analysis_run_id: "run-12345678", analysis_reference_date: "2030-06-10",
+  account_key: "key", display_name: "Account", entity_type: "Business", business_category: "Corporate", primary_business_type: "Developer", b2b_priority_eligible: true, account_status: "Client-Confirmed Active", last_verified: "2030-01-01", verification_type: "Client confirmation", verification_date: "2030-01-01", verification_basis: "Direct PESLC client confirmation", current_actionable: true, criteria_complete: true, analysis_run_id: "run-12345678", analysis_reference_date: "2030-06-10",
   rfm_mean_score: 4, rfm_code: "543", average_settlement_days: 20, settlement_invoice_count: 2,
   valid_settlement_record_count: 2, normalized_recency: .8, normalized_frequency: .7,
   normalized_monetary: .6, normalized_settlement: .7, recency_contribution: .2,
@@ -21,7 +21,7 @@ const base = {
 const rows: AccountDecisionRow[] = [
   { ...base, account: "ALPHA", account_key: "a", priority_rank: 1, priority_group: "High", final_priority_score: .9, predicted_future_transaction_class: "Future Transaction" },
   { ...base, account: "BETA", account_key: "b", priority_rank: 2, priority_group: "Low", final_priority_score: .4, predicted_future_transaction_class: "No Future Transaction" },
-  { ...base, account: "NEW FUTURE", account_key: "c", priority_rank: null, priority_group: null, final_priority_score: null, predicted_future_transaction_class: "No Future Transaction", average_settlement_days: null, settlement_invoice_count: 0, valid_settlement_record_count: 0, mcs_eligible: false, mcs_eligibility_reason: "No valid settlement evidence.", is_ranked: false, ranking_status: "Not ranked", ranking_unavailable_reason: "Required decision criteria are unavailable.", normalized_recency: null, normalized_frequency: null, normalized_monetary: null, normalized_settlement: null, recency_contribution: null, frequency_contribution: null, monetary_contribution: null, settlement_contribution: null },
+  { ...base, account: "ROSTRAM PROTECTIVE SYSTEM METIER COMPANY", account_key: "c", account_status: "Client-Confirmed Closed", current_actionable: false, priority_rank: null, priority_group: null, final_priority_score: null, predicted_future_transaction_class: "No Future Transaction", average_settlement_days: null, settlement_invoice_count: 0, valid_settlement_record_count: 0, mcs_eligible: false, mcs_eligibility_reason: "Client-confirmed closed; excluded from the current actionable ranking.", is_ranked: false, ranking_status: "Not ranked", ranking_unavailable_reason: "Client-confirmed closed; excluded from the current actionable ranking.", normalized_recency: null, normalized_frequency: null, normalized_monetary: null, normalized_settlement: null, recency_contribution: null, frequency_contribution: null, monetary_contribution: null, settlement_contribution: null },
 ];
 
 vi.mock("@/lib/use-api", () => ({
@@ -43,7 +43,7 @@ test("search and priority filters operate on the unified API account data", asyn
   const user = userEvent.setup();
   render(<AccountPriorityTable />);
   expect(screen.getByText("ALPHA")).toBeInTheDocument();
-  expect(screen.getByText("NEW FUTURE")).toBeInTheDocument();
+  expect(screen.getByText("ROSTRAM PROTECTIVE SYSTEM METIER COMPANY")).toBeInTheDocument();
   expect(screen.getByText("Analysis reference")).toBeInTheDocument();
   expect(screen.getByText("2030-06-10")).toBeInTheDocument();
   expect(screen.getByText("Last successful refresh")).toBeInTheDocument();
@@ -68,13 +68,14 @@ test("unranked accounts retain RFM context and show null MCS values truthfully",
   const user = userEvent.setup();
   render(<AccountPriorityTable />);
   await user.selectOptions(screen.getByLabelText("Ranking status"), "not_ranked");
-  expect(screen.getByText("NEW FUTURE")).toBeInTheDocument();
+  expect(screen.getByText("ROSTRAM PROTECTIVE SYSTEM METIER COMPANY")).toBeInTheDocument();
   expect(screen.getAllByText("Not ranked").length).toBeGreaterThan(0);
   expect(screen.getAllByText("N/A").length).toBeGreaterThan(0);
 });
 
 test("priority group and transaction class remain visibly separate columns", () => {
   render(<AccountPriorityTable />);
+  expect(screen.getByRole("columnheader", { name: "Current Status" })).toBeInTheDocument();
   expect(screen.getByRole("columnheader", { name: "Priority" })).toBeInTheDocument();
   expect(screen.getByRole("columnheader", { name: "12-Month Transaction Class" })).toBeInTheDocument();
   expect(screen.getByRole("columnheader", { name: "Recency" })).toBeInTheDocument();

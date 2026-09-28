@@ -26,26 +26,22 @@ from app.services.locked_packages import (
 from app.services.model_lifecycle import _validate_artifact
 
 PACKAGE = os.getenv("PESLC_FINAL_ANALYTICS_PACKAGE_PATH")
-RAW = os.getenv("PESLC_OFFICIAL_RAW_PATH")
-MODEL = os.getenv("PESLC_LOCKED_MODEL_PATH")
-MASTER = os.getenv("PESLC_ACCOUNT_MASTER_PATH")
-STATUS = os.getenv("PESLC_ACCOUNT_STATUS_PATH")
-AVAILABLE = bool(PACKAGE or all((RAW, MODEL, MASTER)))
+AVAILABLE = bool(PACKAGE)
 pytestmark = pytest.mark.skipif(
     not AVAILABLE,
     reason="Authorized private final analytics package/inputs are not configured.",
 )
 
 EXPECTED_SENSITIVITY = {
-    0.10: (0.9987951807228914, 0.9957071985420674, 0.013095238095238, 0.0476190476190476, 6),
-    0.20: (0.9968324389996964, 0.9880328034828392, 0.0304761904761904, 0.0714285714285714, 12),
-    0.30: (0.9933925280955757, 0.9783740002024908, 0.0449999999999999, 0.119047619047619, 18),
-    0.40: (0.9920609496810772, 0.9682494684620836, 0.0495238095238095, 0.119047619047619, 23),
+    0.10: (0.9987756601318164, 0.9958649930733384, 0.0120481927710843, 0.0481927710843373, 6),
+    0.20: (0.9968319969774568, 0.9878888375802862, 0.0289156626506024, 0.072289156626506, 13),
+    0.30: (0.9934530456320052, 0.9809201964653036, 0.0438554216867469, 0.0963855421686747, 17),
+    0.40: (0.9920471432769402, 0.9713488098736408, 0.0508433734939759, 0.1204819277108433, 20),
 }
 EXPECTED_TOP_TEN = [
     "MEGAWORLD CORPORATION", "LOXON PHILIPPINES INC", "METRO WORX PROPERTIES INC",
     "RYXEN INC", "EXQUADRA INC", "WILL DECENA AND ASSOCIATES, INC.",
-    "WEE COMMUNITY DEVELOPERS INC", "BCE PROPERTIES INC",
+    "BCE PROPERTIES INC", "WEE COMMUNITY DEVELOPERS INC",
     "EXECUTIVE GENESIS SERVICES INC", "WEECOMM CENTRE PROPERTIES, INC.",
 ]
 EXPECTED_SALES = {
@@ -57,20 +53,18 @@ EXPECTED_SALES = {
 
 
 def _private_inputs():
-    if PACKAGE:
-        _, package_content = verified_package(PACKAGE, FINAL_PACKAGE_SHA256)
-        raw = read_package_member(package_content, "PESLC_RAW.xlsx")
-        master = read_package_csv(package_content, "01_DATA/01_ACCOUNTS/account_master.csv")
-        status = read_package_csv(package_content, "01_DATA/01_ACCOUNTS/account_status.csv")
-        model_bytes = read_package_member(package_content, "03_MODEL/extra_trees.joblib")
-        return raw, master, status, model_bytes
-    raw_path, model_path, master_path = map(Path, (RAW, MODEL, MASTER))
-    status = pd.read_csv(STATUS) if STATUS else None
-    return raw_path.read_bytes(), pd.read_csv(master_path), status, model_path.read_bytes()
+    _, package_content = verified_package(PACKAGE, FINAL_PACKAGE_SHA256)
+    return (
+        read_package_member(package_content, "PESLC_RAW.xlsx"),
+        read_package_csv(package_content, "01_DATA/01_ACCOUNTS/account_master.csv"),
+        read_package_csv(package_content, "01_DATA/01_ACCOUNTS/account_status.csv"),
+        read_package_csv(package_content, "01_DATA/01_ACCOUNTS/status_provenance.csv"),
+        read_package_member(package_content, "03_MODEL/extra_trees.joblib"),
+    )
 
 
 def test_private_final_locked_end_to_end(monkeypatch):
-    raw_bytes, master, status, model_bytes = _private_inputs()
+    raw_bytes, master, status, provenance, model_bytes = _private_inputs()
     parsed = parse_source_file("PESLC_RAW.xlsx", raw_bytes)
     rows = [row for frame in parsed.frames.values()
             for row in dataframe_to_source_rows(frame, "official")]
@@ -85,9 +79,15 @@ def test_private_final_locked_end_to_end(monkeypatch):
         "account_key", "account_name", "entity_type", "business_category",
         "primary_business_type",
     ]
-    if status is not None:
-        assert list(status.columns) == ["account_key", "account_status", "last_verified"]
-        assert len(master.merge(status, on="account_key", how="left", validate="one_to_one")) == 85
+    assert list(status.columns) == ["account_key", "account_status", "last_verified"]
+    assert len(status) == 84
+    assert Counter(status["account_status"]) == {
+        "Client-Confirmed Active": 83, "Client-Confirmed Closed": 1,
+    }
+    assert list(provenance.columns) == ["account_key", "verification_type", "verification_date", "basis"]
+    assert len(provenance) == 84
+    assert set(provenance["verification_type"]) == {"Client confirmation"}
+    assert set(provenance["basis"]) == {"Direct PESLC client confirmation"}
     master = master.copy()
     master["standardized"] = master["account_name"].map(standardize_account_name)
     eligible = set(master.loc[
@@ -97,6 +97,14 @@ def test_private_final_locked_end_to_end(monkeypatch):
     assert len(eligible) == 84
     personal = master.loc[master["entity_type"] == "Individual/Personal"]
     assert personal["standardized"].tolist() == ["ROD DE GUIA"]
+    status_context = status.merge(master[["account_key", "standardized"]], on="account_key", validate="one_to_one")
+    actionable = set(status_context.loc[
+        status_context["account_status"] == "Client-Confirmed Active", "standardized"
+    ])
+    assert len(actionable) == 83
+    closed = status_context.loc[status_context["account_status"] == "Client-Confirmed Closed"]
+    assert closed["account_key"].tolist() == ["A064"]
+    assert closed["standardized"].tolist() == ["ROSTRAM PROTECTIVE SYSTEM METIER COMPANY"]
     assert sha256(model_bytes).hexdigest() == DEFAULT_ANALYTICS_CONFIG.model_sha256
     monkeypatch.setattr("app.services.model_lifecycle.sklearn.__version__", "1.8.0")
     artifact = _validate_artifact(joblib.load(BytesIO(model_bytes)), DEFAULT_ANALYTICS_CONFIG)
@@ -106,25 +114,26 @@ def test_private_final_locked_end_to_end(monkeypatch):
         DEFAULT_ANALYTICS_CONFIG.model_sha256,
     )
     result = run_account_prioritization(
-        groups, pd.Timestamp("2026-09-21"), eligible, predictive_result=predictive
+        groups, pd.Timestamp("2026-09-21"), eligible, actionable, predictive_result=predictive
     )
     assert result.latest_valid_si_date == "2025-08-13"
     assert result.latest_final_cr_date == "2025-12-13"
-    assert len(result.priorities) == 84
+    assert len(result.priorities) == 83
     assert Counter(item["priority_group"] for item in result.priorities) == {
-        "High": 28, "Medium": 28, "Low": 28,
+        "High": 28, "Medium": 27, "Low": 28,
     }
     assert Counter(predictive.predictions.values()) == {"No Future Transaction": 84}
     assert result.critic_weights == pytest.approx({
-        "recency": 0.374388292558304,
-        "frequency": 0.19126358898879575,
-        "monetary": 0.17978654445098569,
-        "settlement": 0.2545615740019145,
+        "recency": 0.3744267906167242,
+        "frequency": 0.1837992490377663,
+        "monetary": 0.1755208018503358,
+        "settlement": 0.2662531584951738,
     }, abs=1e-12)
     assert [item["account"] for item in result.priorities[:10]] == EXPECTED_TOP_TEN
+    assert "ROSTRAM PROTECTIVE SYSTEM METIER COMPANY" not in {item["account"] for item in result.priorities}
     assert len(result.sensitivity) == 4
     assert sum(summary["iterations"] for summary in result.sensitivity) == 400
-    assert sum(len(summary["scenarios"]) for summary in result.sensitivity) == 33600
+    assert sum(len(summary["scenarios"]) for summary in result.sensitivity) == 33200
     for summary in result.sensitivity:
         expected = EXPECTED_SENSITIVITY[summary["weight_range"]]
         assert summary["mean_spearman"] == pytest.approx(expected[0], abs=1e-12)

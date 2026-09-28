@@ -6,9 +6,9 @@
 2. Commit requires an explicit analysis reference date and runs in one database transaction.
 3. Accepted raw rows remain immutable. Logical invoices are cumulatively reconstructed using account + SI number + SI date + SI amount, independent of import lineage.
 4. Exact duplicate files are audited no-ops. Late distinct CR evidence updates the same logical invoice. A changed row with the same stable CR identity, or a differing SI amount for one account/SI/date, is quarantined for audited correction resolution and cannot silently double-count.
-5. An administrator verifies pending account context; only explicitly verified B2B identities enter the analytical population, and a new run is required to publish context changes.
+5. An administrator verifies taxonomy, B2B eligibility, status, and provenance. B2B accounts enter descriptive/predictive analytics; only Client-Confirmed Active B2B accounts with complete criteria enter current CRITIC/MCS.
 6. Python computes descriptive RFM/Settlement, frozen Extra Trees classification, CRITIC/additive MCS, one-stream sensitivity, leave-one-out influence, all-valid versus B2B baselines, and seven backtests.
-7. A successful run is published atomically and never mutated. Failed/in-progress runs cannot replace the latest successful run.
+7. A successful run atomically persists analytical outputs and an immutable account-context snapshot. Failed/in-progress runs cannot replace the latest successful run, and later dimension edits cannot alter an old publication.
 8. The Web DSS reads persisted operational outputs. Power BI reads certified latest-successful-run views after its own refresh.
 
 ## Boundaries

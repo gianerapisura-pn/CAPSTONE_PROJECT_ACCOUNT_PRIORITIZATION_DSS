@@ -103,3 +103,24 @@ def test_prediction_and_business_context_do_not_enter_fps():
     assert "predicted_future_transaction" not in scoring
     assert "business_category" not in scoring
     assert "predict_proba" not in active_text()
+
+
+def test_migration_011_snapshots_context_and_preserves_reporting_least_privilege():
+    sql = Path("../supabase/migrations/011_current_actionability_and_provenance.sql").read_text(
+        encoding="utf-8"
+    ).lower()
+    required = (
+        "verification_type", "verification_date", "verification_basis",
+        "fact_account_context", "current_actionable",
+        "reporting_latest_account_context", "reporting_latest_account_priorities",
+        "reporting_latest_future_transaction_predictions", "reporting_latest_rfm",
+        "reporting_latest_settlement", "reporting_latest_sensitivity_detail",
+        "reporting_latest_critic_influence", "prescriptive-robustness-final-v2",
+    )
+    assert all(term in sql for term in required)
+    assert "join fact_account_context" in sql
+    assert "security_invoker = true" in sql
+    assert "analysis_run_id=reporting_latest_successful_run_id()" in sql
+    assert "grant select on fact_account_context" in sql
+    assert "grant insert" not in sql and "grant update" not in sql and "grant delete" not in sql
+    assert "revoke all on raw_source_rows" in sql

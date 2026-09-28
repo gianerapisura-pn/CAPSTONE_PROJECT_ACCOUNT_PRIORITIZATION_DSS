@@ -4,7 +4,7 @@ import pandas as pd
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from app.db.models import (
-    AnalyticsRun, Base, DimAccount, FutureTransactionPrediction, InvoiceGroupRecord,
+    AccountContextSnapshot, AnalyticsRun, Base, DimAccount, FutureTransactionPrediction, InvoiceGroupRecord,
     RFMResult, SettlementResult,
 )
 from app.db.repository import (
@@ -37,7 +37,7 @@ def test_final_run_persistence_and_public_contract():
                 standardized_account_name=item.standardized_account_name,
                 display_name=item.standardized_account_name,
                 entity_type="Business", business_category="Corporate",
-                b2b_priority_eligible=True, account_status="Verified"))
+                b2b_priority_eligible=True, account_status="Client-Confirmed Active"))
         db.flush()
         predictions = {item.standardized_account_name: "No Future Transaction"
                        for item in groups}
@@ -58,7 +58,14 @@ def test_final_run_persistence_and_public_contract():
         payload = run_payload(db, latest)
         assert "predictive" in payload and "cart" not in payload
         assert payload["predictive"]["model_version"] == "extra_trees_stage8"
+        snapshotted = db.scalars(select(DimAccount)).first()
+        snapshotted.entity_type = "Property/Building"
+        snapshotted.account_status = "Client-Confirmed Closed"
+        db.commit()
         rows = current_account_rows(db, latest)
+        assert rows[0]["entity_type"] == "Business"
+        assert rows[0]["account_status"] == "Client-Confirmed Active"
+        assert rows[0]["current_actionable"] is True
         assert all(x["b2b_priority_eligible"] for x in rows)
         assert {x["predicted_future_transaction_class"] for x in rows} == {
             "No Future Transaction"}
@@ -114,6 +121,14 @@ def test_mcs_eligibility_is_distinct_from_non_discriminating_rank_status():
                            analysis_reference_date=pd.Timestamp("2026-09-21").date())
         db.add_all([account, run])
         db.flush()
+        db.add(AccountContextSnapshot(
+            analysis_run_id=run.analysis_run_id,
+            account_key=account.account_key,
+            standardized_account_name="A",
+            b2b_priority_eligible=True,
+            account_status="Client-Confirmed Active",
+            current_actionable=True,
+        ))
         db.add(RFMResult(
             analysis_run_id=run.analysis_run_id,
             account_key=account.account_key,
@@ -136,6 +151,6 @@ def test_mcs_eligibility_is_distinct_from_non_discriminating_rank_status():
         assert row["mcs_eligible"] is True
         assert row["mcs_eligibility_reason"] is None
         assert row["is_ranked"] is False
-        assert row["ranking_status"] == "non_discriminating"
+        assert row["ranking_status"] == "not_ranked"
         assert "non-discriminating" in row["ranking_unavailable_reason"]
         assert filter_current_account_rows([row], eligibility="not_ranked") == [row]
