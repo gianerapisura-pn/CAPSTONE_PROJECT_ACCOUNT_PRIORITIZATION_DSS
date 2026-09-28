@@ -158,34 +158,33 @@ def classification_metrics(actual, predicted) -> dict:
 
 
 def _canonical_class(value: object) -> str:
-    if value in (FUTURE_TRANSACTION, 1, True, "1"):
+    if value in (FUTURE_TRANSACTION, 0, False, "0"):
         return FUTURE_TRANSACTION
-    if value in (NO_FUTURE_TRANSACTION, 0, False, "0"):
+    if value in (NO_FUTURE_TRANSACTION, 1, True, "1"):
         return NO_FUTURE_TRANSACTION
     raise ValueError(f"Frozen artifact returned unsupported class label: {value!r}")
 
 
 def score_extra_trees_artifact(
     invoice_groups: list[InvoiceGroup],
-    artifact: dict,
+    artifact: object,
     analysis_reference_date: pd.Timestamp,
     eligible_accounts: set[str],
     model_version: str,
     artifact_hash: str,
 ) -> FutureTransactionResult:
-    feature_columns = list(artifact.get("feature_columns") or FEATURE_COLUMNS)
+    feature_columns = list(getattr(artifact, "feature_names_in_", []))
     if feature_columns != list(FEATURE_COLUMNS):
         raise ValueError("Frozen artifact feature contract does not match the seven locked predictors.")
-    estimator = artifact.get("pipeline") or artifact.get("model")
-    if estimator is None or not hasattr(estimator, "predict"):
-        raise ValueError("Frozen artifact does not contain a scikit-learn prediction pipeline.")
+    if not hasattr(artifact, "predict"):
+        raise ValueError("Frozen artifact is not a fitted scikit-learn prediction pipeline.")
     frame = build_cutoff_dataset(
         invoice_groups,
         pd.Timestamp(analysis_reference_date),
         include_outcome=False,
         eligible_accounts=eligible_accounts,
     )
-    raw_predictions = estimator.predict(frame[feature_columns]) if not frame.empty else []
+    raw_predictions = artifact.predict(frame[feature_columns]) if not frame.empty else []
     predictions = {
         account: _canonical_class(value)
         for account, value in zip(frame.get("account", []), raw_predictions, strict=False)
@@ -198,6 +197,6 @@ def score_extra_trees_artifact(
         model_version=model_version,
         artifact_hash=artifact_hash,
         analysis_reference_date=pd.Timestamp(analysis_reference_date).date().isoformat(),
-        report=dict(artifact.get("validation_report") or {}),
+        report=None,
         monitoring_status="Pending outcome maturity",
     )

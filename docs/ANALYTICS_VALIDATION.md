@@ -1,4 +1,4 @@
-﻿# Analytics Validation
+# Analytics Validation
 
 ## Locked acceptance
 
@@ -13,10 +13,12 @@ Expected current output is 84 MCS-eligible accounts; 28/28/28 groups; Extra Tree
 - CR evidence is unavailable before its date.
 - Seven exact features and 12-month target are cutoff-safe.
 - 2020/2021/2022 outer years and equal-year Macro F1 govern model selection.
-- Frozen artifact hash/version checks prevent silent incompatible loading.
+- The raw sklearn Pipeline is accepted only after package/artifact SHA, sklearn 1.8.0, exact feature order, fitted imputer medians, estimator parameters, and [0,1] classes pass validation.
 - Routine import cannot train.
 - Single-class monitoring suppresses balanced metrics.
 - Prediction is excluded from FPS.
 - Exact k/n is used for expected-random backtests.
 
-tests/test_official_raw_regression.py uses PESLC_OFFICIAL_RAW_PATH, PESLC_LOCKED_MODEL_PATH, and PESLC_ACCOUNT_MASTER_PATH. A skip means private regression was not executed, not passed.
+tests/test_official_raw_regression.py preferentially uses PESLC_FINAL_ANALYTICS_PACKAGE_PATH, verifies the complete package SHA-256, and reads RAW, account master/status, metadata, and the genuine model in place. Legacy individual paths remain compatibility inputs. A skip means private regression was not executed, not passed.
+
+Official sensitivity creates one RNG seeded at 42 and consumes it continuously across 0.10, 0.20, 0.30, and 0.40. The supplementary robustness package is independently hash-verified; its weighting and aggregation comparisons are locked reporting evidence, not runtime alternatives.

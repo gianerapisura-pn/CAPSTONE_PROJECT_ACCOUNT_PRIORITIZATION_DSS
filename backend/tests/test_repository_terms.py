@@ -76,3 +76,30 @@ def test_power_bi_rejects_public_publish_to_web():
         encoding="utf-8")
     assert 'startsWith("/view")' in reports
     assert 'hostname.toLowerCase() !== "app.powerbi.com"' in reports
+
+def test_migration_010_is_forward_only_read_only_and_latest_run_scoped():
+    sql = Path("../supabase/migrations/010_post_lock_corrective_alignment.sql").read_text(
+        encoding="utf-8"
+    ).lower()
+    assert "collection_correction_reviews" in sql
+    assert "prescriptive_validation_evidence" in sql
+    assert "reporting_prescriptive_validation_evidence" in sql
+    assert "reporting_latest_business_baseline" in sql
+    assert "join reporting_latest_run_summary" in sql
+    assert "security_invoker = true" in sql
+    assert "revoke all on collection_correction_reviews from peslc_reporting_reader" in sql
+    assert "grant select on prescriptive_validation_evidence" in sql
+    assert "grant insert" not in sql and "grant update" not in sql and "grant delete" not in sql
+    assert "grant select on raw_source_rows" not in sql
+
+
+def test_settings_contract_includes_exact_settlement_definition():
+    main = Path("app/main.py").read_text(encoding="utf-8")
+    assert '"settlement": "Observed SI-to-final-valid-CR duration using only cutoff-known, reconciled, nonnegative evidence."' in main
+
+
+def test_prediction_and_business_context_do_not_enter_fps():
+    scoring = Path("app/analytics/prescriptive/scoring.py").read_text(encoding="utf-8")
+    assert "predicted_future_transaction" not in scoring
+    assert "business_category" not in scoring
+    assert "predict_proba" not in active_text()

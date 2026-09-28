@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from app.db.models import (
     AnalyticsRun, Base, DimAccount, FutureTransactionPrediction, InvoiceGroupRecord,
+    RFMResult, SettlementResult,
 )
 from app.db.repository import (
     current_account_rows, filter_current_account_rows, latest_successful_run,
@@ -69,10 +70,10 @@ def test_final_run_persistence_and_public_contract():
 def test_filters_do_not_rerank_or_mutate_scores():
     rows = [
         {"account": "A", "priority_group": "High", "priority_rank": 1,
-         "final_priority_score": .9, "mcs_eligible": True,
+         "final_priority_score": .9, "mcs_eligible": True, "is_ranked": True,
          "predicted_future_transaction_class": "Future Transaction"},
         {"account": "B", "priority_group": "Low", "priority_rank": 2,
-         "final_priority_score": .4, "mcs_eligible": True,
+         "final_priority_score": .4, "mcs_eligible": True, "is_ranked": True,
          "predicted_future_transaction_class": "No Future Transaction"},
     ]
     filtered = filter_current_account_rows(
@@ -100,3 +101,41 @@ def test_load_invoice_groups_recomputes_derived_properties():
         assert loaded[0].rfm_eligible is True
         assert loaded[0].settlement_eligible is True
         assert loaded[0].settlement_days == 10
+
+def test_mcs_eligibility_is_distinct_from_non_discriminating_rank_status():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        account = DimAccount(
+            standardized_account_name="A", display_name="A",
+            b2b_priority_eligible=True,
+        )
+        run = AnalyticsRun(status="successful", mcs_status="non_discriminating",
+                           analysis_reference_date=pd.Timestamp("2026-09-21").date())
+        db.add_all([account, run])
+        db.flush()
+        db.add(RFMResult(
+            analysis_run_id=run.analysis_run_id,
+            account_key=account.account_key,
+            payload={
+                "account": "A", "recency_days": 1, "frequency": 1, "monetary": 100,
+                "r_score": 3, "f_score": 3, "m_score": 3,
+                "rfm_code": "333", "rfm_mean_score": 3,
+            },
+        ))
+        db.add(SettlementResult(
+            analysis_run_id=run.analysis_run_id,
+            account_key=account.account_key,
+            payload={
+                "account": "A", "settlement_invoice_count": 1,
+                "average_settlement_days": 10,
+            },
+        ))
+        db.commit()
+        row = current_account_rows(db, run)[0]
+        assert row["mcs_eligible"] is True
+        assert row["mcs_eligibility_reason"] is None
+        assert row["is_ranked"] is False
+        assert row["ranking_status"] == "non_discriminating"
+        assert "non-discriminating" in row["ranking_unavailable_reason"]
+        assert filter_current_account_rows([row], eligibility="not_ranked") == [row]

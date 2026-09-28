@@ -1,11 +1,15 @@
-﻿from decimal import Decimal
+from decimal import Decimal
+import numpy as np
 import pandas as pd
 import pytest
 from app.analytics.descriptive.rfm import _quantile_scores, compute_rfm
 from app.analytics.descriptive.settlement import compute_settlement_metrics
 from app.analytics.prescriptive.scoring import assign_priority_groups, compute_priorities
 from app.analytics.validation.backtest import run_historical_backtest, top_decile_backtest
-from app.analytics.validation.sensitivity import run_leave_one_out_influence, run_sensitivity
+from app.analytics.validation.baselines import annual_business_baselines
+from app.analytics.validation.sensitivity import (
+    run_leave_one_out_influence, run_sensitivity, run_sensitivity_suite,
+)
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
 from app.etl.invoices import InvoiceGroup, SourceRow, group_invoices
 from app.services.analytics_runner import run_account_prioritization, validate_analysis_reference
@@ -133,3 +137,64 @@ def test_backtest_uses_seven_cutoffs_and_exact_k_over_n_expectation():
     assert summary.cutoff_count == 7
     assert [x["cutoff_date"] for x in summary.cutoffs] == list(
         DEFAULT_ANALYTICS_CONFIG.backtest_cutoffs)
+
+def test_priority_group_boundaries_follow_locked_rounding_for_future_populations():
+    for count in (49, 57, 62, 67, 69, 77, 79, 83, 84):
+        groups = assign_priority_groups([
+            (f"A{index:03d}", float(count - index)) for index in range(count)
+        ])
+        assert list(groups.values()).count("High") == round(count / 3)
+        assert list(groups.values()).count("Medium") == round(2 * count / 3) - round(count / 3)
+        assert list(groups.values()).count("Low") == count - round(2 * count / 3)
+
+
+def test_priority_group_ties_expand_locked_boundaries():
+    scored = [(f"A{index:02d}", float(12 - index)) for index in range(12)]
+    scored[4] = (scored[4][0], scored[3][1])
+    grouped = assign_priority_groups(scored)
+    assert grouped[scored[3][0]] == "High"
+    assert grouped[scored[4][0]] == "High"
+
+
+def test_sensitivity_suite_consumes_one_continuous_random_stream():
+    groups = [
+        group(str(i), str(i), "2025-01-01", 100 + i * 10,
+              f"2025-01-{10 + i:02d}") for i in range(12)
+    ]
+    rfm = compute_rfm(groups, pd.Timestamp("2026-09-21"))
+    settlement = compute_settlement_metrics(groups, pd.Timestamp("2026-09-21"))
+    priorities, weights = compute_priorities(rfm, settlement)
+    suite = run_sensitivity_suite(priorities, weights, (.1, .2, .3, .4), 100, 42)
+    rng = np.random.default_rng(42)
+    sequential = [
+        run_sensitivity(priorities, weights, value, 100, 42, rng=rng)
+        for value in (.1, .2, .3, .4)
+    ]
+    assert [item.mean_spearman for item in suite] == [
+        item.mean_spearman for item in sequential
+    ]
+    assert sum(item.iterations for item in suite) == 400
+    assert sum(len(item.scenarios) for item in suite) == 400 * len(priorities)
+    independently_reseeded = run_sensitivity(priorities, weights, .2, 100, 42)
+    assert suite[1].scenarios[0]["perturbed_monetary_weight"] != (
+        independently_reseeded.scenarios[0]["perturbed_monetary_weight"]
+    )
+
+
+def test_annual_baseline_separates_all_valid_and_b2b_and_suppresses_ytd_yoy():
+    groups = [
+        group("B2B", "1", "2025-01-01", 100, "2025-01-10"),
+        group("PERSON", "2", "2025-02-01", 25, "2025-02-10"),
+    ]
+    rows = annual_business_baselines(groups, pd.Timestamp("2026-09-21"), {"B2B"})
+    complete = next(row for row in rows if row["year"] == 2025)
+    assert complete["period_status"] == "Complete year"
+    assert complete["all_recorded_sales"] == 125
+    assert complete["b2b_recorded_sales"] == 100
+    assert complete["all_valid_invoice_count"] == 2
+    assert complete["b2b_valid_invoice_count"] == 1
+    ytd = next(row for row in rows if row["year"] == 2026)
+    assert ytd["period_status"] == "YTD through 2026-09-21"
+    assert ytd["all_recorded_sales"] == 0
+    assert ytd["all_sales_yoy_change_pct"] is None
+    assert ytd["b2b_transacting_accounts_yoy_change_pct"] is None

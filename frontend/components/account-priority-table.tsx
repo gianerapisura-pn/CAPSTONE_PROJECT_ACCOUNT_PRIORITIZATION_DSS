@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { ChevronLeft, ChevronRight, Download, ExternalLink, Search } from "lucide-react";
 import Link from "next/link";
@@ -57,7 +57,7 @@ const filters = useMemo(
         <select aria-label="12-Month Transaction Class" value={risk} onChange={(event) => { setRisk(event.target.value as FutureTransactionClass | ""); setPage(1); }}>
           <option value="">All transaction classes</option><option>Future Transaction</option><option>No Future Transaction</option>
         </select>
-        <select aria-label="MCS eligibility" value={eligibility} onChange={(event) => { setEligibility(event.target.value as "" | "ranked" | "not_ranked"); setPage(1); }}>
+        <select aria-label="Ranking status" value={eligibility} onChange={(event) => { setEligibility(event.target.value as "" | "ranked" | "not_ranked"); setPage(1); }}>
           <option value="">All accounts</option><option value="ranked">Ranked</option><option value="not_ranked">Not ranked</option>
         </select>
         <button className="button secondary" onClick={() => downloadExport(exportPath("csv"), "peslc-account-priorities.csv")}><Download size={17} />CSV</button>

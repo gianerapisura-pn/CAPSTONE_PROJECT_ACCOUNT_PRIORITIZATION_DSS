@@ -14,7 +14,7 @@ from app.analytics.validation.backtest import run_historical_backtest
 from app.analytics.validation.baselines import annual_business_baselines
 from app.analytics.validation.sensitivity import (
     run_leave_one_out_influence,
-    run_sensitivity,
+    run_sensitivity_suite,
 )
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG, AnalyticsConfig
 from app.etl.invoices import InvoiceGroup
@@ -104,11 +104,13 @@ def run_account_prioritization(
             "No verified B2B accounts had all four defensible MCS criteria."
         )
     sensitivity = [
-        asdict(run_sensitivity(
-            priorities, weights, weight_range,
-            config.sensitivity_iterations, config.random_seed,
-        ))
-        for weight_range in config.sensitivity_ranges
+        asdict(summary) for summary in run_sensitivity_suite(
+            priorities,
+            weights,
+            config.sensitivity_ranges,
+            config.sensitivity_iterations,
+            config.random_seed,
+        )
     ] if priorities else []
     influence = run_leave_one_out_influence(rfm, settlement, priorities, weights) if priorities else []
     predictive = predictive_result or unavailable_prediction(config)
@@ -169,7 +171,7 @@ def run_account_prioritization(
             analytical_groups, config=config, eligible_accounts=eligible_accounts,
         )),
         business_baselines=annual_business_baselines(
-            analytical_groups, reference, eligible_accounts,
+            invoice_groups, reference, eligible_accounts,
         ),
         context_metrics={
             "historical_account_count": len({

@@ -195,8 +195,20 @@ def current_account_rows(db, run):
             "valid_settlement_record_count": int(settled.get("settlement_invoice_count") or 0),
             "average_settlement_days": settled.get("average_settlement_days"),
             "settlement_days_avg": settled.get("average_settlement_days"),
-            "mcs_eligible": bool(priority),
-            "mcs_eligibility_reason": None if priority else MCS_INELIGIBLE_REASON,
+            "mcs_eligible": settled.get("average_settlement_days") is not None,
+            "mcs_eligibility_reason": (
+                None if settled.get("average_settlement_days") is not None
+                else MCS_INELIGIBLE_REASON
+            ),
+            "is_ranked": bool(priority),
+            "ranking_status": "ranked" if priority else run.mcs_status or "unavailable",
+            "ranking_unavailable_reason": (
+                None if priority
+                else "The eligible population was non-discriminating; no ranking was published."
+                if settled.get("average_settlement_days") is not None
+                and run.mcs_status == "non_discriminating"
+                else "Required decision criteria were incomplete."
+            ),
             "predicted_future_transaction_class": predictions.get(account.standardized_account_name),
             "model_version": predictive.get("model_version") if predictions.get(account.standardized_account_name) else None,
         }
@@ -222,9 +234,9 @@ def filter_current_account_rows(rows, search="", priority_group=None,
         rows = [x for x in rows if x.get("predicted_future_transaction_class") ==
                 predicted_future_transaction_class]
     if eligibility == "ranked":
-        rows = [x for x in rows if x.get("mcs_eligible")]
+        rows = [x for x in rows if x.get("is_ranked")]
     elif eligibility == "not_ranked":
-        rows = [x for x in rows if not x.get("mcs_eligible")]
+        rows = [x for x in rows if not x.get("is_ranked")]
     return rows
 
 

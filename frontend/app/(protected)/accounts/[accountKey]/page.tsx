@@ -36,7 +36,7 @@ export default function AccountDetailsPage() {
     <PageHeader eyebrow="Account evidence" title={data?.account || "Account details"} description="Traceable descriptive, prescriptive, predictive, and transaction-level context from the latest successful run." />
     <PageState loading={loading} error={error} onRetry={reload} empty={!loading && !error && !data}>
       <>{data && d && <>
-        {!d.mcs_eligible && <div className="method-note"><Info /><div><strong>Not ranked by MCS</strong><span>{d.mcs_eligibility_reason}</span></div></div>}
+        {!d.is_ranked && <div className="method-note"><Info /><div><strong>Not ranked by MCS</strong><span>{d.ranking_unavailable_reason || d.mcs_eligibility_reason}</span></div></div>}
         <section className="account-hero">
           <div><span>Current rank</span><strong>{p ? `#${p.priority_rank}` : "Not ranked"}</strong></div>
           <div><span>Priority Group</span><Badge tone={p?.priority_group || "neutral"}>{p?.priority_group || "Not applicable"}</Badge></div>

@@ -15,12 +15,13 @@ const base = {
   baseline_recency_weight: .25, baseline_frequency_weight: .25,
   baseline_monetary_weight: .25, baseline_settlement_weight: .25,
   r_score: 5, f_score: 4, m_score: 3,
-  mcs_eligible: true, mcs_eligibility_reason: null, model_version: "extra_trees_stage8",
+  mcs_eligible: true, mcs_eligibility_reason: null, is_ranked: true,
+  ranking_status: "Ranked", ranking_unavailable_reason: null, model_version: "extra_trees_stage8",
 };
 const rows: AccountDecisionRow[] = [
   { ...base, account: "ALPHA", account_key: "a", priority_rank: 1, priority_group: "High", final_priority_score: .9, predicted_future_transaction_class: "Future Transaction" },
   { ...base, account: "BETA", account_key: "b", priority_rank: 2, priority_group: "Low", final_priority_score: .4, predicted_future_transaction_class: "No Future Transaction" },
-  { ...base, account: "NEW FUTURE", account_key: "c", priority_rank: null, priority_group: null, final_priority_score: null, predicted_future_transaction_class: "No Future Transaction", average_settlement_days: null, settlement_invoice_count: 0, valid_settlement_record_count: 0, mcs_eligible: false, mcs_eligibility_reason: "No valid settlement evidence.", normalized_recency: null, normalized_frequency: null, normalized_monetary: null, normalized_settlement: null, recency_contribution: null, frequency_contribution: null, monetary_contribution: null, settlement_contribution: null },
+  { ...base, account: "NEW FUTURE", account_key: "c", priority_rank: null, priority_group: null, final_priority_score: null, predicted_future_transaction_class: "No Future Transaction", average_settlement_days: null, settlement_invoice_count: 0, valid_settlement_record_count: 0, mcs_eligible: false, mcs_eligibility_reason: "No valid settlement evidence.", is_ranked: false, ranking_status: "Not ranked", ranking_unavailable_reason: "Required decision criteria are unavailable.", normalized_recency: null, normalized_frequency: null, normalized_monetary: null, normalized_settlement: null, recency_contribution: null, frequency_contribution: null, monetary_contribution: null, settlement_contribution: null },
 ];
 
 vi.mock("@/lib/use-api", () => ({
@@ -32,8 +33,8 @@ vi.mock("@/lib/use-api", () => ({
     const group = params.get("priority_group");
     if (group) filtered = filtered.filter(row => row.priority_group === group);
     const eligibility = params.get("eligibility");
-    if (eligibility === "ranked") filtered = filtered.filter(row => row.mcs_eligible);
-    if (eligibility === "not_ranked") filtered = filtered.filter(row => !row.mcs_eligible);
+    if (eligibility === "ranked") filtered = filtered.filter(row => row.is_ranked);
+    if (eligibility === "not_ranked") filtered = filtered.filter(row => !row.is_ranked);
     return { data: { items: filtered, total: filtered.length, page: 1, page_size: 15, analysis_run_id: "run-12345678", analysis_reference_date: "2030-06-10", updated_at: "2030-06-10T00:00:00Z" }, error: "", loading: false, reload: vi.fn() };
   },
 }));
@@ -66,7 +67,7 @@ test("dashboard group initializes the API filter without reranking", () => {
 test("unranked accounts retain RFM context and show null MCS values truthfully", async () => {
   const user = userEvent.setup();
   render(<AccountPriorityTable />);
-  await user.selectOptions(screen.getByLabelText("MCS eligibility"), "not_ranked");
+  await user.selectOptions(screen.getByLabelText("Ranking status"), "not_ranked");
   expect(screen.getByText("NEW FUTURE")).toBeInTheDocument();
   expect(screen.getAllByText("Not ranked").length).toBeGreaterThan(0);
   expect(screen.getAllByText("N/A").length).toBeGreaterThan(0);

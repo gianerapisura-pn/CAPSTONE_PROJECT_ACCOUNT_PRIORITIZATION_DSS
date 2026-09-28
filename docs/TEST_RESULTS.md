@@ -1,19 +1,22 @@
 # Test Results
 
-## 2026-09 Final Locked Alignment
+## 2026-09 Final Surgical Corrective Audit
 
 The historical sections below are retained as superseded records and do not describe the active methodology.
 
-Latest verified local results:
-- Backend: 56 passed, 1 skipped. The skip is the authorized private RAW/account-master/frozen-artifact regression because its three paths were not configured.
-- Frontend unit/component: 30 passed.
-- Frontend typecheck, ESLint, and optimized production build: passed.
-- Playwright end-to-end controlled import/publication workflow: 1 passed.
-- Migration 009 contract and demo SQLite additive schema checks passed through automated tests.
-- Live Supabase migration/access, actual PBIX refresh/reconciliation, production-like later-year import, target timing, and role-based UAT were not executed and remain pending.
+Commands actually executed:
+- Backend: python -m pytest -q --basetemp=.pytest_tmp_corrective_final2 -> 77 passed, 1 skipped, 24 warnings in 14.47s.
+- Frontend unit/component: npm test -> 11 files and 31 tests passed.
+- Frontend lint: npm run lint -> passed.
+- Frontend TypeScript: npm run typecheck -> passed.
+- Optimized production build: npm run build -> passed; 16 routes generated.
+- Playwright: npm run test:e2e -> 1 controlled import/publication workflow passed.
 
-Active method is 2026.09-final-locked with frozen `extra_trees_stage8`, explicit 2026-09-21 locked reference for the private baseline, verified-B2B filtering, 400 sensitivity scenarios, leave-one-out influence, and seven exact k/n backtests.
+The one backend skip is the package-gated private FINAL_LOCKED regression. PESLC_FINAL_ANALYTICS_PACKAGE_PATH and compatible private paths were unavailable, so official private numerical reproduction remains pending and is not reported as passed. Expected scipy constant-input and sklearn single-class warnings were retained; no test failure was hidden.
 
+Migration 010 contracts and demo SQLite schema behavior are covered locally. Live Supabase migration/RLS verification, actual PBIX refresh/value reconciliation, production-like later-year/new-account import, target-environment generation timing, and role-based PESLC UAT were not executed and remain pending.
+
+Active method remains frozen Extra Trees plus official CRITIC/additive MCS. Supplementary Entropy, Equal Weighting, and CRITIC-weighted TOPSIS evidence is reporting-only.
 ---
 
 ## Superseded Historical Results

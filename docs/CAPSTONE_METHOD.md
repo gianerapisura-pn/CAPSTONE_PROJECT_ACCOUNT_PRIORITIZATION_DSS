@@ -1,4 +1,4 @@
-﻿# Final Capstone Method
+# Final Capstone Method
 
 Methodology version: 2026.09-final-locked. Predictive model version: extra_trees_stage8.
 
@@ -16,10 +16,14 @@ Historical Settlement Duration uses only reconciled, nonnegative SI-to-final-CR 
 
 The target is at least one valid logical SI in (T, T+12 months], labelled Future Transaction; otherwise No Future Transaction. Seven predictors are Recency Days, Frequency 24m, Monetary 24m, Average Settlement Days, Account Activity Gap, Recent Transaction Count 12m, and Recent Monetary Value 12m. All evidence is cutoff-safe; first-transaction activity-gap missingness is structural.
 
-Routine scoring uses only the private frozen Extra Trees artifact extra_trees_stage8, expected SHA-256 7c606fceb6a5e9515e68dc53430789352128ad2e1cad7bd2941c826bbcff91d8, with scikit-learn 1.8.0. No endpoint retrains it. Output is categorical only and never enters ranking. Monitoring stays Pending until the 12-month outcome matures; single-class periods suppress class-balanced metrics.
+Routine scoring uses only the private frozen Extra Trees artifact extra_trees_stage8, expected SHA-256 7c606fceb6a5e9515e68dc53430789352128ad2e1cad7bd2941c826bbcff91d8, with scikit-learn 1.8.0. The genuine artifact is an unchanged sklearn Pipeline with a fitted median imputer and Extra Trees classifier; metadata is loaded separately. Model code 0 maps to Future Transaction and code 1 maps to No Future Transaction. No endpoint retrains it. Output is categorical only and never enters ranking. Monitoring stays Pending until the 12-month outcome matures; single-class periods suppress class-balanced metrics.
 
 ## Prescriptive branch
 
-CRITIC computes objective weights from separately normalized Recency (cost), Frequency (benefit), Monetary (benefit), and Settlement Duration (cost). FPS is the weighted sum. Tie-safe ranking and ranked thirds produce High/Medium/Low groups. Sensitivity runs 100 deterministic perturbations at each of +/-10/20/30/40 percent. Leave-one-account-out influence recomputes CRITIC separately.
+CRITIC computes objective weights from separately normalized Recency (cost), Frequency (benefit), Monetary (benefit), and Settlement Duration (cost). Additive MCS produces FPS. Tie-safe ranking uses competition ranks; group boundaries use round(n/3) and round(2n/3), expanded across FPS ties. Sensitivity consumes one NumPy RNG stream seeded once at 42 across the ordered +/-10/20/30/40 percent ranges, with 100 iterations per range. Leave-one-account-out influence recomputes CRITIC separately.
 
 Seven annual 2018-2024 historical cutoffs evaluate top-decile capture over the next 12 months. Expected random capture is exactly k/n; no Monte Carlo baseline is used.
+
+## Business baseline and robustness
+
+Annual business context preserves both the full valid logical-SI history and the verified-B2B subset. Incomplete reference years are labelled YTD and do not receive annual YoY comparisons. Supplementary locked checks compare CRITIC with Entropy/Equal Weighting and additive MCS with CRITIC-weighted TOPSIS. They support robustness interpretation only; official production ranking remains CRITIC plus additive MCS.

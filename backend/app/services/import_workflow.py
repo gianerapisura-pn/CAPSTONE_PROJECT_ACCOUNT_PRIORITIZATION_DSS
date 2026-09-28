@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import date, datetime, timezone
+from hashlib import sha256
 import logging
 
 import pandas as pd
@@ -14,6 +15,7 @@ from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
 from app.core.config import get_settings
 from app.db.models import (
     AnalyticsRun,
+    CollectionCorrectionReview,
     DimAccount,
     ImportBatch,
     ImportRowIssue,
@@ -55,22 +57,88 @@ def _raw_to_source(raw: RawSourceRow) -> SourceRow:
     return source
 
 
-def _reconstruct_invoice_groups(db: Session, current_batch_id: str) -> None:
+def _invoice_identity(row: SourceRow) -> tuple:
+    return (row.standardized_account_name, row.si_no, str(row.si_date))
+
+
+def _identity_hash(parts: tuple) -> str:
+    return sha256("\x1f".join(str(value).strip() for value in parts).encode("utf-8")).hexdigest()
+
+
+def _collection_identity(row: SourceRow) -> tuple:
+    cr_identity = str(row.cr_no or "").strip()
+    if not cr_identity:
+        cr_identity = f"NO-CR:{row.cr_date}:{row.payment_mode}"
+    return (*_invoice_identity(row), cr_identity)
+
+
+def _collection_signature(row: SourceRow) -> tuple:
+    return (
+        str(row.cr_date), str(row.cr_amount), str(row.ewt),
+        row.payment_mode, row.payment_status,
+    )
+
+
+def _reconstruct_invoice_groups(db: Session, current_batch_id: str | None = None) -> None:
+    condition = ImportBatch.status == "committed"
+    if current_batch_id is not None:
+        condition = or_(condition, ImportBatch.import_batch_id == current_batch_id)
     raw_rows = db.scalars(
         select(RawSourceRow)
         .join(ImportBatch, ImportBatch.import_batch_id == RawSourceRow.import_batch_id)
-        .where(or_(ImportBatch.status == "committed", ImportBatch.import_batch_id == current_batch_id))
+        .where(condition)
         .order_by(RawSourceRow.created_at, RawSourceRow.raw_source_row_id)
     ).all()
-    unique: dict[tuple, SourceRow] = {}
+    exact_rows: dict[tuple, tuple[RawSourceRow, SourceRow]] = {}
     duplicate_ids: dict[tuple, list[str]] = {}
     for raw in raw_rows:
         source = _raw_to_source(raw)
         key = _source_business_key(source)
         duplicate_ids.setdefault(key, []).append(raw.raw_source_row_id)
-        unique.setdefault(key, source)
+        exact_rows.setdefault(key, (raw, source))
+
+    collections: dict[tuple, list[tuple[RawSourceRow, SourceRow]]] = {}
+    for raw, source in exact_rows.values():
+        collections.setdefault(_collection_identity(source), []).append((raw, source))
+    selected_rows: list[SourceRow] = []
+    conflicted_invoices: set[str] = set()
+    for identity, variants in collections.items():
+        signatures = {_collection_signature(source) for _, source in variants}
+        if len(signatures) == 1:
+            selected_rows.extend(source for _, source in variants)
+            continue
+        identity_hash = _identity_hash(identity)
+        invoice_hash = _identity_hash(identity[:3])
+        review = db.scalar(select(CollectionCorrectionReview).where(
+            CollectionCorrectionReview.collection_identity == identity_hash
+        ))
+        raw_ids = [raw.raw_source_row_id for raw, _ in variants]
+        if review is None:
+            review = CollectionCorrectionReview(
+                collection_identity=identity_hash,
+                invoice_identity=invoice_hash,
+                raw_source_row_ids=raw_ids,
+                status="pending",
+            )
+            db.add(review)
+            db.flush()
+        else:
+            review.raw_source_row_ids = raw_ids
+        selected = next((
+            source for raw, source in variants
+            if review.status == "resolved"
+            and raw.raw_source_row_id == review.selected_raw_source_row_id
+        ), None)
+        if selected is not None:
+            selected_rows.append(selected)
+        else:
+            selected_rows.append(variants[0][1])
+            review.status = "pending"
+            review.selected_raw_source_row_id = None
+            conflicted_invoices.add(invoice_hash)
+
     groupable = [
-        row for row in unique.values()
+        row for row in selected_rows
         if row.standardized_account_name and row.si_no
         and not pd.isna(row.si_date) and row.si_amount > 0
     ]
@@ -81,7 +149,7 @@ def _reconstruct_invoice_groups(db: Session, current_batch_id: str) -> None:
         if record is None:
             record = InvoiceGroupRecord(
                 invoice_group_id=group.invoice_group_id,
-                import_batch_id=current_batch_id,
+                import_batch_id=current_batch_id or group.rows[0].import_batch_id,
                 account_key=accounts[group.standardized_account_name].account_key,
                 standardized_account_name=group.standardized_account_name,
                 si_no=group.si_no,
@@ -101,6 +169,9 @@ def _reconstruct_invoice_groups(db: Session, current_batch_id: str) -> None:
             )
             db.add(record)
             db.flush()
+        correction_conflict = _identity_hash((
+            group.standardized_account_name, group.si_no, str(group.si_date)
+        )) in conflicted_invoices
         record.payment_status = group.payment_status
         record.final_cr_date = group.final_cr_date.date() if group.final_cr_date is not None else None
         record.total_cr_amount = group.total_cr_amount
@@ -108,12 +179,15 @@ def _reconstruct_invoice_groups(db: Session, current_batch_id: str) -> None:
         record.reconciliation_amount = group.reconciliation_amount
         record.reconciliation_difference = group.reconciliation_difference
         record.reconciled = group.reconciled
-        record.review_reason = group.review_reason
+        record.review_reason = (
+            "Controlled collection correction review is required; changed evidence was not added."
+            if correction_conflict else group.review_reason
+        )
         record.is_cancelled = group.is_cancelled
-        record.conflicting_invoice = group.conflicting_invoice
-        record.rfm_eligible = group.rfm_eligible
-        record.settlement_eligible = group.settlement_eligible
-        record.settlement_days = group.settlement_days
+        record.conflicting_invoice = group.conflicting_invoice or correction_conflict
+        record.rfm_eligible = group.rfm_eligible and not correction_conflict
+        record.settlement_eligible = group.settlement_eligible and not correction_conflict
+        record.settlement_days = group.settlement_days if not correction_conflict else None
         for row in group.rows:
             for raw_id in duplicate_ids.get(_source_business_key(row), []):
                 existing = db.get(InvoiceGroupLineage, {
@@ -141,6 +215,33 @@ def _reconstruct_invoice_groups(db: Session, current_batch_id: str) -> None:
                 "Controlled correction required: the same account/SI/date has differing SI amounts."
             )
 
+
+def resolve_collection_correction(
+    db: Session,
+    user: AuthenticatedUser,
+    review_id: str,
+    selected_raw_source_row_id: str,
+    reason: str,
+) -> CollectionCorrectionReview:
+    review = db.get(CollectionCorrectionReview, review_id)
+    if review is None:
+        raise HTTPException(404, "Collection correction review not found.")
+    if selected_raw_source_row_id not in (review.raw_source_row_ids or []):
+        raise HTTPException(422, "Selected raw row is not part of this correction conflict.")
+    if not reason.strip():
+        raise HTTPException(422, "A controlled correction resolution reason is required.")
+    review.status = "resolved"
+    review.selected_raw_source_row_id = selected_raw_source_row_id
+    review.resolved_by = user.user_id
+    review.resolved_at = datetime.now(timezone.utc)
+    review.reason = reason.strip()
+    _reconstruct_invoice_groups(db)
+    audit(db, user.user_id, "collection_correction_resolved", "collection_correction_review", review_id, {
+        "selected_raw_source_row_id": selected_raw_source_row_id,
+        "reason": reason.strip(),
+        "analytics_publication_required": True,
+    })
+    return review
 
 def _persist_raw_rows(
     db: Session,

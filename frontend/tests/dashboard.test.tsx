@@ -17,6 +17,7 @@ const data = {
   },
   total_standardized_accounts: 84,
   mcs_eligible_accounts: 84,
+  ranked_accounts: 84,
   priority_group_counts: { High: 28, Medium: 28, Low: 28 },
   prediction_class_counts: { "Future Transaction": 0, "No Future Transaction": 84 },
   total_valid_historical_sales: 167467524.93,

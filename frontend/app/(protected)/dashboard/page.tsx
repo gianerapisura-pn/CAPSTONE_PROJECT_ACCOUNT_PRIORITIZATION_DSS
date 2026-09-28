@@ -35,14 +35,14 @@ export default function DashboardPage() {
         </div>
 
         <section className="kpi-grid">
-          <div className="kpi-card"><span className="kpi-icon teal"><Users /></span><div><span>Current account profiles</span><strong>{data.total_standardized_accounts}</strong><small>{data.mcs_eligible_accounts} MCS eligible / ranked</small></div></div>
+          <div className="kpi-card"><span className="kpi-icon teal"><Users /></span><div><span>Current account profiles</span><strong>{data.total_standardized_accounts}</strong><small>{data.mcs_eligible_accounts} MCS eligible; {data.ranked_accounts} ranked</small></div></div>
           <div className="kpi-card"><span className="kpi-icon amber"><CircleDollarSign /></span><div><span>Valid historical sales</span><strong>{money.format(data.total_valid_historical_sales)}</strong><small>Compact business context</small></div></div>
-          <div className="kpi-card"><span className="kpi-icon blue"><CalendarDays /></span><div><span>Ranked population</span><strong>{data.mcs_eligible_accounts}</strong><small>Latest successful publication</small></div></div>
+          <div className="kpi-card"><span className="kpi-icon blue"><CalendarDays /></span><div><span>Ranked population</span><strong>{data.ranked_accounts}</strong><small>Latest successful publication</small></div></div>
         </section>
 
         <section className="dashboard-grid">
           <div className="data-section">
-            <div className="section-heading"><div><span className="eyebrow">Decision distribution</span><h2>Priority groups</h2></div><span>{data.mcs_eligible_accounts} ranked accounts</span></div>
+            <div className="section-heading"><div><span className="eyebrow">Decision distribution</span><h2>Priority groups</h2></div><span>{data.ranked_accounts} ranked accounts</span></div>
             <div className="compact-list">{groups.map(item => <Link href={"/accounts?priority_group=" + item.name} key={item.name}><div><strong>{item.name} Priority</strong><small>Recommended attention tier</small></div><span className="score">{item.value}</span></Link>)}</div>
           </div>
           <div className="data-section">

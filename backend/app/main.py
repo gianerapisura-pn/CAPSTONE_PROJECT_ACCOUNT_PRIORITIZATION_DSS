@@ -15,7 +15,7 @@ from app.auth.dependencies import AuthenticatedUser, require_admin, require_user
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
 from app.core.config import get_settings, validate_runtime_configuration
 from app.db.models import (
-    AccountAlias, AccountAliasReview, AnalyticsRun, DimAccount, ImportBatch,
+    AccountAlias, AccountAliasReview, AnalyticsRun, CollectionCorrectionReview, DimAccount, ImportBatch,
     ImportRowIssue, InvoiceGroupRecord, RFMResult, SensitivityScenarioRecord,
     SettlementResult,
 )
@@ -30,7 +30,9 @@ from app.schemas.api import (
     ImportCommitResponse, ImportDetailResponse, ImportPreviewResponse, ModelSummaryResponse,
 )
 from app.services.analytics_runner import run_account_prioritization, validate_analysis_reference
-from app.services.import_workflow import commit_source, preview_source
+from app.services.import_workflow import (
+    commit_source, preview_source, resolve_collection_correction,
+)
 from app.services.model_lifecycle import (
     active_model_version, future_transaction_for_current_run, monitor_registered_predictions,
 )
@@ -67,6 +69,10 @@ class AliasDecisionRequest(BaseModel):
     canonical_account_name: str | None = None
     reason: str
 
+
+class CollectionCorrectionDecisionRequest(BaseModel):
+    selected_raw_source_row_id: str
+    reason: str
 
 class AccountContextRequest(BaseModel):
     entity_type: str | None = None
@@ -162,6 +168,86 @@ def decide_alias(review_id: str, request: AliasDecisionRequest,
             "canonical_account_name": canonical or None}
 
 
+@app.get("/collection-corrections")
+def collection_correction_queue(
+    status: str = Query("pending", pattern="^(pending|resolved|all)$"),
+    user: AuthenticatedUser = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    rows = db.scalars(select(CollectionCorrectionReview).order_by(
+        CollectionCorrectionReview.status,
+        CollectionCorrectionReview.detected_at,
+    )).all()
+    return [{
+        "collection_correction_review_id": row.collection_correction_review_id,
+        "collection_identity": row.collection_identity,
+        "invoice_identity": row.invoice_identity,
+        "raw_source_row_ids": row.raw_source_row_ids or [],
+        "status": row.status,
+        "selected_raw_source_row_id": row.selected_raw_source_row_id,
+        "detected_at": row.detected_at.isoformat(),
+        "resolved_at": row.resolved_at.isoformat() if row.resolved_at else None,
+        "reason": row.reason,
+    } for row in rows if status == "all" or row.status == status]
+
+
+@app.post("/collection-corrections/{review_id}/resolve")
+def resolve_correction(
+    review_id: str,
+    request: CollectionCorrectionDecisionRequest,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    row = resolve_collection_correction(
+        db, user, review_id, request.selected_raw_source_row_id, request.reason
+    )
+    db.commit()
+    return {
+        "collection_correction_review_id": row.collection_correction_review_id,
+        "status": row.status,
+        "selected_raw_source_row_id": row.selected_raw_source_row_id,
+        "analytics_publication_required": True,
+    }
+
+@app.get("/account-context")
+def account_context_queue(
+    status: str = Query("pending", pattern="^(pending|all)$"),
+    user: AuthenticatedUser = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    rows = db.scalars(select(DimAccount).order_by(DimAccount.standardized_account_name)).all()
+    items = []
+    for row in rows:
+        pending = any(value in (None, "") for value in (
+            row.entity_type,
+            row.business_category,
+            row.primary_business_type,
+            row.account_status,
+            row.last_verified,
+        ))
+        if status == "pending" and not pending:
+            continue
+        items.append({
+            "account_key": row.account_key,
+            "account": row.standardized_account_name,
+            "display_name": row.display_name,
+            "entity_type": row.entity_type,
+            "business_category": row.business_category,
+            "primary_business_type": row.primary_business_type,
+            "account_status": row.account_status,
+            "last_verified": row.last_verified.isoformat() if row.last_verified else None,
+            "b2b_priority_eligible": row.b2b_priority_eligible,
+            "verification_status": "pending" if pending else "verified",
+        })
+    return {
+        "items": items,
+        "total": len(items),
+        "publication_note": (
+            "Context changes do not mutate a published run. Run analytics explicitly to publish "
+            "a new immutable decision result."
+        ),
+    }
+
 @app.patch("/account-context/{account_key}")
 def update_account_context(account_key: str, request: AccountContextRequest,
                            user: AuthenticatedUser = Depends(require_admin),
@@ -169,12 +255,30 @@ def update_account_context(account_key: str, request: AccountContextRequest,
     row = db.get(DimAccount, account_key)
     if not row:
         raise HTTPException(404, "Account not found.")
-    for field, value in request.model_dump().items():
+    values = request.model_dump()
+    required = ("entity_type", "business_category", "primary_business_type", "account_status", "last_verified")
+    if any(values.get(field) in (None, "") for field in required):
+        raise HTTPException(422, "Complete verified account context and last_verified are required.")
+    if values["b2b_priority_eligible"] and values["entity_type"] == "Individual/Personal":
+        raise HTTPException(422, "Individual/Personal context cannot be marked B2B eligible.")
+    previous = {
+        field: getattr(row, field).isoformat() if isinstance(getattr(row, field), date)
+        else getattr(row, field)
+        for field in values
+    }
+    for field, value in values.items():
         setattr(row, field, value)
-    audit(db, user.user_id, "account_context_updated", "dim_account", account_key,
-          request.model_dump(mode="json"))
+    audit(db, user.user_id, "account_context_updated", "dim_account", account_key, {
+        "previous": previous,
+        "updated": request.model_dump(mode="json"),
+        "publication_required": True,
+    })
     db.commit()
-    return {"account_key": account_key, **request.model_dump(mode="json")}
+    return {
+        "account_key": account_key,
+        **request.model_dump(mode="json"),
+        "publication_required": True,
+    }
 
 
 @app.post("/imports/preview", response_model=ImportPreviewResponse)
@@ -298,13 +402,14 @@ def dashboard(user: AuthenticatedUser = Depends(require_user), db: Session = Dep
         "run": serialize_run(run),
         "total_standardized_accounts": len(accounts),
         "mcs_eligible_accounts": sum(x["mcs_eligible"] for x in accounts),
+        "ranked_accounts": sum(x["is_ranked"] for x in accounts),
         "priority_group_counts": {x: sum(r["priority_group"] == x for r in priorities)
                                   for x in ("High", "Medium", "Low")},
         "prediction_class_counts": {
             x: sum(r.get("predicted_future_transaction_class") == x for r in accounts)
             for x in classes},
         "total_valid_historical_sales": sum(
-            x.get("valid_si_sales", 0) for x in payload["business_baselines"]),
+            x.get("all_recorded_sales", 0) for x in payload["business_baselines"]),
         "warnings": run.warnings or [], "top_accounts": priorities[:8],
         "stability": ({"minimum_spearman": min(x["min_spearman"] for x in payload["sensitivity"]),
                        "maximum_group_movement_rate": max(
@@ -366,7 +471,7 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
         "context": {key: decision.get(key) for key in (
             "entity_type", "business_category", "primary_business_type",
             "b2b_priority_eligible", "account_status", "last_verified")},
-        "decision": decision, "priority": decision if decision["mcs_eligible"] else None,
+        "decision": decision, "priority": decision if decision["is_ranked"] else None,
         "rfm": rfm.payload if rfm else None,
         "settlement": settlement.payload if settlement else None,
         "predictive": {
@@ -481,6 +586,7 @@ def methodology(user: AuthenticatedUser = Depends(require_admin)):
         "analysis_reference_date": "Administrator-selected and not earlier than accepted SI/CR evidence.",
         "eligibility": "Only explicitly verified B2B accounts enter RFM, prediction, and MCS.",
         "rfm": "q20/q40/q60/q80 empirical quintiles with linear interpolation and ties preserved.",
+        "settlement": "Observed SI-to-final-valid-CR duration using only cutoff-known, reconciled, nonnegative evidence.",
         "predictive": "Frozen Extra Trees stage-8 artifact; 12-month Future Transaction target; seven cutoff-safe predictors.",
         "mcs": "CRITIC weights normalized Recency, Frequency, Monetary, and Historical Settlement Duration.",
         "priority_groups": "Tie-preserving ranked thirds from each discriminatory four-criterion run.",

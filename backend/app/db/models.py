@@ -82,6 +82,19 @@ class RawSourceRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
+class CollectionCorrectionReview(Base):
+    __tablename__ = "collection_correction_reviews"
+    collection_correction_review_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
+    collection_identity: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    invoice_identity: Mapped[str] = mapped_column(String(64), index=True)
+    raw_source_row_ids: Mapped[list] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
+    selected_raw_source_row_id: Mapped[str | None] = mapped_column(UUID_STRING)
+    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    resolved_by: Mapped[str | None] = mapped_column(UUID_STRING)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reason: Mapped[str | None] = mapped_column(Text)
+
 class DimAccount(Base):
     __tablename__ = "dim_account"
     account_key: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
@@ -321,6 +334,16 @@ class PredictiveBenchmarkRecord(Base):
     benchmark_scope: Mapped[str] = mapped_column(String(40))
     model_name: Mapped[str] = mapped_column(String(120))
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
+
+class PrescriptiveValidationEvidence(Base):
+    __tablename__ = "prescriptive_validation_evidence"
+    prescriptive_validation_evidence_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
+    evidence_version: Mapped[str] = mapped_column(String(120), index=True)
+    evidence_scope: Mapped[str] = mapped_column(String(80), index=True)
+    comparator: Mapped[str] = mapped_column(String(160))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    source_package_hash: Mapped[str] = mapped_column(String(64))
+    registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 class SensitivitySummaryRecord(Base):
     __tablename__ = "sensitivity_results"

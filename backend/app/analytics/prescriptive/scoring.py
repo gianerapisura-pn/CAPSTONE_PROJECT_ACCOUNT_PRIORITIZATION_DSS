@@ -84,12 +84,13 @@ def assign_priority_groups(scored: list[tuple[str, float]]) -> dict[str, str]:
     if len({score for _, score in ordered}) == 1:
         return {account: "Medium" for account, _ in ordered}
     total = len(ordered)
-    first = int(np.ceil(total / 3))
+    first = round(total / 3)
+    second = round(2 * total / 3)
     while first < total and np.isclose(
         ordered[first - 1][1], ordered[first][1], rtol=0, atol=1e-12
     ):
         first += 1
-    second = max(first, total - int(np.ceil(total / 3)))
+    second = max(first, second)
     while second < total and np.isclose(
         ordered[second - 1][1], ordered[second][1], rtol=0, atol=1e-12
     ):

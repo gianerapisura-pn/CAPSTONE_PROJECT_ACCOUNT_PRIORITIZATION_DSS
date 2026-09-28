@@ -1,4 +1,4 @@
-﻿# User Guide
+# User Guide
 
 ## Management
 
@@ -11,7 +11,7 @@
 
 ## Administrator
 
-Administrators additionally preview/commit files, choose the analysis reference date, verify account context/B2B eligibility, inspect run history and technical analytics, manage aliases, register the private frozen artifact through the controlled backend process, and evaluate matured predictions.
+Administrators additionally preview/commit files, choose the analysis reference date, complete the pending Account Context queue, resolve quarantined collection corrections by selecting one authoritative raw row and recording a reason, inspect run history and technical analytics, manage aliases, register the private frozen Pipeline/package through the controlled backend process, and evaluate matured predictions. Context/correction changes require an explicit analytics rerun; they never mutate an old publication.
 
 Exact duplicate files are blocked as audited no-ops. Unknown account context is not guessed. Routine import never retrains. Model unavailable warnings do not disable descriptive/prescriptive outputs.
 

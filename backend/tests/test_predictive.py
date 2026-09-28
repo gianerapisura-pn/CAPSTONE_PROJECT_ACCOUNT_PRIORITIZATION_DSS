@@ -1,11 +1,11 @@
-﻿from decimal import Decimal
+from decimal import Decimal
 from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
 from app.analytics.predictive.future_transaction import (
     FEATURE_COLUMNS, FUTURE_TRANSACTION, NO_FUTURE_TRANSACTION, TARGET_COLUMN,
-    build_cutoff_dataset, classification_metrics, score_extra_trees_artifact,
+    _canonical_class, build_cutoff_dataset, classification_metrics, score_extra_trees_artifact,
 )
 from app.etl.invoices import InvoiceGroup
 
@@ -82,18 +82,28 @@ def test_single_class_metrics_suppress_balanced_measures():
     assert result["balanced_accuracy"] is None
 
 
+def test_locked_integer_class_orientation_is_explicit():
+    assert _canonical_class(0) == FUTURE_TRANSACTION
+    assert _canonical_class(1) == NO_FUTURE_TRANSACTION
+    assert _canonical_class("Future Transaction") == FUTURE_TRANSACTION
+    assert _canonical_class("No Future Transaction") == NO_FUTURE_TRANSACTION
+    with pytest.raises(ValueError, match="unsupported"):
+        _canonical_class(2)
+
+
 def test_frozen_scoring_returns_only_categorical_class():
-    class Model:
+    class PipelineLike:
+        feature_names_in_ = np.asarray(FEATURE_COLUMNS)
+
         def predict(self, frame):
-            return [0] * len(frame)
-    artifact = {"model": Model(), "feature_columns": list(FEATURE_COLUMNS)}
+            return [1] * len(frame)
+
     result = score_extra_trees_artifact(
-        [group("A", "1", "2020-01-01")], artifact,
+        [group("A", "1", "2020-01-01")], PipelineLike(),
         pd.Timestamp("2020-12-31"), {"A"}, "extra_trees_stage8", "hash")
     assert result.predictions == {"A": NO_FUTURE_TRANSACTION}
     assert not any("score" in key or "probability" in key
                    for key in result.__dict__)
-
 
 def test_obsolete_cart_production_module_is_removed():
     assert not Path("app/analytics/predictive/cart.py").exists()

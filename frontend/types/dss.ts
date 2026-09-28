@@ -51,6 +51,9 @@ export interface AccountDecisionRow {
   priority_group: PriorityGroup | null;
   mcs_eligible: boolean;
   mcs_eligibility_reason: string | null;
+  is_ranked: boolean;
+  ranking_status: string;
+  ranking_unavailable_reason: string | null;
   rfm_mean_score: number;
   rfm_code: string;
   average_settlement_days: number | null;
@@ -132,6 +135,7 @@ export interface DashboardData {
   run: RunSummary;
   total_standardized_accounts: number;
   mcs_eligible_accounts: number;
+  ranked_accounts: number;
   priority_group_counts: Record<PriorityGroup, number>;
   prediction_class_counts: Record<FutureTransactionClass, number>;
   total_valid_historical_sales: number;

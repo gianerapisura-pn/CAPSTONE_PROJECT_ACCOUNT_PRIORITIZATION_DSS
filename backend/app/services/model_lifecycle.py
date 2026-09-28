@@ -1,14 +1,21 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from dataclasses import replace
+from datetime import date
 from hashlib import sha256
 from io import BytesIO
+import json
 from pathlib import Path
+import re
 
 import joblib
+import numpy as np
 import pandas as pd
 import sklearn
-from sqlalchemy import desc, select
+from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+from sqlalchemy import delete, desc, select
 from sqlalchemy.orm import Session
 
 from app.analytics.predictive.future_transaction import (
@@ -23,10 +30,20 @@ from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG, AnalyticsConfig
 from app.db.models import (
     DimAccount,
     FutureTransactionPrediction,
+    PredictiveBenchmarkRecord,
+    PredictiveHorizonEvaluation,
     PredictiveModelVersion,
     PredictiveMonitoringEvaluation,
+    PredictiveOOPEvaluation,
 )
 from app.etl.invoices import InvoiceGroup
+from app.services.locked_packages import (
+    FINAL_PACKAGE_SHA256,
+    csv_members_under,
+    read_package_json,
+    read_package_member,
+    verified_package,
+)
 from app.services.storage import ModelStorage
 
 TARGET_DEFINITION = (
@@ -44,6 +61,7 @@ LOCKED_PARAMETERS = {
     "bootstrap": False,
     "random_state": 42,
 }
+LOCKED_IMPUTER_MEDIANS = (750.5, 0.0, 0.0, 10.0, 94.0, 0.0, 0.0)
 LOCKED_DEVELOPMENT_METRICS = {
     "macro_f1": 0.8015103929068558,
     "classification_error": 0.0650150370168791,
@@ -74,31 +92,50 @@ def _artifact_bytes(record: PredictiveModelVersion) -> bytes:
     return content
 
 
-def _validate_artifact(artifact: object, config: AnalyticsConfig) -> dict:
+def _validate_artifact(artifact: object, config: AnalyticsConfig) -> Pipeline:
     if sklearn.__version__ != "1.8.0":
         raise ValueError(
             f"Frozen artifact requires scikit-learn 1.8.0; runtime is {sklearn.__version__}."
         )
-    if not isinstance(artifact, dict):
-        raise ValueError("Frozen artifact must be a metadata-wrapped joblib dictionary.")
-    if list(artifact.get("feature_columns") or []) != list(FEATURE_COLUMNS):
+    if not isinstance(artifact, Pipeline):
+        raise ValueError("Frozen artifact must be the raw fitted scikit-learn Pipeline.")
+    if list(getattr(artifact, "feature_names_in_", [])) != list(FEATURE_COLUMNS):
         raise ValueError("Frozen artifact does not declare the seven locked predictors in order.")
-    estimator = artifact.get("pipeline") or artifact.get("model")
-    if estimator is None or not hasattr(estimator, "predict"):
-        raise ValueError("Frozen artifact does not contain a prediction pipeline.")
-    version = artifact.get("model_version", config.model_version)
-    if version != config.model_version:
-        raise ValueError(f"Artifact model version must be {config.model_version}.")
-    family = artifact.get("model_family", config.model_family)
-    if family != config.model_family:
-        raise ValueError(f"Artifact model family must be {config.model_family}.")
+    if list(artifact.named_steps) != ["imputer", "model"]:
+        raise ValueError("Frozen Pipeline must contain exactly the fitted imputer and model steps.")
+    imputer = artifact.named_steps["imputer"]
+    estimator = artifact.named_steps["model"]
+    if not isinstance(imputer, SimpleImputer) or imputer.strategy != "median":
+        raise ValueError("Frozen Pipeline imputer must be SimpleImputer(strategy='median').")
+    if not hasattr(imputer, "statistics_") or not np.allclose(
+        np.asarray(imputer.statistics_, dtype=float),
+        np.asarray(LOCKED_IMPUTER_MEDIANS, dtype=float),
+        rtol=0.0,
+        atol=1e-12,
+        equal_nan=False,
+    ):
+        raise ValueError("Frozen Pipeline imputer medians do not match the locked values.")
+    if not isinstance(estimator, ExtraTreesClassifier):
+        raise ValueError("Frozen Pipeline model step must be ExtraTreesClassifier.")
+    parameters = estimator.get_params(deep=False)
+    mismatches = {
+        key: (parameters.get(key), expected)
+        for key, expected in LOCKED_PARAMETERS.items()
+        if parameters.get(key) != expected
+    }
+    if mismatches:
+        raise ValueError(f"Frozen Extra Trees parameters do not match the locked contract: {mismatches}.")
+    if list(getattr(estimator, "classes_", [])) != [0, 1]:
+        raise ValueError("Frozen Extra Trees classes must be exactly [0, 1].")
+    if config.model_version != "extra_trees_stage8" or config.model_family != "Extra Trees Classifier":
+        raise ValueError("Runtime configuration does not identify the locked Extra Trees model.")
     return artifact
 
 
 def _load_artifact(
     record: PredictiveModelVersion,
     config: AnalyticsConfig = DEFAULT_ANALYTICS_CONFIG,
-) -> dict:
+) -> Pipeline:
     if record.model_version != config.model_version:
         raise ValueError("Active artifact is not the locked Extra Trees model version.")
     if record.artifact_hash != config.model_sha256:
@@ -106,31 +143,166 @@ def _load_artifact(
     return _validate_artifact(joblib.load(BytesIO(_artifact_bytes(record))), config)
 
 
+def _json_value(value):
+    if pd.isna(value):
+        return None
+    if hasattr(value, "item"):
+        value = value.item()
+    if isinstance(value, (pd.Timestamp, date)):
+        return value.isoformat()
+    return value
+
+
+def _rows(frame: pd.DataFrame) -> list[dict]:
+    return [
+        {str(key): _json_value(value) for key, value in row.items()}
+        for row in frame.to_dict(orient="records")
+    ]
+
+
+def _find_column(frame: pd.DataFrame, candidates: set[str]) -> str | None:
+    for column in frame.columns:
+        normalized = re.sub(r"[^a-z0-9]+", "_", str(column).strip().casefold()).strip("_")
+        if normalized in candidates:
+            return str(column)
+    return None
+
+
+def seed_locked_predictive_evidence(
+    db: Session,
+    record: PredictiveModelVersion,
+    package_content: bytes,
+) -> dict:
+    db.execute(delete(PredictiveHorizonEvaluation).where(
+        PredictiveHorizonEvaluation.predictive_model_version_id == record.predictive_model_version_id
+    ))
+    db.execute(delete(PredictiveBenchmarkRecord).where(
+        PredictiveBenchmarkRecord.predictive_model_version_id == record.predictive_model_version_id
+    ))
+    db.execute(delete(PredictiveOOPEvaluation).where(
+        PredictiveOOPEvaluation.predictive_model_version_id == record.predictive_model_version_id
+    ))
+
+    horizon_payloads: dict[int, list[dict]] = {3: [], 6: [], 12: []}
+    for name, frame in csv_members_under(package_content, "01_DATA/05_PREDICTIVE/02_HORIZON"):
+        horizon_column = _find_column(frame, {"horizon", "horizon_months", "outcome_horizon_months"})
+        for row in _rows(frame):
+            value = row.get(horizon_column) if horizon_column else None
+            match = re.search(r"(?:^|\D)(3|6|12)(?:\D|$)", name)
+            horizon = int(value) if value is not None and str(value).isdigit() else int(match.group(1)) if match else None
+            if horizon in horizon_payloads:
+                horizon_payloads[horizon].append({"source_member": name, **row})
+    for horizon, evidence in horizon_payloads.items():
+        if not evidence:
+            raise ValueError(f"Locked package is missing {horizon}-month horizon evidence.")
+        db.add(PredictiveHorizonEvaluation(
+            predictive_model_version_id=record.predictive_model_version_id,
+            horizon_months=horizon,
+            payload={"evidence": evidence},
+        ))
+
+    canonical: dict[str, list[dict]] = {}
+    for name, frame in csv_members_under(package_content, "01_DATA/05_PREDICTIVE/05_BENCHMARK"):
+        model_column = _find_column(frame, {"model", "model_name", "classifier", "estimator"})
+        if model_column is None:
+            continue
+        for row in _rows(frame):
+            model_name = str(row.get(model_column) or "").strip()
+            if model_name:
+                canonical.setdefault(model_name, []).append({"source_member": name, **row})
+    if len(canonical) != 22:
+        raise ValueError(
+            f"Canonical locked benchmark must contain 22 entries; found {len(canonical)}."
+        )
+    for model_name, evidence in canonical.items():
+        db.add(PredictiveBenchmarkRecord(
+            predictive_model_version_id=record.predictive_model_version_id,
+            benchmark_scope="canonical_21_classifiers_plus_majority",
+            model_name=model_name,
+            payload={"evidence": evidence},
+        ))
+
+    for directory, scope in (
+        ("01_DATA/05_PREDICTIVE/06_MODEL_SELECTION", "model_selection_evidence"),
+        ("01_DATA/05_PREDICTIVE/08_EXTENDED_AUDIT", "supplemental_nine_classifier_audit"),
+    ):
+        for name, frame in csv_members_under(package_content, directory):
+            model_column = _find_column(frame, {"model", "model_name", "classifier", "estimator"})
+            for index, row in enumerate(_rows(frame), start=1):
+                model_name = str(row.get(model_column) or Path(name).stem) if model_column else Path(name).stem
+                db.add(PredictiveBenchmarkRecord(
+                    predictive_model_version_id=record.predictive_model_version_id,
+                    benchmark_scope=scope,
+                    model_name=model_name,
+                    payload={"source_member": name, "row": index, **row},
+                ))
+
+    later_count = 0
+    for name, frame in csv_members_under(package_content, "01_DATA/05_PREDICTIVE/07_LATER_CHECKS"):
+        cutoff_column = _find_column(frame, {"cutoff", "cutoff_date", "evaluation_cutoff"})
+        for row in _rows(frame):
+            parsed = pd.to_datetime(row.get(cutoff_column), errors="coerce") if cutoff_column else pd.NaT
+            db.add(PredictiveOOPEvaluation(
+                predictive_model_version_id=record.predictive_model_version_id,
+                oop_cutoff=None if pd.isna(parsed) else parsed.date(),
+                payload={"source_member": name, **row},
+            ))
+            later_count += 1
+    if later_count == 0:
+        raise ValueError("Locked package contains no later-period predictive checks.")
+    return {"horizons": 3, "canonical_benchmarks": 22, "later_checks": later_count}
+
+
+def _metadata_date(metadata: dict, *keys: str) -> date | None:
+    for key in keys:
+        value = metadata.get(key)
+        if value:
+            parsed = pd.to_datetime(value, errors="coerce")
+            if not pd.isna(parsed):
+                return parsed.date()
+    return None
+
+
 def register_frozen_model(
     db: Session,
-    local_artifact_path: str | Path,
+    local_artifact_path: str | Path | None = None,
+    metadata_path: str | Path | None = None,
+    package_path: str | Path | None = None,
     config: AnalyticsConfig = DEFAULT_ANALYTICS_CONFIG,
 ) -> PredictiveModelVersion:
-    path = Path(local_artifact_path).expanduser().resolve(strict=True)
-    content = path.read_bytes()
+    package_content: bytes | None = None
+    if package_path is not None:
+        _, package_content = verified_package(package_path, FINAL_PACKAGE_SHA256)
+        content = read_package_member(package_content, "03_MODEL/extra_trees.joblib")
+        metadata = read_package_json(package_content, "03_MODEL/model_metadata.json")
+    else:
+        if local_artifact_path is None or metadata_path is None:
+            raise ValueError("Provide either a verified final package or both artifact and metadata paths.")
+        artifact_path = Path(local_artifact_path).expanduser().resolve(strict=True)
+        metadata_file = Path(metadata_path).expanduser().resolve(strict=True)
+        content = artifact_path.read_bytes()
+        metadata = json.loads(metadata_file.read_text(encoding="utf-8-sig"))
+        if not isinstance(metadata, dict):
+            raise ValueError("Model metadata must be a JSON object.")
     digest = sha256(content).hexdigest()
     if digest != config.model_sha256:
         raise ValueError(
             f"Artifact SHA-256 mismatch: expected {config.model_sha256}, received {digest}."
         )
     artifact = _validate_artifact(joblib.load(BytesIO(content)), config)
-    existing = db.scalar(
-        select(PredictiveModelVersion).where(
-            PredictiveModelVersion.model_version == config.model_version
-        )
-    )
+    existing = db.scalar(select(PredictiveModelVersion).where(
+        PredictiveModelVersion.model_version == config.model_version
+    ))
     if existing:
         raise ValueError(f"Model version {config.model_version} is already registered.")
     storage_path = ModelStorage().put(config.model_version, content)
-    for prior in db.scalars(
-        select(PredictiveModelVersion).where(PredictiveModelVersion.status == "active")
-    ).all():
+    for prior in db.scalars(select(PredictiveModelVersion).where(
+        PredictiveModelVersion.status == "active"
+    )).all():
         prior.status = "retired"
+    imputer = artifact.named_steps["imputer"]
+    validation_metrics = metadata.get("oop_metrics") or metadata.get("validation_report") or {}
+    development_metrics = metadata.get("development_metrics") or LOCKED_DEVELOPMENT_METRICS
     record = PredictiveModelVersion(
         model_version=config.model_version,
         model_family=config.model_family,
@@ -139,21 +311,24 @@ def register_frozen_model(
         primary_selection_metric="Equal-year mean outer Macro F1",
         decision_threshold=config.decision_threshold,
         status="active",
-        trained_through_date=date(2022, 12, 31),
+        trained_through_date=_metadata_date(metadata, "trained_through_date", "trained_through") or date(2022, 12, 31),
         selected_outcome_horizon=config.target_horizon_months,
         predictive_lookback_months=config.predictive_lookback_months,
         recent_transaction_months=config.recent_transaction_months,
         retained_features=list(FEATURE_COLUMNS),
         preprocessing_config={
-            "imputation": "training-fold median during temporal evaluation",
-            "deployment_imputation_values": artifact.get("imputation_values", {}),
+            "imputation": "fitted median imputation from the locked training evidence",
+            "deployment_imputation_values": {
+                feature: float(value)
+                for feature, value in zip(FEATURE_COLUMNS, imputer.statistics_, strict=True)
+            },
             "scaling": None,
         },
         tree_hyperparameters=LOCKED_PARAMETERS,
         random_seed=config.random_seed,
-        development_metrics=LOCKED_DEVELOPMENT_METRICS,
-        oop_metrics=dict(artifact.get("validation_report") or {}),
-        last_validation_date=datetime.now(timezone.utc).date(),
+        development_metrics=development_metrics,
+        oop_metrics=validation_metrics,
+        last_validation_date=_metadata_date(metadata, "last_validation_date", "validation_evidence_date"),
         method_version=config.version,
         code_version=config.version,
         artifact_path=storage_path,
@@ -162,6 +337,8 @@ def register_frozen_model(
     )
     db.add(record)
     db.flush()
+    if package_content is not None:
+        seed_locked_predictive_evidence(db, record, package_content)
     return record
 
 
@@ -187,7 +364,7 @@ def future_transaction_for_current_run(
         return unavailable_prediction(config)
     try:
         artifact = _load_artifact(active, config)
-        return score_extra_trees_artifact(
+        result = score_extra_trees_artifact(
             invoice_groups,
             artifact,
             analysis_reference_date,
@@ -195,6 +372,7 @@ def future_transaction_for_current_run(
             active.model_version,
             active.artifact_hash or "",
         )
+        return replace(result, report=dict(active.oop_metrics or {}))
     except (OSError, ValueError, EOFError, KeyError):
         active.review_recommended = True
         return unavailable_prediction(config)
@@ -205,11 +383,9 @@ def monitor_registered_predictions(
     invoice_groups: list[InvoiceGroup],
     as_of_date: date,
 ) -> dict:
-    rows = db.scalars(
-        select(FutureTransactionPrediction).where(
-            FutureTransactionPrediction.matured.is_(False)
-        )
-    ).all()
+    rows = db.scalars(select(FutureTransactionPrediction).where(
+        FutureTransactionPrediction.matured.is_(False)
+    )).all()
     matured = [row for row in rows if row.future_window_end <= as_of_date]
     valid = [group for group in invoice_groups if group.rfm_eligible]
     account_names = {

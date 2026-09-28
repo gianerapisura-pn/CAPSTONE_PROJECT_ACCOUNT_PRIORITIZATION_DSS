@@ -143,6 +143,9 @@ class AccountDecisionRowResponse(BaseModel):
     settlement_days_avg: float | None = None
     mcs_eligible: bool
     mcs_eligibility_reason: str | None = None
+    is_ranked: bool
+    ranking_status: str
+    ranking_unavailable_reason: str | None = None
     normalized_recency: float | None = None
     normalized_frequency: float | None = None
     normalized_monetary: float | None = None

@@ -1,10 +1,10 @@
-﻿# Power BI Report Specification
+# Power BI Report Specification
 
 Power BI consumes certified persisted views only. It does not load RAW files, private artifacts, or recompute analytics.
 
 ## Page 1: Management Overview
 
-Show run/reference metadata, annual valid SI sales, annual transacting-account count, Priority Group counts, top-ranked accounts/FPS, and ranked B2B count. A compact Future Transaction class summary is supporting context. Do not force a two-slice visual when the current class is uniform.
+Show run/reference metadata, all-valid annual SI sales, verified-B2B transacting-account trend, Priority Group counts, top-ranked accounts/FPS, and ranked B2B count. A compact Future Transaction class summary is supporting context. Do not force a two-slice visual when the current class is uniform.
 
 ## Page 2: Account Profile and Prioritization Context
 
@@ -16,6 +16,6 @@ Show the 3/6/12 horizon comparison, selected 12-month target, canonical model be
 
 ## Page 4: Ranking Robustness and Historical Usefulness
 
-Show four CRITIC weights, +/-10/20/30/40 sensitivity summaries, movement/boundary detail, leave-one-out influence, seven 2018-2024 backtests, exact k/n expected random, lift, and the 2019 below-random result.
+Show four CRITIC weights, +/-10/20/30/40 locked sensitivity summaries, movement/boundary detail, leave-one-out influence, seven 2018-2024 backtests, exact k/n expected random, lift, and the 2019 below-random result. Add one concise evidence element for CRITIC versus Entropy/Equal Weighting and additive MCS versus CRITIC-weighted TOPSIS. These are methodological robustness comparators, not operational queues; do not claim universal superiority.
 
 Every visual must answer a management or validation question. No product, brand, competitor, forecast, demographic, decorative, or duplicate Web DSS visuals.

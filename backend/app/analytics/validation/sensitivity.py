@@ -45,12 +45,13 @@ def run_sensitivity(
     weight_range: float,
     iterations: int,
     random_seed: int,
+    rng: np.random.Generator | None = None,
 ) -> SensitivitySummary:
     if not priorities or set(base_weights) != set(CRITERIA):
         return SensitivitySummary(
             iterations, weight_range, 0.0, 0.0, 0.0, 0.0, 0.0, 0, False, []
         )
-    rng = np.random.default_rng(random_seed)
+    rng = rng or np.random.default_rng(random_seed)
     baseline_ranks = {item.account: item.priority_rank for item in priorities}
     baseline_top_ten = {
         item.account for item in priorities if item.priority_rank <= 10
@@ -120,6 +121,26 @@ def run_sensitivity(
         scenarios=scenarios,
     )
 
+def run_sensitivity_suite(
+    priorities: list[AccountPriority],
+    base_weights: dict[str, float],
+    weight_ranges: tuple[float, ...],
+    iterations: int,
+    random_seed: int,
+) -> list[SensitivitySummary]:
+    """Consume one locked random stream across perturbation ranges in declared order."""
+    rng = np.random.default_rng(random_seed)
+    return [
+        run_sensitivity(
+            priorities,
+            base_weights,
+            weight_range,
+            iterations,
+            random_seed,
+            rng=rng,
+        )
+        for weight_range in weight_ranges
+    ]
 
 def run_leave_one_out_influence(
     rfm: list[AccountRFM],

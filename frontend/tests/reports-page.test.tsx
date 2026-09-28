@@ -11,6 +11,7 @@ vi.mock("@/lib/use-api", () => ({
         completed_at: "2030-06-01T12:00:00Z",
       },
       mcs_eligible_accounts: 3,
+      ranked_accounts: 3,
     },
   }),
 }));
