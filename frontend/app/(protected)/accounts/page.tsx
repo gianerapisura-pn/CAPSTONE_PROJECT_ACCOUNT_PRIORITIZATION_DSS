@@ -13,7 +13,7 @@ function AccountsContent() {
     requested === "High" || requested === "Medium" || requested === "Low" ? requested : "";
   return <div className="page-stack">
     <PageHeader eyebrow="Primary decision view" title="Account prioritization" description="Current account profiles from the latest run. MCS-eligible accounts retain their published rank; filters never rerank results." />
-    <div className="method-note"><Info /><div><strong>Priority and risk answer different questions.</strong><span>Priority Group comes from CRITIC/MCS. Predicted Inactivity Risk is separate supporting CART context and never enters the Final Priority Score.</span></div></div>
+    <div className="method-note"><Info /><div><strong>Priority and predicted transaction class answer different questions.</strong><span>Priority Group comes from CRITIC/MCS. The 12-month Future Transaction prediction is supporting context and never enters the Final Priority Score.</span></div></div>
     <AccountPriorityTable initialGroup={initialGroup} />
   </div>;
 }

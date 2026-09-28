@@ -15,7 +15,7 @@ CRITERIA = ("recency", "frequency", "monetary", "settlement")
 @dataclass(frozen=True)
 class AccountPriority:
     account: str
-    rfm_score: float
+    rfm_mean_score: float
     recency_days: int
     frequency: int
     monetary: Decimal
@@ -45,7 +45,6 @@ def normalize(values: dict[str, float], benefit: bool) -> dict[str, float]:
 
 
 def critic_weights(criteria_frame: pd.DataFrame) -> dict[str, float]:
-    """Return Pearson CRITIC weights, or no weights when total information is zero."""
     if criteria_frame.empty:
         return {}
     frame = criteria_frame.loc[:, list(CRITERIA)]
@@ -53,8 +52,8 @@ def critic_weights(criteria_frame: pd.DataFrame) -> dict[str, float]:
     informative = [criterion for criterion in CRITERIA if std[criterion] > 0.0]
     if not informative:
         return {}
-    corr = frame.loc[:, informative].corr(method="pearson")
-    information = std.loc[informative] * (1.0 - corr).sum(axis=0)
+    correlation = frame.loc[:, informative].corr(method="pearson")
+    information = std.loc[informative] * (1.0 - correlation).sum(axis=0)
     total = float(information.sum())
     if np.isclose(total, 0.0, rtol=0.0, atol=1e-15):
         return {}
@@ -79,21 +78,18 @@ def analytical_ranks(scored: list[tuple[str, float]]) -> dict[str, int]:
 
 
 def assign_priority_groups(scored: list[tuple[str, float]]) -> dict[str, str]:
-    """Assign high/medium/low thirds while keeping equal-score boundaries intact."""
     if not scored:
         return {}
     ordered = sorted(scored, key=lambda item: (-item[1], item[0]))
     if len({score for _, score in ordered}) == 1:
         return {account: "Medium" for account, _ in ordered}
     total = len(ordered)
-    high_target = int(np.ceil(total / 3))
-    low_target = int(np.ceil(total / 3))
-    first = high_target
+    first = int(np.ceil(total / 3))
     while first < total and np.isclose(
         ordered[first - 1][1], ordered[first][1], rtol=0, atol=1e-12
     ):
         first += 1
-    second = max(first, total - low_target)
+    second = max(first, total - int(np.ceil(total / 3)))
     while second < total and np.isclose(
         ordered[second - 1][1], ordered[second][1], rtol=0, atol=1e-12
     ):
@@ -149,7 +145,7 @@ def compute_priorities(
     priorities = [
         AccountPriority(
             account=account,
-            rfm_score=rfm_by_account[account].rfm_score,
+            rfm_mean_score=rfm_by_account[account].rfm_mean_score,
             recency_days=rfm_by_account[account].recency_days,
             frequency=rfm_by_account[account].frequency,
             monetary=rfm_by_account[account].monetary,

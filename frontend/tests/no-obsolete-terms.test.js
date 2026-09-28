@@ -1,9 +1,9 @@
-const fs = require("fs");
+﻿const fs = require("fs");
 const path = require("path");
 
 const forbidden = [
   "Settlement Behavior Score",
-  "Moderate Inactivity Risk",
+  "Moderate Transaction Class",
   "75% RFM",
   "25% Settlement",
   "60/40",

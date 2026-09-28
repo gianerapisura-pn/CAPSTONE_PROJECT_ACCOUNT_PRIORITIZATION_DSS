@@ -168,8 +168,10 @@ def group_invoices(rows: list[SourceRow], precision: Decimal = Decimal("0.01")) 
             (row.ewt for row in group.rows if row.ewt is not None), Decimal("0")
         )
         group.reconciliation_amount = group.total_cr_amount + group.total_ewt
-        group.reconciliation_difference = (group.reconciliation_amount - group.si_amount).quantize(precision)
-        group.reconciled = group.reconciliation_difference == Decimal("0.00")
+        group.reconciliation_difference = (
+            group.si_amount - group.total_cr_amount - group.total_ewt
+        ).quantize(precision)
+        group.reconciled = abs(group.reconciliation_difference) <= precision
         if group.conflicting_invoice:
             group.review_reason = "Conflicting invoice amount or payment status; excluded pending review."
         elif group.is_cancelled:

@@ -1,165 +1,99 @@
-from __future__ import annotations
-
-from decimal import Decimal
+﻿from decimal import Decimal
 from pathlib import Path
-
+import numpy as np
 import pandas as pd
-
-from app.analytics.predictive.cart import (
-    CANDIDATE_FEATURES,
-    TARGET_COLUMN,
-    _development_supported_features,
-    build_cutoff_dataset,
-    train_cart_temporal,
+import pytest
+from app.analytics.predictive.future_transaction import (
+    FEATURE_COLUMNS, FUTURE_TRANSACTION, NO_FUTURE_TRANSACTION, TARGET_COLUMN,
+    build_cutoff_dataset, classification_metrics, score_extra_trees_artifact,
 )
-from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
-from app.etl.invoices import SourceRow, group_invoices
+from app.etl.invoices import InvoiceGroup
 
 
-def source(
-    account: str,
-    date: str,
-    amount: str = "100",
-    cr_date: str | None = None,
-) -> SourceRow:
-    collection = pd.Timestamp(cr_date) if cr_date else pd.Timestamp(date) + pd.Timedelta(days=10)
-    return SourceRow(
-        customer_name_raw=account,
-        standardized_account_name=account.upper(),
-        si_no=f"SI-{account}-{date}",
-        si_date=pd.Timestamp(date),
-        si_amount=Decimal(amount),
-        cr_no="CR",
-        cr_date=collection,
-        cr_amount=Decimal(amount),
-        ewt=Decimal("0"),
-        payment_mode="Bank",
-        payment_status_raw="Fully Paid",
-        payment_status="Fully Paid",
-        is_cancelled=False,
-        import_batch_id="batch",
-        source_sheet="Sheet1",
-        source_row_number=1,
+def group(account, si, date, amount=100, cr=None):
+    return InvoiceGroup(
+        invoice_group_id=account + si, standardized_account_name=account,
+        si_no=si, si_date=pd.Timestamp(date), si_amount=Decimal(str(amount)),
+        payment_status="Fully Paid", final_cr_date=pd.Timestamp(cr) if cr else None,
+        total_cr_amount=Decimal(str(amount)), reconciliation_amount=Decimal(str(amount)),
+        reconciliation_difference=Decimal("0"), reconciled=True,
     )
 
 
-def test_cutoff_features_use_component_specific_history_without_future_leakage():
-    groups = group_invoices([
-        source("A", "2017-01-01"),
-        source("A", "2018-01-01"),
-        source("A", "2019-06-01", "200"),
-        source("A", "2021-01-01"),
-        source("B", "2019-12-01", "50", "2021-01-01"),
-    ])
-    cutoff = pd.Timestamp("2020-12-31")
-    frame = build_cutoff_dataset(groups, cutoff, 24, 12, include_outcome=False)
-    account_a = frame[frame["account"] == "A"].iloc[0]
-    account_b = frame[frame["account"] == "B"].iloc[0]
-    assert account_a["recency_days"] == (cutoff - pd.Timestamp("2019-06-01")).days
-    assert account_a["frequency_count"] == 1
-    assert account_a["monetary_value"] == 200
-    assert account_a["recent_transaction_count"] == 0
-    assert account_a["account_activity_gap"] == (pd.Timestamp("2019-06-01") - pd.Timestamp("2018-01-01")).days
-    assert account_a["avg_settlement_days"] == 10
-    assert account_b["has_valid_settlement_record"] == 0
-    assert pd.isna(account_b["avg_settlement_days"])
-    assert TARGET_COLUMN not in frame
-
-
-def test_historical_account_older_than_24_months_remains_in_cutoff_universe():
+def test_exact_seven_predictors_and_cutoff_safe_windows():
+    groups = [
+        group("A", "1", "2019-01-01", 10, "2019-01-10"),
+        group("A", "2", "2020-06-01", 20, "2020-06-10"),
+        group("A", "3", "2021-06-01", 30, "2021-06-10"),
+        group("A", "4", "2022-01-01", 999, "2022-01-10"),
+    ]
     frame = build_cutoff_dataset(
-        group_invoices([source("OLD", "2017-01-01")]),
-        pd.Timestamp("2020-12-31"),
-        24,
-        12,
-        include_outcome=False,
-    )
-    assert frame.iloc[0]["account"] == "OLD"
-    assert frame.iloc[0]["frequency_count"] == 0
-    assert frame.iloc[0]["monetary_value"] == 0
+        groups, pd.Timestamp("2021-06-30"), include_outcome=False)
+    assert tuple(FEATURE_COLUMNS) == (
+        "recency_days", "frequency_24m", "monetary_24m", "avg_settlement_days",
+        "account_activity_gap", "recent_transaction_count_12m",
+        "recent_monetary_value_12m")
+    row = frame.iloc[0]
+    assert row["frequency_24m"] == 2
+    assert row["monetary_24m"] == 50
+    assert row["recent_transaction_count_12m"] == 1
+    assert row["recent_monetary_value_12m"] == 30
 
 
-def test_realized_outcome_is_distinct_and_requires_complete_future_window():
-    groups = group_invoices([source("A", "2020-01-01"), source("A", "2020-12-01"), source("B", "2020-12-30"), source("B", "2021-01-01")])
-    complete = build_cutoff_dataset(groups, pd.Timestamp("2020-06-30"), 24, 6)
-    assert complete.iloc[0][TARGET_COLUMN] == "Lower"
-    incomplete = build_cutoff_dataset(groups, pd.Timestamp("2021-01-01"), 24, 12)
+def test_outcome_orientation_and_completeness_guard():
+    groups = [
+        group("A", "1", "2020-01-01"),
+        group("A", "2", "2021-03-01"),
+        group("B", "3", "2020-01-01"),
+        group("C", "4", "2022-01-01"),
+    ]
+    frame = build_cutoff_dataset(groups, pd.Timestamp("2020-12-31"),
+                                 data_complete_through=pd.Timestamp("2022-01-01"))
+    labels = dict(zip(frame["account"], frame[TARGET_COLUMN]))
+    assert labels["A"] == FUTURE_TRANSACTION
+    assert labels["B"] == NO_FUTURE_TRANSACTION
+    incomplete = build_cutoff_dataset(
+        groups, pd.Timestamp("2021-12-31"),
+        data_complete_through=pd.Timestamp("2022-01-01"))
     assert incomplete.empty
 
 
-def test_final_candidate_features_and_exact_temporal_grid():
-    config = DEFAULT_ANALYTICS_CONFIG
-    assert "latest_transaction_year" not in CANDIDATE_FEATURES
-    assert not {
-        "rfm_score", "final_priority_score", "priority_rank", "priority_group",
-        "normalized_recency", "normalized_frequency", "normalized_monetary",
-        "normalized_settlement",
-    } & set(CANDIDATE_FEATURES)
-    assert config.cart_cutoffs == (
-        "2018-12-31", "2019-12-31", "2020-12-31",
-        "2021-12-31", "2022-12-31", "2023-12-31",
-    )
-    assert config.cart_development_cutoffs == config.cart_cutoffs[:-1]
-    assert config.cart_oop_cutoff == "2023-12-31"
-    assert config.cart_max_depth == (3, 4, 5)
-    assert config.cart_min_samples_split == (4, 8, 12)
-    assert config.cart_min_samples_leaf == (2, 4, 6)
+def test_activity_gap_missingness_is_structural():
+    frame = build_cutoff_dataset(
+        [group("A", "1", "2020-01-01")], pd.Timestamp("2020-12-31"),
+        include_outcome=False)
+    assert np.isnan(frame.iloc[0]["account_activity_gap"])
 
 
-def test_reduced_feature_selection_has_no_mandatory_rfm_retention():
-    missingness = pd.Series({feature: 0.0 for feature in CANDIDATE_FEATURES})
-    no_importance = {feature: 0.0 for feature in CANDIDATE_FEATURES}
-    frequency_only = dict(no_importance, frequency_count=0.2)
-    assert _development_supported_features(missingness, frequency_only, no_importance) == [
-        "frequency_count"
-    ]
-    settlement_only = dict(no_importance, avg_settlement_days=0.2)
-    assert _development_supported_features(missingness, settlement_only, no_importance) == [
-        "avg_settlement_days"
-    ]
-    assert _development_supported_features(missingness, no_importance, no_importance) == []
+def test_b2b_set_filters_unknown_or_personal_context():
+    groups = [group("B2B", "1", "2020-01-01"), group("UNKNOWN", "2", "2020-01-01")]
+    frame = build_cutoff_dataset(
+        groups, pd.Timestamp("2020-12-31"), include_outcome=False,
+        eligible_accounts={"B2B"})
+    assert frame["account"].tolist() == ["B2B"]
 
 
-def test_cart_insufficient_class_safeguard():
-    dev = pd.DataFrame({
-        "account": ["A", "B"],
-        "recency_days": [1, 2],
-        "frequency": [1, 1],
-        "monetary": [100, 100],
-        TARGET_COLUMN: ["Lower", "Lower"],
-    })
-    result = train_cart_temporal(dev, dev)
-    assert result.status == "Predictive Context Unavailable / Insufficient Data"
+def test_single_class_metrics_suppress_balanced_measures():
+    result = classification_metrics(
+        [NO_FUTURE_TRANSACTION, NO_FUTURE_TRANSACTION],
+        [NO_FUTURE_TRANSACTION, NO_FUTURE_TRANSACTION])
+    assert result["accuracy"] == 1
+    assert result["macro_f1"] is None
+    assert result["balanced_accuracy"] is None
 
 
-def test_temporal_cart_reports_required_metrics_and_raw_features_only():
-    development = pd.DataFrame({
-        "account": [f"A{i}" for i in range(8)],
-        "recency_days": [5, 10, 15, 20, 80, 90, 100, 110],
-        "frequency_count": [5, 4, 4, 3, 2, 2, 1, 1],
-        "monetary_value": [500, 450, 400, 350, 200, 180, 150, 100],
-        TARGET_COLUMN: ["Lower"] * 4 + ["Higher"] * 4,
-    })
-    oop = pd.DataFrame({
-        "account": ["O1", "O2", "O3", "O4"],
-        "recency_days": [8, 18, 85, 105],
-        "frequency_count": [5, 3, 2, 1],
-        "monetary_value": [480, 360, 190, 120],
-        TARGET_COLUMN: ["Lower", "Lower", "Higher", "Higher"],
-    })
-    result = train_cart_temporal(development, oop)
-    assert result.status == "Validated"
-    assert set(result.feature_columns) <= set(CANDIDATE_FEATURES)
-    assert result.report["classification_error"] == 1 - result.report["accuracy"]
-    assert {"Lower", "Higher"} <= result.report["per_class"].keys()
-    assert result.majority_baseline_report is not None
-    assert len(result.confusion_matrix or []) == 2
+def test_frozen_scoring_returns_only_categorical_class():
+    class Model:
+        def predict(self, frame):
+            return [0] * len(frame)
+    artifact = {"model": Model(), "feature_columns": list(FEATURE_COLUMNS)}
+    result = score_extra_trees_artifact(
+        [group("A", "1", "2020-01-01")], artifact,
+        pd.Timestamp("2020-12-31"), {"A"}, "extra_trees_stage8", "hash")
+    assert result.predictions == {"A": NO_FUTURE_TRANSACTION}
+    assert not any("score" in key or "probability" in key
+                   for key in result.__dict__)
 
 
-def test_cart_source_has_no_forbidden_preprocessing_or_oop_refit():
-    source_text = Path("app/analytics/predictive/cart.py").read_text(encoding="utf-8")
-    assert "StandardScaler" not in source_text
-    assert "add_indicator=True" not in source_text
-    assert "class_weight" not in source_text
-    assert "operational_model.fit" not in source_text
-    assert '"pipeline": frozen_model' in source_text
+def test_obsolete_cart_production_module_is_removed():
+    assert not Path("app/analytics/predictive/cart.py").exists()

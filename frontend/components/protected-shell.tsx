@@ -23,12 +23,12 @@ const navGroups = [
     { href: "/settings", label: "Methodology & Governance", icon: Settings },
     { href: "/analytics/rfm", label: "RFM", icon: BarChart3 },
     { href: "/analytics/settlement", label: "Settlement", icon: Clock3 },
-    { href: "/analytics/cart", label: "CART", icon: Activity },
+    { href: "/analytics/predictive", label: "Future Transaction", icon: Activity },
     { href: "/analytics/sensitivity", label: "Sensitivity", icon: FlaskConical },
   ] },
 ];
 
-const adminRoutePrefixes = ["/import", "/runs", "/settings", "/analytics/rfm", "/analytics/settlement", "/analytics/cart", "/analytics/sensitivity"];
+const adminRoutePrefixes = ["/import", "/runs", "/settings", "/analytics/rfm", "/analytics/settlement", "/analytics/predictive", "/analytics/sensitivity"];
 
 export function ProtectedShell({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut } = useAuth();
@@ -53,7 +53,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
           return <Link key={item.href} href={item.href} className={active ? "active" : ""} onClick={() => setMobileOpen(false)}><item.icon size={18} /><span>{item.label}</span></Link>;
         })}
       </div>)}</nav>
-      <div className="sidebar-foot"><span>Methodology version</span><strong>2026.09 final alignment</strong></div>
+      <div className="sidebar-foot"><span>Methodology version</span><strong>2026.09-final-locked</strong></div>
     </aside>
     <div className="workspace">
       <header className="topbar"><button className="icon-button menu-button" aria-label="Open navigation" onClick={() => setMobileOpen(true)}><Menu /></button><div className="topbar-context"><span>Decision Support System</span><strong>Management workspace</strong></div><div className="profile-wrap"><button className="profile-button" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen}><span className="avatar">{user.displayName.slice(0, 2).toUpperCase()}</span><span><strong>{user.displayName}</strong><small>{user.role}</small></span><ChevronDown size={16} /></button>{menuOpen && <div className="profile-menu"><div><strong>{user.email}</strong><span>{user.demo ? "Local demo session" : "Secure authenticated session"}</span></div><button onClick={async () => { await signOut(); router.replace("/login") }}><LogOut size={16} />Sign out</button></div>}</div></header>

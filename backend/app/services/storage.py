@@ -44,7 +44,7 @@ class SourceStorage:
 
 
 class ModelStorage:
-    """Private persistence for validated CART artifacts."""
+    """Private persistence for validated frozen predictive artifacts."""
 
     def __init__(self) -> None:
         self.settings = get_settings()

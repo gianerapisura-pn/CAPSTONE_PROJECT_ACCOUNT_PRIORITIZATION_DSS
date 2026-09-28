@@ -1,5 +1,4 @@
 from typing import Any
-
 from pydantic import BaseModel, Field
 
 
@@ -19,6 +18,8 @@ class ImportPreviewResponse(BaseModel):
     sheets: list[str]
     rows_discovered: int
     cancelled_count: int
+    latest_evidence_date: str | None = None
+    analysis_reference_required: bool = True
     issues: list[ValidationIssueResponse]
     duplicate_committed_file: bool
     quality_rates: dict[str, float]
@@ -31,7 +32,7 @@ class ImportCommitResponse(BaseModel):
     import_batch_id: str
     analysis_run_id: str
     prioritized_accounts: int
-    cutoff_date: str | None = None
+    analysis_reference_date: str
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -49,7 +50,7 @@ class ImportBatchResponse(BaseModel):
     rows_excluded: int
     cancelled_count: int
     analysis_run_id: str | None = None
-    override_reason: str | None = None
+    analysis_reference_date: str | None = None
 
 
 class ImportDetailResponse(ImportBatchResponse):
@@ -60,7 +61,10 @@ class ImportDetailResponse(ImportBatchResponse):
 
 class AnalyticsRunResponse(BaseModel):
     analysis_run_id: str
-    cutoff_date: str | None = None
+    analysis_reference_date: str | None = None
+    latest_valid_si_date: str | None = None
+    latest_final_cr_date: str | None = None
+    methodology_version: str | None = None
     started_at: str
     completed_at: str | None = None
     status: str
@@ -77,18 +81,15 @@ class AnalyticsRunResponse(BaseModel):
 
 class AccountPriorityResponse(BaseModel):
     account: str
-    rfm_score: float
+    rfm_mean_score: float
     recency_days: int
     frequency: int
     frequency_count: int
     monetary: float
     monetary_value: float
-    recency_score: int
-    frequency_score: int
-    monetary_score: int
     settlement_days_avg: float
     average_settlement_days: float
-    valid_settlement_record_count: int | None
+    valid_settlement_record_count: int
     normalized_recency: float
     normalized_frequency: float
     normalized_monetary: float
@@ -100,34 +101,42 @@ class AccountPriorityResponse(BaseModel):
     final_priority_score: float
     priority_rank: int
     priority_group: str
-    latest_valid_transaction: str
-    latest_valid_transaction_date: str | None
     latest_valid_si_date: str | None
     baseline_recency_weight: float | None
     baseline_frequency_weight: float | None
     baseline_monetary_weight: float | None
     baseline_settlement_weight: float | None
-    predicted_inactivity_risk: str | None = None
-    inactivity_risk: str | None = None
+    r_score: int
+    f_score: int
+    m_score: int
+    rfm_code: str
+    predicted_future_transaction_class: str | None = None
     model_version: str | None = None
 
 
 class AccountDecisionRowResponse(BaseModel):
     account_key: str
     account: str
+    display_name: str
+    entity_type: str | None = None
+    business_category: str | None = None
+    primary_business_type: str | None = None
+    b2b_priority_eligible: bool
+    account_status: str | None = None
+    last_verified: str | None = None
     analysis_run_id: str
-    analysis_cutoff: str | None = None
+    analysis_reference_date: str | None = None
     latest_valid_si_date: str | None = None
-    latest_valid_transaction_date: str | None = None
     recency_days: int
     frequency: int
     frequency_count: int
     monetary: float
     monetary_value: float
-    recency_score: int
-    frequency_score: int
-    monetary_score: int
-    rfm_score: float
+    r_score: int
+    f_score: int
+    m_score: int
+    rfm_code: str
+    rfm_mean_score: float
     settlement_invoice_count: int
     valid_settlement_record_count: int
     average_settlement_days: float | None = None
@@ -149,8 +158,7 @@ class AccountDecisionRowResponse(BaseModel):
     baseline_frequency_weight: float | None = None
     baseline_monetary_weight: float | None = None
     baseline_settlement_weight: float | None = None
-    predicted_inactivity_risk: str | None = None
-    inactivity_risk: str | None = None
+    predicted_future_transaction_class: str | None = None
     model_version: str | None = None
 
 
@@ -160,20 +168,21 @@ class AccountListResponse(BaseModel):
     page: int
     page_size: int
     analysis_run_id: str
-    analysis_cutoff: str | None = None
+    analysis_reference_date: str | None = None
     updated_at: str | None = None
+
 
 class ModelSummaryResponse(BaseModel):
     status: str
     model_version: str | None = None
+    model_family: str | None = None
     created_at: Any = None
-    development_data_through: Any = None
-    untouched_oop_cutoff: Any = None
-    artifact_validation_date: Any = None
-    current_scoring_cutoff: Any = None
-    monitoring_origin_date: Any = None
+    trained_through_date: Any = None
     selected_outcome_horizon: int | None = None
     retained_features: list[str] = Field(default_factory=list)
+    decision_threshold: float | None = None
+    artifact_hash: str | None = None
     last_validation_date: Any = None
     review_recommended: bool = False
-    oop_metrics: dict[str, Any] = Field(default_factory=dict)
+    development_metrics: dict[str, Any] = Field(default_factory=dict)
+    validation_metrics: dict[str, Any] = Field(default_factory=dict)

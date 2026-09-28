@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { ChevronLeft, ChevronRight, Download, ExternalLink, Search } from "lucide-react";
 import Link from "next/link";
@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { Badge, PageState } from "@/components/page-state";
 import { downloadExport } from "@/lib/api";
 import { useApi } from "@/lib/use-api";
-import type { AccountDecisionRow, AccountListResponse, InactivityRisk, PriorityGroup } from "@/types/dss";
+import type { AccountDecisionRow, AccountListResponse, FutureTransactionClass, PriorityGroup } from "@/types/dss";
 
 const money = new Intl.NumberFormat("en-PH", {
   style: "currency",
@@ -18,7 +18,7 @@ function queryString(search: string, group: string, risk: string, eligibility: s
   const params = new URLSearchParams();
   if (search.trim()) params.set("search", search.trim());
   if (group) params.set("priority_group", group);
-  if (risk) params.set("predicted_inactivity_risk", risk);
+  if (risk) params.set("predicted_future_transaction_class", risk);
   if (eligibility) params.set("eligibility", eligibility);
   if (includePage) {
     params.set("page", String(page));
@@ -30,7 +30,7 @@ function queryString(search: string, group: string, risk: string, eligibility: s
 export function AccountPriorityTable({ initialGroup = "" }: { initialGroup?: PriorityGroup | "" }) {
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState<PriorityGroup | "">(initialGroup);
-  const [risk, setRisk] = useState<InactivityRisk | "">("");
+  const [risk, setRisk] = useState<FutureTransactionClass | "">("");
   const [eligibility, setEligibility] = useState<"" | "ranked" | "not_ranked">("");
   const [page, setPage] = useState(1);
 
@@ -54,8 +54,8 @@ const filters = useMemo(
         <select aria-label="Priority Group" value={group} onChange={(event) => { setGroup(event.target.value as PriorityGroup | ""); setPage(1); }}>
           <option value="">All priority groups</option><option>High</option><option>Medium</option><option>Low</option>
         </select>
-        <select aria-label="Predicted Inactivity Risk" value={risk} onChange={(event) => { setRisk(event.target.value as InactivityRisk | ""); setPage(1); }}>
-          <option value="">All risk contexts</option><option>Lower</option><option>Higher</option>
+        <select aria-label="12-Month Transaction Class" value={risk} onChange={(event) => { setRisk(event.target.value as FutureTransactionClass | ""); setPage(1); }}>
+          <option value="">All transaction classes</option><option>Future Transaction</option><option>No Future Transaction</option>
         </select>
         <select aria-label="MCS eligibility" value={eligibility} onChange={(event) => { setEligibility(event.target.value as "" | "ranked" | "not_ranked"); setPage(1); }}>
           <option value="">All accounts</option><option value="ranked">Ranked</option><option value="not_ranked">Not ranked</option>
@@ -67,13 +67,13 @@ const filters = useMemo(
         <>
           {data && <>
             <div className="data-meta">
-              <span>Analysis cutoff <strong>{data.analysis_cutoff ?? "Unavailable"}</strong></span>
+              <span>Analysis reference <strong>{data.analysis_reference_date ?? "Unavailable"}</strong></span>
               <span>Latest run <strong>{data.analysis_run_id.slice(0, 8)}</strong></span>
               <span>Last successful refresh <strong>{data.updated_at ? new Date(data.updated_at).toLocaleString() : "Unavailable"}</strong></span>
             </div>
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Rank</th><th>Account</th><th>Priority</th><th>Final score</th><th>Recency</th><th>Frequency</th><th>Monetary</th><th>Avg. settlement</th><th>Predicted inactivity risk</th><th>Latest valid SI</th><th aria-label="Open details" /></tr></thead>
+                <thead><tr><th>Rank</th><th>Account</th><th>Priority</th><th>Final score</th><th>Recency</th><th>Frequency</th><th>Monetary</th><th>Avg. settlement</th><th>12-Month Transaction Class</th><th>Latest valid SI</th><th aria-label="Open details" /></tr></thead>
                 <tbody>{data.items.map((row: AccountDecisionRow) => <tr key={row.account_key}>
                   <td className="rank-cell">{row.priority_rank === null ? "Not ranked" : `#${row.priority_rank}`}</td>
                   <td><strong>{row.account}</strong></td>
@@ -81,7 +81,7 @@ const filters = useMemo(
                   <td>{row.final_priority_score === null ? "N/A" : row.final_priority_score.toFixed(4)}</td>
                   <td>{row.recency_days} days</td><td>{row.frequency_count}</td><td>{money.format(row.monetary_value)}</td>
                   <td>{row.average_settlement_days === null ? "N/A" : `${row.average_settlement_days.toFixed(1)} days`}</td>
-                  <td><Badge tone={row.predicted_inactivity_risk === "Lower" ? "positive" : row.predicted_inactivity_risk ? "warning" : "neutral"}>{row.predicted_inactivity_risk ?? "Unavailable"}</Badge></td>
+                  <td><Badge tone={row.predicted_future_transaction_class === "Future Transaction" ? "positive" : row.predicted_future_transaction_class ? "warning" : "neutral"}>{row.predicted_future_transaction_class ?? "Unavailable"}</Badge></td>
                   <td>{row.latest_valid_si_date ?? "Unavailable"}</td>
                   <td><Link className="row-link" aria-label={`Open ${row.account}`} href={`/accounts/${encodeURIComponent(row.account_key)}`}><ExternalLink size={16} /></Link></td>
                 </tr>)}</tbody>

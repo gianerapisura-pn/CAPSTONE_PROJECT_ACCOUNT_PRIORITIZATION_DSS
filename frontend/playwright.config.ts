@@ -8,7 +8,7 @@ export default defineConfig({
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : undefined },
   webServer: [
     {
-      command: "powershell -NoProfile -Command \"Set-Location ../backend; python -m uvicorn app.main:app --host 127.0.0.1 --port 8011\"",
+      command: "powershell -NoProfile -Command \"Set-Location ../backend; Remove-Item -LiteralPath e2e.sqlite3 -Force -ErrorAction SilentlyContinue; python -m uvicorn app.main:app --host 127.0.0.1 --port 8011\"",
       url: "http://127.0.0.1:8011/health",
       timeout: 240_000,
       reuseExistingServer: false,

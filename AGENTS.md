@@ -1,40 +1,30 @@
-# PESLC Account Prioritization DSS
+﻿# PESLC Account Prioritization DSS
 
-This repository contains the web DSS, Python analytics/ETL backend, Supabase PostgreSQL schema, and Power BI reporting setup for the PESLC account prioritization capstone prototype.
+Read docs/ARCHITECTURE.md, docs/CAPSTONE_METHOD.md, docs/FUTURE_DATA_CONTINUITY.md, docs/POWER_BI_SETUP.md, and docs/IMPLEMENTATION_PLAN.md first.
 
-Read these first:
-- `docs/ARCHITECTURE.md` for system boundaries and runtime flow.
-- `docs/CAPSTONE_METHOD.md` for the analytics methodology.
-- `docs/FUTURE_DATA_CONTINUITY.md` for future-year/new-account handling.
-- `docs/POWER_BI_SETUP.md` for reporting.
-- `docs/IMPLEMENTATION_PLAN.md` for implementation status and commands.
-
-Core commands:
-- Backend tests: `cd backend && python -m pytest`
-- Frontend tests: `cd frontend && npm test`
-- Backend dev: `cd backend && uvicorn app.main:app --reload`
-- Frontend dev: `cd frontend && npm run dev`
+Commands:
+- Backend tests: cd backend; python -m pytest
+- Frontend tests: cd frontend; npm test
+- Backend dev: cd backend; uvicorn app.main:app --reload
+- Frontend dev: cd frontend; npm run dev
 
 Non-negotiable rules:
-1. Never hardcode 2017-2025 as the system's lifetime.
-2. Never hardcode the current account list.
-3. Never hardcode current Priority Groups.
-4. Never use fixed 75/25 RFM/Settlement weights.
-5. Never use Low/Moderate/High inactivity risk.
-6. Inactivity Risk is binary Lower/Higher.
-7. CART does not determine Final Priority Score.
-8. RFM Score is not the CART target.
-9. Descriptive and predictive analytics are separate branches.
-10. Power BI is visualization/reporting only.
-11. Future compatible data must work without redesigning the system.
-12. Never automatically fuzzy-merge customer accounts without evidence.
-13. Never use post-cutoff data in predictive features.
-14. Never use final OOP test data for feature selection or tuning.
-15. Cancelled records must be identified before generic missing-data logic.
-16. Multiple collection rows belonging to one Sales Invoice must not inflate Frequency or Monetary.
-17. Current numerical results must be computed from data, not hardcoded.
-18. Production authentication must cryptographically verify Supabase sessions and resolve database roles.
-19. Preview and COMMITTED are distinct import states; successful analytical runs are immutable and atomically published.
-20. Demo storage/database/authentication must remain visibly labeled and isolated from production data.
-21. Logical invoice identity must exclude import batch, worksheet, and source-row lineage.
-22. Routine imports score with the active validated CART artifact; retraining is a separate controlled action.
+1. Never hardcode the system lifetime, account list, Priority Groups, current results, or fixed RFM/Settlement weights.
+2. Inactivity Risk and Lower/Higher are not active constructs.
+3. The predictive target is 12-month Future Transaction versus No Future Transaction.
+4. Prediction never determines Final Priority Score, rank, or Priority Group.
+5. RFM is descriptive and is not the predictive target.
+6. Descriptive, predictive, and prescriptive branches remain separate.
+7. Power BI is reporting only.
+8. Future compatible data must work without redesign.
+9. Never automatically fuzzy-merge accounts.
+10. Never use post-cutoff evidence in predictive features or final OOP data for tuning.
+11. Identify cancelled records before generic missing-data logic.
+12. Multiple collection rows for one SI must not inflate Frequency or Monetary.
+13. Production authentication cryptographically verifies Supabase sessions and database roles.
+14. Preview and COMMITTED are distinct; successful analytical runs are immutable and atomically published.
+15. Demo persistence/authentication remains visibly isolated.
+16. Logical invoice identity excludes import batch, worksheet, and row lineage.
+17. Routine imports score only with the active hash-verified extra_trees_stage8 artifact; retraining is separate and controlled.
+18. Analysis reference date is explicit and must cover accepted SI and final CR evidence.
+19. Only explicitly verified B2B accounts enter the analytical population.

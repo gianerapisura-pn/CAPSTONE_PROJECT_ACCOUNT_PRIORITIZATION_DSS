@@ -29,7 +29,7 @@ export default function DashboardPage() {
     <PageState loading={loading} error={empty ? "" : error} empty={empty} onRetry={reload}>
       <>{data && <>
         <div className="report-meta" aria-label="Current decision context">
-          <span>Analysis cutoff <strong>{data.run.cutoff_date ?? "Unavailable"}</strong></span>
+          <span>Analysis reference <strong>{data.run.analysis_reference_date ?? "Unavailable"}</strong></span>
           <span>Last successful refresh <strong>{data.run.completed_at ? new Date(data.run.completed_at).toLocaleString() : "Unavailable"}</strong></span>
           <span>Latest run <strong className="mono">{data.run.analysis_run_id.slice(0, 12)}</strong></span>
         </div>
@@ -46,10 +46,10 @@ export default function DashboardPage() {
             <div className="compact-list">{groups.map(item => <Link href={"/accounts?priority_group=" + item.name} key={item.name}><div><strong>{item.name} Priority</strong><small>Recommended attention tier</small></div><span className="score">{item.value}</span></Link>)}</div>
           </div>
           <div className="data-section">
-            <div className="section-heading"><div><span className="eyebrow">Separate predictive context</span><h2>CART inactivity risk</h2></div><ShieldAlert /></div>
+            <div className="section-heading"><div><span className="eyebrow">Separate predictive context</span><h2>12-month Future Transaction class</h2></div><ShieldAlert /></div>
             <div className="compact-list">
-              <div><div><strong>Higher Inactivity Risk</strong><small>Supporting context only; not part of FPS</small></div><span className="score">{data.risk_counts.Higher ?? 0}</span></div>
-              <div><div><strong>Lower Inactivity Risk</strong><small>Separate from Priority Group</small></div><span className="score">{data.risk_counts.Lower ?? 0}</span></div>
+              <div><div><strong>Future Transaction</strong><small>Supporting class only; not part of FPS</small></div><span className="score">{data.prediction_class_counts["Future Transaction"] ?? 0}</span></div>
+              <div><div><strong>No Future Transaction</strong><small>Does not imply account closure</small></div><span className="score">{data.prediction_class_counts["No Future Transaction"] ?? 0}</span></div>
             </div>
           </div>
         </section>

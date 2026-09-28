@@ -30,7 +30,7 @@ export default function ReportsPage() {
     />
     <div className="report-meta" aria-label="Latest successful analysis">
       {dashboard ? <>
-        <span>Analysis cutoff <strong>{dashboard.run.cutoff_date ?? "Unavailable"}</strong></span>
+        <span>Analysis reference <strong>{dashboard.run.analysis_reference_date ?? "Unavailable"}</strong></span>
         <span>Latest run <strong className="mono">{dashboard.run.analysis_run_id.slice(0, 12)}</strong></span>
         <span>Last successful refresh <strong>{dashboard.run.completed_at ? new Date(dashboard.run.completed_at).toLocaleString() : "Unavailable"}</strong></span>
       </> : <span>Latest successful analysis metadata is not available yet.</span>}

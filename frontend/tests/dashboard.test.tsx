@@ -6,19 +6,19 @@ import type { DashboardData } from "@/types/dss";
 const data = {
   run: {
     analysis_run_id: "run-12345678",
-    cutoff_date: "2025-08-13",
-    started_at: "2025-08-13T00:00:00Z",
-    completed_at: "2025-08-13T00:00:02Z",
+    analysis_reference_date: "2026-09-21",
+    started_at: "2026-09-21T00:00:00Z",
+    completed_at: "2026-09-21T00:00:02Z",
     status: "successful",
     mcs_status: "available",
     critic_weights: {},
     warnings: [],
     duration_seconds: 2.25,
   },
-  total_standardized_accounts: 85,
-  mcs_eligible_accounts: 83,
-  priority_group_counts: { High: 28, Medium: 27, Low: 28 },
-  risk_counts: { Lower: 6, Higher: 79 },
+  total_standardized_accounts: 84,
+  mcs_eligible_accounts: 84,
+  priority_group_counts: { High: 28, Medium: 28, Low: 28 },
+  prediction_class_counts: { "Future Transaction": 0, "No Future Transaction": 84 },
   total_valid_historical_sales: 167467524.93,
   warnings: [],
   top_accounts: [{
@@ -39,14 +39,14 @@ vi.mock("@/lib/use-api", () => ({
 
 test("management overview keeps current decision context and a compact stability summary", () => {
   render(<DashboardPage />);
-  expect(screen.getByText("Analysis cutoff")).toBeInTheDocument();
-  expect(screen.getByText("2025-08-13")).toBeInTheDocument();
+  expect(screen.getByText("Analysis reference")).toBeInTheDocument();
+  expect(screen.getByText("2026-09-21")).toBeInTheDocument();
   expect(screen.getByText("Last successful refresh")).toBeInTheDocument();
   expect(screen.getByText("Current account profiles")).toBeInTheDocument();
-  expect(screen.getByText("85")).toBeInTheDocument();
-  expect(screen.getByText("83 ranked accounts")).toBeInTheDocument();
-  expect(screen.getByText("Higher Inactivity Risk")).toBeInTheDocument();
-  expect(screen.getByText("Lower Inactivity Risk")).toBeInTheDocument();
+  expect(screen.getAllByText("84")[0]).toBeInTheDocument();
+  expect(screen.getByText("84 ranked accounts")).toBeInTheDocument();
+  expect(screen.getByText("Future Transaction")).toBeInTheDocument();
+  expect(screen.getByText("No Future Transaction")).toBeInTheDocument();
   expect(screen.getByText("Top prioritized accounts")).toBeInTheDocument();
   expect(screen.getByText("ALPHA")).toBeInTheDocument();
   expect(screen.getByText("Minimum Spearman")).toBeInTheDocument();

@@ -1,5 +1,24 @@
 # Test Results
 
+## 2026-09 Final Locked Alignment
+
+The historical sections below are retained as superseded records and do not describe the active methodology.
+
+Latest verified local results:
+- Backend: 56 passed, 1 skipped. The skip is the authorized private RAW/account-master/frozen-artifact regression because its three paths were not configured.
+- Frontend unit/component: 30 passed.
+- Frontend typecheck, ESLint, and optimized production build: passed.
+- Playwright end-to-end controlled import/publication workflow: 1 passed.
+- Migration 009 contract and demo SQLite additive schema checks passed through automated tests.
+- Live Supabase migration/access, actual PBIX refresh/reconciliation, production-like later-year import, target timing, and role-based UAT were not executed and remain pending.
+
+Active method is 2026.09-final-locked with frozen `extra_trees_stage8`, explicit 2026-09-21 locked reference for the private baseline, verified-B2B filtering, 400 sensitivity scenarios, leave-one-out influence, and seven exact k/n backtests.
+
+---
+
+## Superseded Historical Results
+# Test Results
+
 ## Current execution: 2026-09-16 (final surgical hardening)
 
 Environment: Windows, Python 3.13.3, Node.js 24.11.1

@@ -61,7 +61,7 @@ test("administrator advanced navigation is collapsed by default and retains ever
 
   await user.click(toggle);
   expect(toggle).toHaveAttribute("aria-expanded", "true");
-  for (const link of ["Methodology & Governance", "RFM", "Settlement", "CART", "Sensitivity"]) {
+  for (const link of ["Methodology & Governance", "RFM", "Settlement", "Future Transaction", "Sensitivity"]) {
     expect(screen.getByRole("link", { name: link })).toBeInTheDocument();
   }
 });

@@ -7,7 +7,7 @@ vi.mock("@/lib/use-api", () => ({
     data: {
       run: {
         analysis_run_id: "run-1234567890",
-        cutoff_date: "2030-06-01",
+        analysis_reference_date: "2030-06-01",
         completed_at: "2030-06-01T12:00:00Z",
       },
       mcs_eligible_accounts: 3,
@@ -32,7 +32,7 @@ test("Detailed Analytics has a safe setup state, run context, and only the appro
   expect(screen.getByRole("heading", { name: "Account Prioritization" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /CSV/ })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /XLSX/ })).toBeInTheDocument();
-  expect(screen.queryByText("CART Inactivity Risk")).not.toBeInTheDocument();
+  expect(screen.queryByText("CART Transaction Class")).not.toBeInTheDocument();
   expect(screen.queryByText("Sensitivity Summary")).not.toBeInTheDocument();
   expect(screen.queryByText("Transaction History")).not.toBeInTheDocument();
   expect(screen.queryByText("Analysis Run Metadata")).not.toBeInTheDocument();

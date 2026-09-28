@@ -1,12 +1,7 @@
-# Authentication Setup
+﻿# Authentication Setup
 
-1. Create Supabase email/password users; do not add passwords to this repository.
-2. Insert one `user_profiles` row per Auth UUID with `administrator` or `management` and optional display name.
-3. Frontend: configure `NEXT_PUBLIC_SUPABASE_URL`, anon key, and `NEXT_PUBLIC_DEMO_MODE=false`.
-4. Backend: configure Supabase URL, backend-only service role, JWT audience/issuer, `DEMO_MODE=false`, and production CORS.
+Production uses Supabase Auth bearer sessions verified cryptographically by FastAPI against the configured issuer/audience. Application authorization resolves administrator or management from user_profiles; untrusted browser claims do not assign roles.
 
-Asymmetric JWTs are verified locally with Supabase JWKS, issuer, audience, expiry, and subject requirements. Legacy HS256 tokens are verified by the supported Auth user endpoint. A valid token without an approved profile role receives 403. Frontend route hiding is only presentation; backend dependencies enforce every operation.
+Administrator controls import, account context, runs, artifact governance, monitoring, alias review, and technical analytics. Management sees Overview, Account Prioritization/Detail, secure Detailed Analytics, and approved priority export.
 
-Administrator: import, commit/override, run/history, templates, methodology, technical analysis details, model governance, and audit-oriented actions. Management: Overview/dashboard, account prioritization/details, Detailed Analytics, and the approved account-prioritization export. Direct requests to administrator API routes receive 403.
-
-The `administrator` application role is a DSS permission and governance role. It does not automatically refer to PESLC's Office Administrator job position.
+Keep SUPABASE_SERVICE_ROLE_KEY backend-only. Configure only the public Supabase URL and anon key in Next.js. Demo authentication remains visibly labelled, isolated, and disabled in production.

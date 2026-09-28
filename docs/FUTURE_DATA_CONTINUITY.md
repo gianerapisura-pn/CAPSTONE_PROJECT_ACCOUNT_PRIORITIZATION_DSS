@@ -1,7 +1,11 @@
-# Future Data Continuity
+﻿# Future Data Continuity
 
-The initial historical years are data, not system limits. Years, accounts, cutoff, totals, weights, ranks, groups, and charts derive from committed records.
+No year, account list, group membership, or current numerical result is hardcoded in runtime analytics.
 
-The controlled 2030 fixture includes `New Future Account`, whose collection occurs after the current latest-valid-SI cutoff. The account therefore remains in the current RFM-based account universe while Average Settlement Days, MCS score, rank, group, contributions, and sensitivity are unavailable. It is displayed as Not ranked with a reason; a qualifying CART prediction may still appear independently.
+A future import is previewed and committed with an explicit reference date. New identities are preserved but do not enter analytics until an administrator verifies account context and marks B2B eligibility. This prevents personal or unknown accounts from being guessed into the population.
 
-Future compatible files follow the canonical ten-field schema beginning with `ACCOUNT NAMES`. `CUSTOMER NAME` is accepted only as a compatibility alias and cannot coexist ambiguously with `ACCOUNT NAMES`. A material schema change is rejected until a versioned mapping is reviewed. Partial or unsupported payment statuses remain traceable but analytics-ineligible. Account labels receive whitespace-only technical cleanup; no fuzzy merge occurs. The alias review register is currently non-transformative: decisions are audited but do not alter ETL processing or rewrite historical or future imported labels.
+Late collection rows reconstruct the same logical invoice and may add settlement evidence without increasing Frequency or Monetary. Exact duplicate files are audited no-ops. Differing SI amounts for the same account/SI/date are quarantined as controlled corrections.
+
+Routine runs score compatible accounts with the active frozen artifact and never retrain. Missing model/artifact compatibility produces an explicit unavailable prediction while descriptive and prescriptive branches remain usable.
+
+A production-like later-year + new-account end-to-end run remains an external validation action; the generic unit fixture does not prove live Supabase deployment.

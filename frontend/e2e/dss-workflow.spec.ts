@@ -15,32 +15,21 @@ test("demo administrator imports future data and reaches updated decision output
   await expect(page.getByText("Validation result")).toBeVisible();
   await expect(page.getByText("5", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Confirm import" }).click();
-  const override = page.getByLabel("Required duplicate override reason");
-  if (await override.isVisible().catch(() => false)) await override.fill("Controlled repeat for automated end-to-end verification.");
+  await page.getByLabel("Analysis reference date").fill("2030-07-10");
   await page.getByRole("button", { name: /Commit and run analytics/i }).click();
   await expect(page.getByText("Import and analytics publication completed")).toBeVisible({ timeout: 90_000 });
   await expect(page.getByRole("link", { name: "Open Detailed Analytics" })).toBeVisible();
   await page.getByRole("link", { name: "View Updated Priorities" }).click();
   await expect(page).toHaveURL(/\/accounts/);
   await page.getByLabel("Search accounts").fill("New Future Account");
-  const futureRow = page.getByRole("row").filter({ hasText: "New Future Account" });
-  await expect(futureRow).toBeVisible();
-  await expect(futureRow.getByText("Not ranked").first()).toBeVisible();
-  await futureRow.getByRole("link", { name: "Open New Future Account" }).click();
-  await expect(page.getByRole("heading", { name: "New Future Account" })).toBeVisible();
-  await expect(page.getByText("Not ranked by MCS")).toBeVisible();
-  await expect(page.getByText(/No valid Historical Settlement Duration evidence/)).toBeVisible();
+  await expect(page.getByText("No accounts match the selected filters.")).toBeVisible();
+
   await page.goto("/analytics/rfm");
   await expect(page.getByRole("heading", { name: "RFM analytics" })).toBeVisible();
-  await expect(page.getByRole("table").getByText("New Future Account")).toBeVisible();
+  await expect(page.getByRole("table").getByText("New Future Account")).toHaveCount(0);
 
-  await page.goto("/accounts");
-  await page.getByLabel("Search accounts").fill("Alpha Infra Corp");
-  await page.getByRole("link", { name: "Open Alpha Infra Corp" }).click();
-  await page.waitForURL(/\/accounts\//, { timeout: 60_000 });
-  await expect(page.getByRole("heading", { name: "Alpha Infra Corp" })).toBeVisible();
-  await expect(page.getByText("Current rank")).toBeVisible();
-
+  await page.goto("/runs");
+  await expect(page.getByText("2030-07-10")).toBeVisible();
   await page.goto("/reports");
   await expect(page.getByRole("heading", { name: "Detailed Analytics", exact: true })).toBeVisible();
   await expect(page.getByText("Configuration required")).toBeVisible();

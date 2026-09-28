@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
@@ -15,62 +15,70 @@ class AccountRFM:
     recency_days: int
     frequency: int
     monetary: Decimal
-    recency_score: int
-    frequency_score: int
-    monetary_score: int
-    rfm_score: float
+    r_score: int
+    f_score: int
+    m_score: int
+    rfm_code: str
+    rfm_mean_score: float
 
 
-def _tie_preserving_score(values: dict[str, float], higher_is_better: bool) -> dict[str, int]:
-    """Map account-level average percentile ranks to tie-preserving 1-5 bands."""
+def _quantile_scores(values: dict[str, float], higher_is_better: bool) -> dict[str, int]:
+    """Apply empirical q20/q40/q60/q80 thresholds with ties kept together."""
     if not values:
         return {}
-    series = pd.Series(values, dtype="float64")
-    if series.nunique(dropna=True) <= 1:
+    series = np.asarray(list(values.values()), dtype=float)
+    if np.all(series == series[0]):
         return {key: 3 for key in values}
-    percentiles = series.rank(method="average", pct=True, ascending=True)
-    if not higher_is_better:
-        percentiles = 1 - percentiles + (1 / len(series))
-    bands = np.ceil(percentiles * 5).clip(1, 5).astype(int)
-    return {str(key): int(score) for key, score in bands.items()}
+    thresholds = np.quantile(series, [0.20, 0.40, 0.60, 0.80], method="linear")
+
+    def score(value: float) -> int:
+        band = int(1 + sum(value > threshold for threshold in thresholds))
+        return band if higher_is_better else 6 - band
+
+    return {key: score(value) for key, value in values.items()}
 
 
-def compute_rfm(invoice_groups: list[InvoiceGroup], cutoff_date: pd.Timestamp | None = None) -> list[AccountRFM]:
-    eligible = [group for group in invoice_groups if group.rfm_eligible]
+def compute_rfm(
+    invoice_groups: list[InvoiceGroup],
+    analysis_reference_date: pd.Timestamp,
+    eligible_accounts: set[str] | None = None,
+) -> list[AccountRFM]:
+    reference = pd.Timestamp(analysis_reference_date)
+    eligible = [
+        group for group in invoice_groups
+        if group.rfm_eligible
+        and group.si_date <= reference
+        and (eligible_accounts is None or group.standardized_account_name in eligible_accounts)
+    ]
     if not eligible:
         return []
-    cutoff = cutoff_date or max(group.si_date for group in eligible)
     accounts = sorted({group.standardized_account_name for group in eligible})
     recency: dict[str, float] = {}
     frequency: dict[str, float] = {}
     monetary: dict[str, float] = {}
     monetary_decimal: dict[str, Decimal] = {}
     for account in accounts:
-        groups = [group for group in eligible if group.standardized_account_name == account and group.si_date <= cutoff]
-        if not groups:
-            continue
+        groups = [group for group in eligible if group.standardized_account_name == account]
         latest = max(group.si_date for group in groups)
         total = sum((group.si_amount for group in groups), Decimal("0"))
-        recency[account] = float((cutoff - latest).days)
+        recency[account] = float((reference - latest).days)
         frequency[account] = float(len(groups))
         monetary[account] = float(total)
         monetary_decimal[account] = total
-    r_scores = _tie_preserving_score(recency, higher_is_better=False)
-    f_scores = _tie_preserving_score(frequency, higher_is_better=True)
-    m_scores = _tie_preserving_score(monetary, higher_is_better=True)
-    results = []
-    for account in sorted(recency):
-        rfm_score = (r_scores[account] + f_scores[account] + m_scores[account]) / 3
-        results.append(
-            AccountRFM(
-                account=account,
-                recency_days=int(recency[account]),
-                frequency=int(frequency[account]),
-                monetary=monetary_decimal[account],
-                recency_score=r_scores[account],
-                frequency_score=f_scores[account],
-                monetary_score=m_scores[account],
-                rfm_score=rfm_score,
-            )
+    r_scores = _quantile_scores(recency, higher_is_better=False)
+    f_scores = _quantile_scores(frequency, higher_is_better=True)
+    m_scores = _quantile_scores(monetary, higher_is_better=True)
+    return [
+        AccountRFM(
+            account=account,
+            recency_days=int(recency[account]),
+            frequency=int(frequency[account]),
+            monetary=monetary_decimal[account],
+            r_score=r_scores[account],
+            f_score=f_scores[account],
+            m_score=m_scores[account],
+            rfm_code=f"{r_scores[account]}{f_scores[account]}{m_scores[account]}",
+            rfm_mean_score=(r_scores[account] + f_scores[account] + m_scores[account]) / 3,
         )
-    return results
+        for account in accounts
+    ]

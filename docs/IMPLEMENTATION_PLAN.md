@@ -1,7 +1,24 @@
-# Implementation Status
+﻿# Implementation Plan and Status
 
-The corrective and final-alignment plans have been implemented for analytics, persistence, authentication, APIs, role-aware UI, reporting views, automated tests, and future-data continuity. The Web DSS is the client front door; Python/FastAPI is the official ETL and analytical engine; Supabase is the central persistence/auth/storage backbone; and Power BI is the downstream Detailed Analytics layer.
+## Code complete locally
 
-The current repository contains eight forward migrations. Production activation must apply `001` through `008` in order, configure a real Supabase project, create Auth users and `administrator`/`management` profiles, create both private Storage buckets, upload/activate the validated CART artifact, and configure an approved secure Power BI organizational report URL.
+- Explicit analysis reference and B2B context.
+- Cumulative logical-invoice reconstruction, duplicate no-op, late CR handling, and cent tolerance.
+- Final RFM field/scoring contract.
+- Frozen Extra Trees registration, hash/version validation, scoring registry, and maturity monitoring without retraining.
+- Four-criterion CRITIC/MCS, 400 sensitivity scenarios, leave-one-out influence, and seven exact-baseline backtests.
+- Canonical API/UI terminology and role restrictions.
+- Forward-only migration 009 and final Power BI view/report specification.
+- Environment-gated private regression.
 
-Automated demo-mode backend, frontend, build, and browser workflows are verified in `TEST_RESULTS.md`. The confidential official workbook regression is implemented but remains pending unless `PESLC_OFFICIAL_RAW_PATH` is supplied. Real Supabase execution, Power BI authoring/refresh, and role-based UAT also remain external deployment checks. Credentials, the confidential workbook, and private model artifacts are intentionally absent from Git.
+## External evidence pending
+
+1. Apply migration 009 and validate production RLS/reader grants.
+2. Register the genuine authorized artifact.
+3. Load/verify the confirmed account master and official RAW baseline.
+4. Refresh and reconcile the actual PBIX against canonical views.
+5. Execute controlled later-year + new-account production-like import.
+6. Measure prioritized-list generation time in the target environment.
+7. Execute 6 User UAT and 8 System Validation cases with named testers/evidence.
+
+No external item is marked passed by local unit/build tests.

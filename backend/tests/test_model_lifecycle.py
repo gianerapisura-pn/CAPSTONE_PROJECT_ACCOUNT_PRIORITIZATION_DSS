@@ -1,151 +1,93 @@
+﻿from datetime import date
 from decimal import Decimal
 from hashlib import sha256
-from types import SimpleNamespace
-
+import joblib
 import pandas as pd
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-
-from app.analytics.predictive.cart import CartResult
-from app.db.models import Base, PredictiveModelVersion, PredictiveMonitoringEvaluation
-from app.etl.invoices import SourceRow, group_invoices
+from app.analytics.predictive.future_transaction import FEATURE_COLUMNS, NO_FUTURE_TRANSACTION
+from app.core.analytics_config import AnalyticsConfig, DEFAULT_ANALYTICS_CONFIG
+from app.db.models import Base, DimAccount, FutureTransactionPrediction, PredictiveModelVersion
+from app.etl.invoices import InvoiceGroup
 from app.services import model_lifecycle
 
 
-def invoice_groups():
-    return group_invoices([SourceRow(
-        customer_name_raw="A", standardized_account_name="A", si_no="SI-1",
-        si_date=pd.Timestamp("2030-01-01"), si_amount=Decimal("100"),
-        cr_no="CR-1", cr_date=pd.Timestamp("2030-01-02"),
-        cr_amount=Decimal("100"), ewt=Decimal("0"), payment_mode="Bank",
-        payment_status_raw="Fully Paid", payment_status="Fully Paid",
-        is_cancelled=False,
-    )])
+class DummyModel:
+    def predict(self, frame):
+        return [0] * len(frame)
 
 
-def active_record():
-    return PredictiveModelVersion(
-        model_version="cart-frozen-1", status="active", retained_features=["recency_days"],
-        preprocessing_config={}, tree_hyperparameters={}, development_metrics={},
-        oop_metrics={}, artifact_path="private/model.joblib", artifact_hash="hash",
-    )
+def group():
+    return InvoiceGroup(
+        invoice_group_id="g", standardized_account_name="A", si_no="1",
+        si_date=pd.Timestamp("2020-01-01"), si_amount=Decimal("100"),
+        payment_status="Fully Paid", final_cr_date=pd.Timestamp("2020-01-10"),
+        total_cr_amount=Decimal("100"), reconciliation_amount=Decimal("100"),
+        reconciliation_difference=Decimal("0"), reconciled=True)
 
 
-def test_active_artifact_hash_mismatch_is_rejected(monkeypatch):
-    record = active_record()
-    record.artifact_hash = sha256(b"expected artifact").hexdigest()
-    monkeypatch.setattr(
-        model_lifecycle,
-        "ModelStorage",
-        lambda: SimpleNamespace(get=lambda _: b"tampered artifact"),
-    )
-    with pytest.raises(ValueError, match="hash verification failed"):
-        model_lifecycle._load_artifact(record)
-
-
-def test_current_scoring_uses_active_model_without_retraining(monkeypatch):
-    engine = create_engine("sqlite+pysqlite:///:memory:")
+@pytest.fixture
+def db():
+    engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    expected = CartResult("Validated", 6, ["recency_days"], {}, {"A": "Lower"}, model_version="cart-frozen-1")
-    with Session(engine) as db:
-        db.add(active_record())
-        db.commit()
-        monkeypatch.setattr(model_lifecycle, "_load_artifact", lambda _: {"frozen": True})
-        monkeypatch.setattr(model_lifecycle, "score_cart_artifact", lambda groups, artifact: expected)
-        monkeypatch.setattr(
-            model_lifecycle, "train_and_persist_model",
-            lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected retraining")),
-        )
-        assert model_lifecycle.cart_for_current_run(db, invoice_groups()) == expected
+    with Session(engine) as session:
+        yield session
 
 
-def test_artifact_failure_flags_review_without_automatic_retraining(monkeypatch):
-    engine = create_engine("sqlite+pysqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    with Session(engine) as db:
-        record = active_record()
-        db.add(record)
-        db.commit()
-        monkeypatch.setattr(model_lifecycle, "_load_artifact", lambda _: (_ for _ in ()).throw(ValueError("bad artifact")))
-        monkeypatch.setattr(
-            model_lifecycle, "train_and_persist_model",
-            lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected retraining")),
-        )
-        result = model_lifecycle.cart_for_current_run(db, invoice_groups())
-        assert result.status == "model_unavailable"
-        assert record.review_recommended
+def test_wrong_artifact_hash_is_rejected_before_storage(db, tmp_path):
+    path = tmp_path / "wrong.joblib"
+    joblib.dump({"model": DummyModel(), "feature_columns": list(FEATURE_COLUMNS)}, path)
+    with pytest.raises(ValueError, match="SHA-256 mismatch"):
+        model_lifecycle.register_frozen_model(db, path)
 
 
-def test_incomplete_monitoring_window_is_persisted_without_retraining(monkeypatch):
-    engine = create_engine("sqlite+pysqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    with Session(engine) as db:
-        record = active_record()
-        record.trained_through_date = pd.Timestamp("2030-01-01").date()
-        record.selected_outcome_horizon = 12
-        db.add(record)
-        db.commit()
-        monkeypatch.setattr(
-            model_lifecycle, "train_and_persist_model",
-            lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected retraining")),
-        )
-        result = model_lifecycle.monitor_active_model(db, invoice_groups())
-        db.flush()
-        assert result["status"] == "insufficient_outcome_coverage"
-        assert db.query(PredictiveMonitoringEvaluation).count() == 1
-        assert not record.review_recommended
+def test_registration_validates_exact_hash_version_and_metadata(db, tmp_path, monkeypatch):
+    path = tmp_path / "model.joblib"
+    joblib.dump({
+        "model": DummyModel(), "feature_columns": list(FEATURE_COLUMNS),
+        "model_version": "extra_trees_stage8",
+        "model_family": "Extra Trees Classifier",
+        "validation_report": {"macro_f1": .8},
+    }, path)
+    digest = sha256(path.read_bytes()).hexdigest()
+    config = AnalyticsConfig(model_sha256=digest)
+    monkeypatch.setattr(model_lifecycle.sklearn, "__version__", "1.8.0")
+    monkeypatch.setattr(model_lifecycle.ModelStorage, "put",
+                        lambda self, version, content: "private/model.joblib")
+    record = model_lifecycle.register_frozen_model(db, path, config)
+    assert record.model_version == "extra_trees_stage8"
+    assert record.model_family == "Extra Trees Classifier"
+    assert record.artifact_hash == digest
+    assert record.retained_features == list(FEATURE_COLUMNS)
+    assert record.decision_threshold == .5
 
 
-def test_no_active_model_returns_unavailable_without_training(monkeypatch):
-    engine = create_engine("sqlite+pysqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    with Session(engine) as db:
-        monkeypatch.setattr(
-            model_lifecycle, "train_and_persist_model",
-            lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected training")),
-        )
-        result = model_lifecycle.cart_for_current_run(db, invoice_groups())
-        assert result.status == "model_unavailable"
-        assert result.predictions == {}
+def test_current_scoring_does_not_train(db, monkeypatch):
+    db.add(PredictiveModelVersion(
+        model_version=DEFAULT_ANALYTICS_CONFIG.model_version,
+        model_family=DEFAULT_ANALYTICS_CONFIG.model_family,
+        status="active", artifact_hash=DEFAULT_ANALYTICS_CONFIG.model_sha256))
+    db.commit()
+    monkeypatch.setattr(model_lifecycle, "_load_artifact",
+                        lambda record, config: {
+                            "model": DummyModel(),
+                            "feature_columns": list(FEATURE_COLUMNS)})
+    result = model_lifecycle.future_transaction_for_current_run(
+        db, [group()], pd.Timestamp("2020-12-31"), {"A"})
+    assert result.predictions == {"A": NO_FUTURE_TRANSACTION}
 
 
-def test_training_uses_exact_configured_version_and_rejects_duplicate(monkeypatch):
-    from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
-
-    engine = create_engine("sqlite+pysqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    calls = {"training": 0}
-
-    def trained_result(*args, **kwargs):
-        calls["training"] += 1
-        return (
-            CartResult(
-                status="Validated",
-                outcome_window_months=12,
-                feature_columns=["recency_days"],
-                report={"macro_f1": 0.8},
-                predictions={},
-                development_periods=list(DEFAULT_ANALYTICS_CONFIG.cart_development_cutoffs),
-                oop_period=DEFAULT_ANALYTICS_CONFIG.cart_oop_cutoff,
-                hyperparameters={"max_depth": 3},
-            ),
-            {"imputation_values": {"recency_days": 0}},
-        )
-
-    monkeypatch.setattr(model_lifecycle, "run_cart_analysis", trained_result)
-    monkeypatch.setattr(
-        model_lifecycle,
-        "ModelStorage",
-        lambda: SimpleNamespace(put=lambda version, content: f"private/{version}.joblib"),
-    )
-    with Session(engine) as db:
-        result = model_lifecycle.train_and_persist_model(db, invoice_groups())
-        db.flush()
-        record = db.query(PredictiveModelVersion).one()
-        assert result.model_version == DEFAULT_ANALYTICS_CONFIG.cart_model_version
-        assert record.model_version == DEFAULT_ANALYTICS_CONFIG.cart_model_version
-        assert record.trained_through_date == pd.Timestamp("2030-01-01").date()
-        with pytest.raises(ValueError, match="already exists"):
-            model_lifecycle.train_and_persist_model(db, invoice_groups())
-        assert calls["training"] == 1
+def test_monitoring_stays_pending_until_window_matures(db):
+    account = DimAccount(standardized_account_name="A", display_name="A",
+                         b2b_priority_eligible=True)
+    db.add(account); db.flush()
+    db.add(FutureTransactionPrediction(
+        analysis_run_id="00000000-0000-4000-8000-000000000010",
+        account_key=account.account_key, model_version="extra_trees_stage8",
+        cutoff_date=date(2026, 9, 21), future_window_end=date(2027, 9, 21),
+        predicted_class=NO_FUTURE_TRANSACTION))
+    db.commit()
+    result = model_lifecycle.monitor_registered_predictions(
+        db, [group()], date(2027, 9, 20))
+    assert result == {"status": "pending", "matured": 0, "pending": 1, "metrics": {}}

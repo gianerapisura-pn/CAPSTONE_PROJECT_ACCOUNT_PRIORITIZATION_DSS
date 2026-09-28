@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import pandas as pd
 
 from app.etl.invoices import dataframe_to_source_rows, group_invoices
 from app.imports.validators import parse_source_file, validate_rows
@@ -17,7 +18,10 @@ def test_future_year_and_new_account_import_pipeline():
     groups = group_invoices(rows)
     assert any(group.si_date.year == 2030 for group in groups)
     assert any(group.standardized_account_name == "New Future Account" for group in groups)
-    result = run_account_prioritization(groups)
+    result = run_account_prioritization(
+        groups, pd.Timestamp("2030-12-31"),
+        {group.standardized_account_name for group in groups},
+    )
     assert result.status == "successful"
 
 

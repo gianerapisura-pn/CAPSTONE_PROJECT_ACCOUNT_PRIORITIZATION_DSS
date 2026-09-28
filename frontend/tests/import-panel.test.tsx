@@ -48,7 +48,7 @@ test("successful import shows warnings and clear next actions", async () => {
       status: "COMMITTED",
       analysis_run_id: "run-123",
       prioritized_accounts: 3,
-      cutoff_date: "2030-06-01",
+      analysis_reference_date: "2030-06-01",
       warnings: ["Predictive context is unavailable for this run."],
     });
   const user = userEvent.setup();
@@ -60,6 +60,7 @@ test("successful import shows warnings and clear next actions", async () => {
   expect(screen.getByText("Worksheets")).toBeInTheDocument();
   expect(screen.getByText("cancelled row rate")).toBeInTheDocument();
   await user.click(await screen.findByRole("button", { name: "Confirm import" }));
+  await user.type(screen.getByLabelText("Analysis reference date"), "2030-06-01");
   await user.click(screen.getByRole("button", { name: /Commit and run analytics/i }));
 
   expect(await screen.findByText("Import and analytics publication completed")).toBeInTheDocument();

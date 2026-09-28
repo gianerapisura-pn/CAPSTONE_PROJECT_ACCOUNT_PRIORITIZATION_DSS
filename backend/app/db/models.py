@@ -47,6 +47,7 @@ class ImportBatch(Base):
     storage_path: Mapped[str | None] = mapped_column(Text)
     override_reason: Mapped[str | None] = mapped_column(Text)
     analysis_run_id: Mapped[str | None] = mapped_column(UUID_STRING)
+    analysis_reference_date: Mapped[datetime | None] = mapped_column(Date)
 
 
 class ImportRowIssue(Base):
@@ -86,6 +87,12 @@ class DimAccount(Base):
     account_key: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     standardized_account_name: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(255))
+    entity_type: Mapped[str | None] = mapped_column(String(80))
+    business_category: Mapped[str | None] = mapped_column(String(160))
+    primary_business_type: Mapped[str | None] = mapped_column(String(160))
+    b2b_priority_eligible: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    account_status: Mapped[str | None] = mapped_column(String(80))
+    last_verified: Mapped[datetime | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
@@ -148,6 +155,10 @@ class AnalyticsRun(Base):
     __tablename__ = "analytics_runs"
     analysis_run_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     cutoff_date: Mapped[datetime | None] = mapped_column(Date)
+    analysis_reference_date: Mapped[datetime | None] = mapped_column(Date)
+    latest_valid_si_date: Mapped[datetime | None] = mapped_column(Date)
+    latest_final_cr_date: Mapped[datetime | None] = mapped_column(Date)
+    methodology_version: Mapped[str | None] = mapped_column(String(80))
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     latest_import_batch_id: Mapped[str | None] = mapped_column(UUID_STRING)
@@ -207,6 +218,11 @@ class PredictiveModelVersion(Base):
     __tablename__ = "predictive_model_versions"
     predictive_model_version_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
     model_version: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    model_family: Mapped[str | None] = mapped_column(String(120))
+    model_parameters: Mapped[dict] = mapped_column(JSON, default=dict)
+    target_definition: Mapped[str | None] = mapped_column(Text)
+    primary_selection_metric: Mapped[str | None] = mapped_column(String(120))
+    decision_threshold: Mapped[float | None] = mapped_column(Float)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     status: Mapped[str] = mapped_column(String(40), index=True)
     trained_through_date: Mapped[datetime | None] = mapped_column(Date)
@@ -271,6 +287,40 @@ class PredictiveOOPEvaluation(Base):
     oop_cutoff: Mapped[datetime | None] = mapped_column(Date)
     payload: Mapped[dict] = mapped_column(JSON)
 
+
+class FutureTransactionPrediction(Base):
+    __tablename__ = "future_transaction_predictions"
+    future_transaction_prediction_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
+    analysis_run_id: Mapped[str] = mapped_column(ForeignKey("analytics_runs.analysis_run_id"), index=True)
+    account_key: Mapped[str] = mapped_column(ForeignKey("dim_account.account_key"), index=True)
+    model_version: Mapped[str] = mapped_column(String(120), index=True)
+    cutoff_date: Mapped[datetime] = mapped_column(Date)
+    future_window_end: Mapped[datetime] = mapped_column(Date)
+    predicted_class: Mapped[str] = mapped_column(String(40))
+    matured: Mapped[bool] = mapped_column(Boolean, default=False)
+    actual_class: Mapped[str | None] = mapped_column(String(40))
+    correct: Mapped[bool | None] = mapped_column(Boolean)
+    evaluated_on: Mapped[datetime | None] = mapped_column(Date)
+    monitoring_status: Mapped[str] = mapped_column(String(60), default="Pending")
+
+
+class CriticInfluenceRecord(Base):
+    __tablename__ = "critic_influence_results"
+    critic_influence_result_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
+    analysis_run_id: Mapped[str] = mapped_column(ForeignKey("analytics_runs.analysis_run_id"), index=True)
+    removed_account_key: Mapped[str] = mapped_column(ForeignKey("dim_account.account_key"), index=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+
+
+class PredictiveBenchmarkRecord(Base):
+    __tablename__ = "predictive_model_benchmarks"
+    predictive_model_benchmark_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
+    predictive_model_version_id: Mapped[str] = mapped_column(
+        ForeignKey("predictive_model_versions.predictive_model_version_id"), index=True
+    )
+    benchmark_scope: Mapped[str] = mapped_column(String(40))
+    model_name: Mapped[str] = mapped_column(String(120))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
 
 class SensitivitySummaryRecord(Base):
     __tablename__ = "sensitivity_results"

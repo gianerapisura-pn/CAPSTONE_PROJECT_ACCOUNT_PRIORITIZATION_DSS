@@ -14,8 +14,9 @@ type Detail = {
   decision: AccountDecisionRow;
   priority: AccountDecisionRow | null;
   rfm: Evidence | null;
-  settlement: Evidence;
-  cart: { predicted_inactivity_risk: string | null; model_version: string | null };
+  settlement: Evidence | null;
+  context: Evidence;
+  predictive: { predicted_future_transaction_class: string | null; model_version: string | null };
   critic_weights: Record<string, number>;
   sensitivity: { minimum_rank: number; maximum_rank: number; group_movement_rate: number } | null;
   transactions: Evidence[];
@@ -40,17 +41,17 @@ export default function AccountDetailsPage() {
           <div><span>Current rank</span><strong>{p ? `#${p.priority_rank}` : "Not ranked"}</strong></div>
           <div><span>Priority Group</span><Badge tone={p?.priority_group || "neutral"}>{p?.priority_group || "Not applicable"}</Badge></div>
           <div><span>Final Priority Score</span><strong>{fixed(p?.final_priority_score)}</strong></div>
-          <div><span>Predicted Inactivity Risk</span><Badge tone={data.cart.predicted_inactivity_risk === "Lower" ? "positive" : data.cart.predicted_inactivity_risk ? "warning" : "neutral"}>{data.cart.predicted_inactivity_risk || "Unavailable"}</Badge></div>
+          <div><span>12-Month Transaction Class</span><Badge tone={data.predictive.predicted_future_transaction_class === "Future Transaction" ? "positive" : data.predictive.predicted_future_transaction_class ? "warning" : "neutral"}>{data.predictive.predicted_future_transaction_class || "Unavailable"}</Badge></div>
           <div><span>Latest valid SI</span><strong className="small-value">{d.latest_valid_si_date || "Unavailable"}</strong></div>
         </section>
         <section className="detail-grid">
           <div className="data-section">
             <div className="section-heading"><h2><Calculator />RFM profile</h2><span>Descriptive</span></div>
             <dl className="method-facts">
-              <div><dt>Recency</dt><dd>{rfm?.recency_days ?? "N/A"} days / score {rfm?.recency_score ?? "N/A"}</dd></div>
-              <div><dt>Frequency</dt><dd>{rfm?.frequency ?? "N/A"} invoices / score {rfm?.frequency_score ?? "N/A"}</dd></div>
-              <div><dt>Monetary</dt><dd>{rfm?.monetary == null ? "N/A" : currency.format(Number(rfm.monetary))} / score {rfm?.monetary_score ?? "N/A"}</dd></div>
-              <div><dt>RFM Score</dt><dd>{rfm?.rfm_score == null ? "N/A" : Number(rfm.rfm_score).toFixed(2)}</dd></div>
+              <div><dt>Recency</dt><dd>{rfm?.recency_days ?? "N/A"} days / score {rfm?.r_score ?? "N/A"}</dd></div>
+              <div><dt>Frequency</dt><dd>{rfm?.frequency ?? "N/A"} invoices / score {rfm?.f_score ?? "N/A"}</dd></div>
+              <div><dt>Monetary</dt><dd>{rfm?.monetary == null ? "N/A" : currency.format(Number(rfm.monetary))} / score {rfm?.m_score ?? "N/A"}</dd></div>
+              <div><dt>RFM mean score</dt><dd>{rfm?.rfm_mean_score == null ? "N/A" : Number(rfm.rfm_mean_score).toFixed(2)}</dd></div>
             </dl>
           </div>
           <div className="data-section">
@@ -77,12 +78,12 @@ export default function AccountDetailsPage() {
           <div className="data-section">
             <div className="section-heading"><h2><Activity />Predictive and stability</h2><span>Supporting context</span></div>
             <dl className="method-facts">
-              <div><dt>CART output</dt><dd>{data.cart.predicted_inactivity_risk || "Unavailable"}</dd></div>
-              <div><dt>Model version</dt><dd>{data.cart.model_version || "Unavailable"}</dd></div>
+              <div><dt>12-month class</dt><dd>{data.predictive.predicted_future_transaction_class || "Unavailable"}</dd></div>
+              <div><dt>Model version</dt><dd>{data.predictive.model_version || "Unavailable"}</dd></div>
               <div><dt>Scenario rank range</dt><dd>{data.sensitivity ? `${data.sensitivity.minimum_rank}-${data.sensitivity.maximum_rank}` : "N/A"}</dd></div>
               <div><dt>Group movement rate</dt><dd>{data.sensitivity ? `${(data.sensitivity.group_movement_rate * 100).toFixed(1)}%` : "N/A"}</dd></div>
             </dl>
-            <p className="fine-print">Predicted Inactivity Risk does not claim permanent churn and does not determine the Final Priority Score.</p>
+            <p className="fine-print">12-Month Transaction Class does not claim permanent churn and does not determine the Final Priority Score.</p>
           </div>
         </section>
         <section className="data-section">

@@ -1,34 +1,21 @@
-# Data Dictionary
+﻿# Data Dictionary
 
-## Source
+- import_batches: preview/commit metadata, source SHA-256, explicit analysis reference, and published run link.
+- raw_source_rows: immutable source evidence and canonical payload.
+- invoice_groups: current cumulative logical-invoice materialization; identity excludes import lineage.
+- invoice_group_rows: raw-to-logical lineage.
+- dim_account: canonical identity plus entity type, business category, primary business type, explicit B2B eligibility, status, and verification date.
+- analytics_runs: immutable run status, explicit reference, latest accepted SI/final CR, methodology version, weights, configuration, warnings, and model version.
+- fact_account_rfm: Recency/Frequency/Monetary plus r_score, f_score, m_score, rfm_code, and rfm_mean_score.
+- fact_historical_settlement: count, average duration, and maximum final collection duration.
+- account_priority_results: four normalized criteria, four contributions, FPS, tied rank/group, separate categorical Future Transaction class, and model version.
+- model_runs: run-linked categorical predictive output.
+- predictive_model_versions: frozen artifact family, parameters, target, primary metric, threshold, exact features, artifact path/hash, and validation metadata.
+- future_transaction_predictions: prediction registry, 12-month maturity date, actual class, correctness, and monitoring status.
+- predictive_horizon_evaluations, predictive_model_benchmarks, predictive_oop_evaluations: persisted model-selection evidence.
+- sensitivity_results and fact_sensitivity_analysis: four summary ranges and account/scenario detail.
+- critic_influence_results: leave-one-account-out CRITIC recomputation.
+- ranking_backtests: seven annual exact-baseline evaluations.
+- business_baseline_results: annual valid sales, invoice count, transacting-account count, and partial-year flag.
 
-`ACCOUNT NAMES`, `SI NO.`, `SI DATE`, `SI AMOUNT`, `CR NO.`, `CR DATE`, `CR AMOUNT`, `EWT`, `PAYMENT MODE`, and `PAYMENT STATUS` are preserved in canonical raw payloads. `CUSTOMER NAME` is accepted only as an input compatibility alias and is immediately canonicalized. Identifiers are text; money is parsed with Decimal semantics. Blank collection amounts remain nullable and distinct from explicitly recorded zero through the typed source representation; grouped totals safely aggregate only numeric contributions. `source_sheet`, `source_row_number`, `import_batch_id`, `file_hash`, and private `storage_path` provide lineage.
-
-## Core dimensions and facts
-
-- `dim_account`: stable account key and conservative standardized/display names.
-- `invoice_groups` / `fact_account_transactions`: one logical invoice, final CR date, reconciliation, eligibility, and review reason.
-- `fact_account_rfm`: Recency/Frequency/Monetary values, component scores, and RFM Score by run/account.
-- `fact_historical_settlement`: eligible invoice count and account average duration.
-- `account_priority_results` / `fact_account_priority`: four raw criteria, four normalized criteria, four contributions, descriptive RFM Score, CRITIC/MCS score, tied rank/group, latest valid SI, and separate predicted risk context. Migration `007` bases the latest reporting account universe on all current RFM results and left-joins nullable MCS and independent CART evidence. Migration `006` exposes `latest_valid_si_date`, settlement invoice count, four canonical weights/contributions, and `predicted_inactivity_risk` without denormalizing physical storage. Migration `008` adds certified latest-successful views for business baseline, RFM, Settlement, CRITIC, sensitivity, backtesting, and CART validation tied to the model version used by the published run.
-- `model_runs`: CART configuration, temporal periods, feature evidence, OOP metrics, confusion matrix, and predictions.
-- `predictive_model_versions`: active/retired artifact version, private path
-  and hash, frozen features/preprocessing/tree settings, OOP metrics, validation
-  date, and review flag.
-- `predictive_horizon_evaluations`, `predictive_feature_decisions`, and
-  `predictive_oop_evaluations`: focused evidence tied to one model version. The
-  certified CART validation views expose persisted OOP `macro_f1`, per-class
-  precision/recall/F1/support, and `majority_baseline_macro_f1` without SQL or
-  Power BI recalculation.
-- `predictive_monitoring_evaluations`: future validation/review evidence; it
-  does not authorize automatic retraining.
-- `fact_sensitivity_analysis`: one account result per perturbation range/iteration with analysis date, scenario key, four perturbed weights, canonical `rank_change`, and the iteration Spearman correlation.
-- `ranking_backtests`: one payload containing all six fixed historical cutoff evaluations; the certified reporting view expands one row per cutoff.
-- `business_baseline_results`: annual dynamic sales/account context.
-
-## Operational
-
-`user_profiles`, `import_batches`, `import_row_issues`, `raw_source_rows`,
-`invoice_group_rows`, `account_aliases`, `account_alias_review`,
-`analytics_runs`, and `audit_log` support roles, controlled imports,
-immutable publication, manual review, and source-to-invoice traceability.
+Migration 009 defines the canonical Power BI views listed in docs/POWER_BI_SETUP.md.

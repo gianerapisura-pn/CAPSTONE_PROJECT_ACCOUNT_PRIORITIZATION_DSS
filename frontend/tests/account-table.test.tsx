@@ -5,8 +5,8 @@ import { AccountPriorityTable } from "@/components/account-priority-table";
 import type { AccountDecisionRow } from "@/types/dss";
 
 const base = {
-  account_key: "key", analysis_run_id: "run-12345678", analysis_cutoff: "2030-06-10",
-  rfm_score: 4, average_settlement_days: 20, settlement_invoice_count: 2,
+  account_key: "key", display_name: "Account", entity_type: "Business", business_category: "Corporate", primary_business_type: "Developer", b2b_priority_eligible: true, account_status: "Verified", last_verified: "2030-01-01", analysis_run_id: "run-12345678", analysis_reference_date: "2030-06-10",
+  rfm_mean_score: 4, rfm_code: "543", average_settlement_days: 20, settlement_invoice_count: 2,
   valid_settlement_record_count: 2, normalized_recency: .8, normalized_frequency: .7,
   normalized_monetary: .6, normalized_settlement: .7, recency_contribution: .2,
   frequency_contribution: .2, monetary_contribution: .2, settlement_contribution: .2,
@@ -14,13 +14,13 @@ const base = {
   recency_days: 10, frequency_count: 3, monetary_value: 1000,
   baseline_recency_weight: .25, baseline_frequency_weight: .25,
   baseline_monetary_weight: .25, baseline_settlement_weight: .25,
-  recency_score: 5, frequency_score: 4, monetary_score: 3,
-  mcs_eligible: true, mcs_eligibility_reason: null, model_version: "cart-v3",
+  r_score: 5, f_score: 4, m_score: 3,
+  mcs_eligible: true, mcs_eligibility_reason: null, model_version: "extra_trees_stage8",
 };
 const rows: AccountDecisionRow[] = [
-  { ...base, account: "ALPHA", account_key: "a", priority_rank: 1, priority_group: "High", final_priority_score: .9, predicted_inactivity_risk: "Lower" },
-  { ...base, account: "BETA", account_key: "b", priority_rank: 2, priority_group: "Low", final_priority_score: .4, predicted_inactivity_risk: "Higher" },
-  { ...base, account: "NEW FUTURE", account_key: "c", priority_rank: null, priority_group: null, final_priority_score: null, predicted_inactivity_risk: "Higher", average_settlement_days: null, settlement_invoice_count: 0, valid_settlement_record_count: 0, mcs_eligible: false, mcs_eligibility_reason: "No valid settlement evidence.", normalized_recency: null, normalized_frequency: null, normalized_monetary: null, normalized_settlement: null, recency_contribution: null, frequency_contribution: null, monetary_contribution: null, settlement_contribution: null },
+  { ...base, account: "ALPHA", account_key: "a", priority_rank: 1, priority_group: "High", final_priority_score: .9, predicted_future_transaction_class: "Future Transaction" },
+  { ...base, account: "BETA", account_key: "b", priority_rank: 2, priority_group: "Low", final_priority_score: .4, predicted_future_transaction_class: "No Future Transaction" },
+  { ...base, account: "NEW FUTURE", account_key: "c", priority_rank: null, priority_group: null, final_priority_score: null, predicted_future_transaction_class: "No Future Transaction", average_settlement_days: null, settlement_invoice_count: 0, valid_settlement_record_count: 0, mcs_eligible: false, mcs_eligibility_reason: "No valid settlement evidence.", normalized_recency: null, normalized_frequency: null, normalized_monetary: null, normalized_settlement: null, recency_contribution: null, frequency_contribution: null, monetary_contribution: null, settlement_contribution: null },
 ];
 
 vi.mock("@/lib/use-api", () => ({
@@ -34,7 +34,7 @@ vi.mock("@/lib/use-api", () => ({
     const eligibility = params.get("eligibility");
     if (eligibility === "ranked") filtered = filtered.filter(row => row.mcs_eligible);
     if (eligibility === "not_ranked") filtered = filtered.filter(row => !row.mcs_eligible);
-    return { data: { items: filtered, total: filtered.length, page: 1, page_size: 15, analysis_run_id: "run-12345678", analysis_cutoff: "2030-06-10", updated_at: "2030-06-10T00:00:00Z" }, error: "", loading: false, reload: vi.fn() };
+    return { data: { items: filtered, total: filtered.length, page: 1, page_size: 15, analysis_run_id: "run-12345678", analysis_reference_date: "2030-06-10", updated_at: "2030-06-10T00:00:00Z" }, error: "", loading: false, reload: vi.fn() };
   },
 }));
 
@@ -43,7 +43,7 @@ test("search and priority filters operate on the unified API account data", asyn
   render(<AccountPriorityTable />);
   expect(screen.getByText("ALPHA")).toBeInTheDocument();
   expect(screen.getByText("NEW FUTURE")).toBeInTheDocument();
-  expect(screen.getByText("Analysis cutoff")).toBeInTheDocument();
+  expect(screen.getByText("Analysis reference")).toBeInTheDocument();
   expect(screen.getByText("2030-06-10")).toBeInTheDocument();
   expect(screen.getByText("Last successful refresh")).toBeInTheDocument();
   await user.type(screen.getByLabelText("Search accounts"), "beta");
@@ -72,10 +72,10 @@ test("unranked accounts retain RFM context and show null MCS values truthfully",
   expect(screen.getAllByText("N/A").length).toBeGreaterThan(0);
 });
 
-test("priority group and inactivity risk remain visibly separate columns", () => {
+test("priority group and transaction class remain visibly separate columns", () => {
   render(<AccountPriorityTable />);
   expect(screen.getByRole("columnheader", { name: "Priority" })).toBeInTheDocument();
-  expect(screen.getByRole("columnheader", { name: "Predicted inactivity risk" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "12-Month Transaction Class" })).toBeInTheDocument();
   expect(screen.getByRole("columnheader", { name: "Recency" })).toBeInTheDocument();
   expect(screen.queryByRole("columnheader", { name: "Normalized RFM" })).not.toBeInTheDocument();
 });

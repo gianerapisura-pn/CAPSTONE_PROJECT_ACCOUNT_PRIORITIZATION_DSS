@@ -7,7 +7,7 @@ vi.mock("@/lib/use-api", () => ({
     data: [
       {
         analysis_run_id: "missing-weights",
-        cutoff_date: "2030-01-01",
+        analysis_reference_date: "2030-01-01",
         started_at: "2030-01-01T00:00:00Z",
         completed_at: "2030-01-01T00:00:01Z",
         status: "successful",
@@ -18,7 +18,7 @@ vi.mock("@/lib/use-api", () => ({
       },
       {
         analysis_run_id: "zero-weight",
-        cutoff_date: "2030-01-02",
+        analysis_reference_date: "2030-01-02",
         started_at: "2030-01-02T00:00:00Z",
         completed_at: "2030-01-02T00:00:01Z",
         status: "successful",
