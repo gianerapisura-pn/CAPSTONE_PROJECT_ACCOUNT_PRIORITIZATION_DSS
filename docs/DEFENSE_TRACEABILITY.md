@@ -3,7 +3,7 @@
 | Capstone need | System evidence | Boundary |
 |---|---|---|
 | Historical account profile | RFM and Settlement pages/views | Descriptive only |
-| Future transaction context | Frozen Extra Trees page/view | Categorical, separate from FPS |
+| Future transaction context | Frozen Extra Trees study page/view | Fixed 2025-12-31 origin, Jan-Dec 2026 SI target, categorical and separate from FPS |
 | Management prioritization | Account list/detail | Four-criterion CRITIC/MCS |
 | Robustness | Sensitivity, leave-one-out, and supplementary comparator views | No alternative MCDM method is deployed operationally |
 | Historical usefulness | Seven backtest rows | Exact k/n expected random |

@@ -60,7 +60,10 @@ test("successful import shows warnings and clear next actions", async () => {
   expect(screen.getByText("Worksheets")).toBeInTheDocument();
   expect(screen.getByText("cancelled row rate")).toBeInTheDocument();
   await user.click(await screen.findByRole("button", { name: "Confirm import" }));
-  await user.type(screen.getByLabelText("Analysis reference date"), "2030-06-01");
+  const reference = screen.getByLabelText(/Analysis reference date/i);
+  expect(reference).not.toHaveAttribute("min");
+  expect(screen.getByText(/verified complete-through date/i)).toBeInTheDocument();
+  await user.type(reference, "2030-06-01");
   await user.click(screen.getByRole("button", { name: /Commit and run analytics/i }));
 
   expect(await screen.findByText("Import and analytics publication completed")).toBeInTheDocument();

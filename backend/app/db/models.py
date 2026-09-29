@@ -339,6 +339,29 @@ class FutureTransactionPrediction(Base):
     monitoring_status: Mapped[str] = mapped_column(String(60), default="Pending")
 
 
+class PredictiveStudyPrediction(Base):
+    __tablename__ = "predictive_study_predictions"
+    predictive_study_prediction_id: Mapped[str] = mapped_column(
+        UUID_STRING, primary_key=True, default=uid
+    )
+    model_version: Mapped[str] = mapped_column(
+        ForeignKey("predictive_model_versions.model_version"), index=True
+    )
+    account_key: Mapped[str] = mapped_column(
+        ForeignKey("dim_account.account_key"), index=True
+    )
+    forecast_origin: Mapped[datetime] = mapped_column(Date)
+    future_window_start: Mapped[datetime] = mapped_column(Date)
+    future_window_end: Mapped[datetime] = mapped_column(Date)
+    predicted_class: Mapped[str] = mapped_column(String(40))
+    source_package_hash: Mapped[str] = mapped_column(String(64))
+    source_package_member: Mapped[str] = mapped_column(Text)
+    registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    __table_args__ = (
+        UniqueConstraint("model_version", "forecast_origin", "account_key"),
+    )
+
+
 class CriticInfluenceRecord(Base):
     __tablename__ = "critic_influence_results"
     critic_influence_result_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)

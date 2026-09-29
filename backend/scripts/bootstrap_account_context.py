@@ -85,7 +85,7 @@ def bootstrap(db, package_path: str, actor: str | None = None) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Load verified account context from the authorized final package.")
-    parser.add_argument("package", help="PESLC_FINAL_ANALYTICS_LOCKED.zip")
+    parser.add_argument("package", help="PESLC_FINAL_ANALYTICS_FINAL_REVISED.zip")
     parser.add_argument("--actor", default=None, help="Administrator UUID for audit attribution")
     args = parser.parse_args()
     init_database()

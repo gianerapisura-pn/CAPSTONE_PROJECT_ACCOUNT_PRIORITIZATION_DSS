@@ -27,6 +27,9 @@ DEMO_ADDITIONS = {
         "b2b_priority_eligible": "BOOLEAN NOT NULL DEFAULT 0",
         "account_status": "VARCHAR(80)",
         "last_verified": "DATE",
+        "verification_type": "VARCHAR(120)",
+        "verification_date": "DATE",
+        "verification_basis": "TEXT",
     },
     "analytics_runs": {
         "analysis_reference_date": "DATE",

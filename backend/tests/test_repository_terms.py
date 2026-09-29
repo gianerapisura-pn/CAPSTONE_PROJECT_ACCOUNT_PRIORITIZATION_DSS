@@ -124,3 +124,18 @@ def test_migration_011_snapshots_context_and_preserves_reporting_least_privilege
     assert "grant select on fact_account_context" in sql
     assert "grant insert" not in sql and "grant update" not in sql and "grant delete" not in sql
     assert "revoke all on raw_source_rows" in sql
+
+def test_migration_012_separates_study_predictions_and_keeps_reporting_read_only():
+    sql = Path("../supabase/migrations/012_final_study_prediction_alignment.sql").read_text(
+        encoding="utf-8"
+    ).lower()
+    assert "predictive_study_predictions" in sql
+    assert "reporting_final_study_future_transaction_predictions" in sql
+    assert "forecast_origin" in sql
+    assert "future_window_start" in sql
+    assert "future_window_end" in sql
+    assert "source_package_hash" in sql
+    assert "security_invoker = true" in sql
+    assert "grant select" in sql
+    assert "grant insert" not in sql and "grant update" not in sql and "grant delete" not in sql
+    assert "revoke all on raw_source_rows" in sql

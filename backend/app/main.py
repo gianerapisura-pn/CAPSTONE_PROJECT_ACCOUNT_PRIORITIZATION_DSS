@@ -16,8 +16,8 @@ from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
 from app.core.config import get_settings, validate_runtime_configuration
 from app.db.models import (
     AccountAlias, AccountAliasReview, AnalyticsRun, CollectionCorrectionReview, DimAccount, ImportBatch,
-    ImportRowIssue, InvoiceGroupRecord, RFMResult, SensitivityScenarioRecord,
-    SettlementResult,
+    ImportRowIssue, InvoiceGroupRecord, PredictiveStudyPrediction, RFMResult,
+    SensitivityScenarioRecord, SettlementResult,
 )
 from app.db.repository import (
     CLIENT_CONFIRMED_ACTIVE,
@@ -45,7 +45,9 @@ from app.services.import_workflow import (
 )
 from app.services.model_lifecycle import (
     active_model_version, future_transaction_for_current_run, monitor_registered_predictions,
+    unavailable_prediction,
 )
+from app.services.study_predictions import final_study_prediction_payload
 
 settings = get_settings()
 
@@ -534,6 +536,9 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
         SensitivityScenarioRecord.analysis_run_id == run.analysis_run_id,
         SensitivityScenarioRecord.account_key == account.account_key)).all()
     ranks = [x.payload["scenario_rank"] for x in scenarios]
+    study_prediction = db.scalar(select(PredictiveStudyPrediction).where(
+        PredictiveStudyPrediction.account_key == account.account_key
+    ))
     return {
         "account_key": account.account_key, "account": decision["account"],
         "context": {key: decision.get(key) for key in (
@@ -548,6 +553,13 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
             "predicted_future_transaction_class":
                 decision["predicted_future_transaction_class"],
             "model_version": decision["model_version"]},
+        "study_predictive": {
+            "predicted_future_transaction_class": study_prediction.predicted_class,
+            "model_version": study_prediction.model_version,
+            "forecast_origin": study_prediction.forecast_origin.isoformat(),
+            "future_window_start": study_prediction.future_window_start.isoformat(),
+            "future_window_end": study_prediction.future_window_end.isoformat(),
+        } if study_prediction else None,
         "critic_weights": run.critic_weights or {},
         "sensitivity": ({"minimum_rank": min(ranks), "maximum_rank": max(ranks),
                          "group_movement_rate": sum(
@@ -580,7 +592,17 @@ def settlement(user: AuthenticatedUser = Depends(require_admin), db: Session = D
 
 @app.get("/analytics/predictive")
 def predictive(user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db)):
-    return run_payload(db, _latest_or_404(db))["predictive"]
+    run = latest_successful_run(db)
+    operational = (
+        run_payload(db, run)["predictive"]
+        if run is not None
+        else asdict(unavailable_prediction(DEFAULT_ANALYTICS_CONFIG))
+    )
+    return {
+        **operational,
+        "study": final_study_prediction_payload(db),
+        "operational": operational,
+    }
 
 
 @app.get("/analytics/cart", include_in_schema=False)

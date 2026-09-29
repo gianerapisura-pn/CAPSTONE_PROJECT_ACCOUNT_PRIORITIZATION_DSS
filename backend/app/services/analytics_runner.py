@@ -59,13 +59,9 @@ def validate_analysis_reference(
         default=None,
     )
     reference = pd.Timestamp(analysis_reference_date)
-    latest_evidence = max(
-        (value for value in (latest_si, latest_cr) if value is not None),
-        default=None,
-    )
-    if latest_evidence is not None and reference < latest_evidence:
+    if latest_si is not None and reference < latest_si:
         raise ValueError(
-            "Analysis reference date cannot precede the latest accepted SI or final CR evidence."
+            "Operational analysis reference date cannot precede the latest accepted SI."
         )
     return latest_si, latest_cr
 

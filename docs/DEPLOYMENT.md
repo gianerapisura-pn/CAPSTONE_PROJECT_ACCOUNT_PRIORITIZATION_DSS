@@ -12,7 +12,7 @@ Configure NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SUPABASE_URL, and NEXT_PUBLIC_SUPABAS
 
 ## Database
 
-Apply migrations 001-009 in order and verify latest-successful-run views and RLS using a dedicated reporting login.
+Apply migrations 001-012 in order and verify latest-successful-run and final-study views plus RLS using a dedicated reporting login.
 
 ## Release checks
 

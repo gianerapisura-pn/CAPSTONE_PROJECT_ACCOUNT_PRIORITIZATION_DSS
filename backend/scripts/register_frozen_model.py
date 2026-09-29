@@ -15,7 +15,7 @@ def main() -> None:
         )
     )
     source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--package", help="Authorized PESLC_FINAL_ANALYTICS_LOCKED.zip")
+    source.add_argument("--package", help="Authorized PESLC_FINAL_ANALYTICS_FINAL_REVISED.zip")
     source.add_argument("--artifact", help="Authorized private 03_MODEL/extra_trees.joblib")
     parser.add_argument(
         "--metadata",

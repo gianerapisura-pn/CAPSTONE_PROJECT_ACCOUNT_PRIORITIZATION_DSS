@@ -44,6 +44,14 @@ EXPECTED_TOP_TEN = [
     "BCE PROPERTIES INC", "WEE COMMUNITY DEVELOPERS INC",
     "EXECUTIVE GENESIS SERVICES INC", "WEECOMM CENTRE PROPERTIES, INC.",
 ]
+EXPECTED_FUTURE_ACCOUNTS = {
+    "WEECOMM CENTRE PROPERTIES, INC.",
+    "WEE COMMUNITY DEVELOPERS INC",
+    "BCE PROPERTIES INC",
+    "RIVER GREEN RESIDENCES",
+    "STATEFIELDS SCHOOL INC",
+    "EXECUTIVE GENESIS SERVICES INC",
+}
 EXPECTED_SALES = {
     2017: 22685859.51, 2018: 28141212.85, 2019: 25104956.78,
     2020: 7422135.75, 2021: 17072550.27, 2022: 16803717.74,
@@ -63,7 +71,52 @@ def _private_inputs():
     )
 
 
-def test_private_final_locked_end_to_end(monkeypatch):
+
+
+def test_private_final_study_predictive_regression(monkeypatch):
+    raw_bytes, master, _status, _provenance, model_bytes = _private_inputs()
+    parsed = parse_source_file("PESLC_RAW.xlsx", raw_bytes)
+    rows = [
+        row
+        for frame in parsed.frames.values()
+        for row in dataframe_to_source_rows(frame, "official-study")
+    ]
+    groups = group_invoices(rows)
+    master = master.copy()
+    master["standardized"] = master["account_name"].map(standardize_account_name)
+    eligible = set(master.loc[
+        master["entity_type"].astype(str) != "Individual/Personal", "standardized"
+    ])
+
+    assert sha256(model_bytes).hexdigest() == DEFAULT_ANALYTICS_CONFIG.model_sha256
+    monkeypatch.setattr("app.services.model_lifecycle.sklearn.__version__", "1.8.0")
+    artifact = _validate_artifact(
+        joblib.load(BytesIO(model_bytes)),
+        DEFAULT_ANALYTICS_CONFIG,
+    )
+    predictive = score_extra_trees_artifact(
+        groups,
+        artifact,
+        pd.Timestamp("2025-12-31"),
+        eligible,
+        DEFAULT_ANALYTICS_CONFIG.model_version,
+        DEFAULT_ANALYTICS_CONFIG.model_sha256,
+    )
+
+    assert predictive.analysis_reference_date == "2025-12-31"
+    assert predictive.target_horizon_months == 12
+    assert Counter(predictive.predictions.values()) == {
+        "Future Transaction": 6,
+        "No Future Transaction": 78,
+    }
+    assert {
+        account
+        for account, label in predictive.predictions.items()
+        if label == "Future Transaction"
+    } == EXPECTED_FUTURE_ACCOUNTS
+
+
+def test_private_current_prescriptive_regression():
     raw_bytes, master, status, provenance, model_bytes = _private_inputs()
     parsed = parse_source_file("PESLC_RAW.xlsx", raw_bytes)
     rows = [row for frame in parsed.frames.values()
@@ -106,15 +159,8 @@ def test_private_final_locked_end_to_end(monkeypatch):
     assert closed["account_key"].tolist() == ["A064"]
     assert closed["standardized"].tolist() == ["ROSTRAM PROTECTIVE SYSTEM METIER COMPANY"]
     assert sha256(model_bytes).hexdigest() == DEFAULT_ANALYTICS_CONFIG.model_sha256
-    monkeypatch.setattr("app.services.model_lifecycle.sklearn.__version__", "1.8.0")
-    artifact = _validate_artifact(joblib.load(BytesIO(model_bytes)), DEFAULT_ANALYTICS_CONFIG)
-    predictive = score_extra_trees_artifact(
-        groups, artifact, pd.Timestamp("2026-09-21"), eligible,
-        DEFAULT_ANALYTICS_CONFIG.model_version,
-        DEFAULT_ANALYTICS_CONFIG.model_sha256,
-    )
     result = run_account_prioritization(
-        groups, pd.Timestamp("2026-09-21"), eligible, actionable, predictive_result=predictive
+        groups, pd.Timestamp("2026-09-21"), eligible, actionable
     )
     assert result.latest_valid_si_date == "2025-08-13"
     assert result.latest_final_cr_date == "2025-12-13"
@@ -122,7 +168,6 @@ def test_private_final_locked_end_to_end(monkeypatch):
     assert Counter(item["priority_group"] for item in result.priorities) == {
         "High": 28, "Medium": 27, "Low": 28,
     }
-    assert Counter(predictive.predictions.values()) == {"No Future Transaction": 84}
     assert result.critic_weights == pytest.approx({
         "recency": 0.3744267906167242,
         "frequency": 0.1837992490377663,

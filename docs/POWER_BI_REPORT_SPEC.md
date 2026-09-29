@@ -4,7 +4,7 @@ Power BI consumes certified persisted views only. It does not load RAW files, pr
 
 ## Page 1: Management Overview
 
-Show run/reference metadata, all-valid annual SI sales, 85 historical identities if shown, 84 B2B analytical profiles, 83 current actionable/ranked accounts, 28/27/28 Priority Group counts, and top-ranked accounts/FPS. A compact Future Transaction class summary is supporting context. Do not force a two-slice visual when the current class is uniform.
+Show current run/reference metadata, all-valid annual SI sales, 85 historical identities if shown, 84 B2B analytical profiles, 83 current actionable/ranked accounts, 28/27/28 Priority Group counts, and top-ranked accounts/FPS. Predictive study context is supporting evidence and must not be presented as the ranking input.
 
 ## Page 2: Account Profile and Prioritization Context
 
@@ -12,7 +12,7 @@ Provide RFM distributions or a concise profile table, Historical Settlement Dura
 
 ## Page 3: Predictive Model Evaluation
 
-Show the 3/6/12 horizon comparison, selected 12-month target, canonical model benchmark and selected Extra Trees, Macro F1 primary metric, classification error, balanced accuracy, Future Transaction recall/F1, XGBoost lower-error tradeoff, CatBoost near-tie caution, later-period checks, current 0 Future / 84 No Future limitation, and pending monitoring window. Do not show tree-depth/leaves, uncalibrated raw scores, old labels, or imply superiority over CatBoost.
+Show the official 2025-12-31 forecast origin, 2026-01-01 through 2026-12-31 window, 6 Future / 78 No Future result, SI-based target, 3/6/12 horizon comparison, selected Extra Trees model, Macro F1 primary metric, classification error, balanced accuracy, Future Transaction recall/F1, XGBoost lower-error tradeoff, CatBoost near-tie caution, clearly labelled later-period checks, and pending monitoring window. Do not show tree-depth/leaves, uncalibrated raw scores, old labels, or imply superiority over CatBoost.
 
 ## Page 4: Ranking Robustness and Historical Usefulness
 

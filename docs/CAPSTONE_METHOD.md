@@ -4,7 +4,7 @@ Methodology version: 2026.09-final-locked. Predictive model version: extra_trees
 
 ## Data and eligibility
 
-Cancelled rows are identified first and retained for audit but excluded from analytics. Multiple collection rows are grouped to one logical Sales Invoice. Reconciliation uses SI - total CR - total EWT with PHP 0.01 tolerance. The current reference is selected explicitly and cannot precede accepted SI or final CR evidence. Only confirmed `b2b_priority_eligible=true` accounts enter descriptive and predictive analytics; unknown context is never guessed. Current prescriptive eligibility additionally requires Client-Confirmed Active status and complete RFM/Settlement criteria. Status is a gate, not a criterion.
+Cancelled rows are identified first and retained for audit but excluded from analytics. Multiple collection rows are grouped to one logical Sales Invoice. Reconciliation uses SI - total CR - total EWT with PHP 0.01 tolerance. The operational reference is selected explicitly as a verified complete-through boundary and cannot precede accepted SI evidence. A later CR is excluded from an earlier snapshot and does not advance its cutoff. Only confirmed `b2b_priority_eligible=true` accounts enter descriptive and predictive analytics; unknown context is never guessed. Current prescriptive eligibility additionally requires Client-Confirmed Active status and complete RFM/Settlement criteria. Status is a gate, not a criterion.
 
 ## Descriptive branch
 
@@ -13,6 +13,8 @@ RFM is computed at account/logical-invoice grain. Recency is measured to the exp
 Historical Settlement Duration uses only reconciled, nonnegative SI-to-final-CR evidence known by the relevant reference/cutoff.
 
 ## Predictive branch
+
+The official study forecast origin is 2025-12-31 and its 12-month window is 2026-01-01 through 2026-12-31. It contains 6 Future Transaction and 78 No Future Transaction classifications for 84 verified B2B accounts. This immutable study evidence is separate from the current 2026-09-21 prescriptive/actionability snapshot and later operational re-scores.
 
 The target is at least one valid logical SI in (T, T+12 months], labelled Future Transaction; otherwise No Future Transaction. Seven predictors are Recency Days, Frequency 24m, Monetary 24m, Average Settlement Days, Account Activity Gap, Recent Transaction Count 12m, and Recent Monetary Value 12m. All evidence is cutoff-safe; first-transaction activity-gap missingness is structural.
 

@@ -4,7 +4,8 @@ Status: the supplied final ZIP hash was verified. Safe production parsing/bootst
 
 | Anchor | Locked value |
 |---|---:|
-| Analysis reference | 2026-09-21 |
+| Study forecast origin / window | 2025-12-31 / 2026-01-01 to 2026-12-31 |
+| Current prescriptive reference | 2026-09-21 |
 | Physical rows | 363 |
 | Fully Paid / Cancelled | 292 / 71 |
 | Logical invoices | 282 |
@@ -12,7 +13,7 @@ Status: the supplied final ZIP hash was verified. Safe production parsing/bootst
 | Historical identities | 85 |
 | B2B descriptive/predictive | 84 |
 | Current actionable / MCS / ranked | 83 / 83 / 83 |
-| Prediction | 0 Future / 84 No Future Transaction |
+| Final study prediction | 6 Future / 78 No Future Transaction |
 | Priority groups | 28 / 27 / 28 |
 | Sensitivity | 400 scenarios / 33,200 detail rows |
 | Backtests | 7 annual cutoffs |

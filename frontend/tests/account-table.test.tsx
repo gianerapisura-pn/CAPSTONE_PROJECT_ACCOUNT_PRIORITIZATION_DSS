@@ -77,7 +77,7 @@ test("priority group and transaction class remain visibly separate columns", () 
   render(<AccountPriorityTable />);
   expect(screen.getByRole("columnheader", { name: "Current Status" })).toBeInTheDocument();
   expect(screen.getByRole("columnheader", { name: "Priority" })).toBeInTheDocument();
-  expect(screen.getByRole("columnheader", { name: "12-Month Transaction Class" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Operational 12-Month SI Class" })).toBeInTheDocument();
   expect(screen.getByRole("columnheader", { name: "Recency" })).toBeInTheDocument();
   expect(screen.queryByRole("columnheader", { name: "Normalized RFM" })).not.toBeInTheDocument();
 });

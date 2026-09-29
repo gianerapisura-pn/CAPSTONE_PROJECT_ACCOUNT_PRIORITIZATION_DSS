@@ -81,11 +81,12 @@ def test_settlement_excludes_collection_evidence_after_reference():
     assert compute_settlement_metrics(groups, pd.Timestamp("2026-10-01"))[0].settlement_invoice_count == 1
 
 
-def test_reference_must_cover_latest_si_and_final_cr():
-    groups = [group("A", "1", "2026-01-01", 100, "2026-09-20")]
-    with pytest.raises(ValueError, match="cannot precede"):
-        validate_analysis_reference(groups, pd.Timestamp("2026-09-19"))
-    validate_analysis_reference(groups, pd.Timestamp("2026-09-21"))
+def test_reference_covers_latest_si_but_later_cr_does_not_advance_cutoff():
+    groups = [group("A", "1", "2025-07-01", 100, "2026-02-01")]
+    validate_analysis_reference(groups, pd.Timestamp("2025-12-31"))
+    assert compute_settlement_metrics(groups, pd.Timestamp("2025-12-31")) == []
+    with pytest.raises(ValueError, match="latest accepted SI"):
+        validate_analysis_reference(groups, pd.Timestamp("2025-06-30"))
 
 def test_b2b_eligibility_excludes_preserved_personal_history():
     groups = [

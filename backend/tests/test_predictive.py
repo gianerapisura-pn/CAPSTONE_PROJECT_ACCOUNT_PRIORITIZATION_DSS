@@ -107,3 +107,24 @@ def test_frozen_scoring_returns_only_categorical_class():
 
 def test_obsolete_cart_production_module_is_removed():
     assert not Path("app/analytics/predictive/cart.py").exists()
+
+
+def test_later_cr_does_not_create_future_transaction_or_move_horizon():
+    groups = [group("A", "1", "2025-07-01", 100, "2026-02-01")]
+    cutoff = pd.Timestamp("2025-12-31")
+    frame = build_cutoff_dataset(
+        groups,
+        cutoff,
+        data_complete_through=pd.Timestamp("2026-12-31"),
+    )
+    row = frame.iloc[0]
+    assert row[TARGET_COLUMN] == NO_FUTURE_TRANSACTION
+    assert np.isnan(row["avg_settlement_days"])
+
+    with_future_si = groups + [group("A", "2", "2026-03-01")]
+    future = build_cutoff_dataset(
+        with_future_si,
+        cutoff,
+        data_complete_through=pd.Timestamp("2026-12-31"),
+    )
+    assert future.iloc[0][TARGET_COLUMN] == FUTURE_TRANSACTION

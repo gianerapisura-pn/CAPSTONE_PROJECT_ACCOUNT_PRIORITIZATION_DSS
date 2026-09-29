@@ -12,7 +12,8 @@
 - account_priority_results: four normalized criteria, four contributions, FPS, tied rank/group, separate categorical Future Transaction class, and model version.
 - model_runs: run-linked categorical predictive output.
 - predictive_model_versions: frozen artifact family, parameters, target, primary metric, threshold, exact features, artifact path/hash, and validation metadata.
-- future_transaction_predictions: prediction registry, 12-month maturity date, actual class, correctness, and monitoring status.
+- future_transaction_predictions: operational run prediction registry, 12-month maturity date, actual class, correctness, and monitoring status.
+- predictive_study_predictions: immutable final-study class, explicit forecast origin/window, model version, package hash/member lineage, and registration time.
 - predictive_horizon_evaluations, predictive_model_benchmarks, predictive_oop_evaluations: separately persisted locked horizon, canonical 22-entry benchmark, model-selection/supplemental audit, and later-period evidence.
 - sensitivity_results and fact_sensitivity_analysis: four summary ranges and account/scenario detail.
 - critic_influence_results: leave-one-account-out CRITIC recomputation.
@@ -20,4 +21,4 @@
 - business_baseline_results: annual period status, all-valid invoice/sales history, verified-B2B invoice/sales/transacting-account history, complete-period YoY measures, and data-complete-through date.
 - prescriptive_validation_evidence: versioned, package-hashed weighting and aggregation robustness evidence for reporting only.
 
-Migrations 009 and 010 define the canonical Power BI views listed in docs/POWER_BI_SETUP.md. Public account rows expose MCS criterion eligibility separately from is_ranked/ranking_status and their distinct unavailable reasons.
+Migrations 009-012 define the canonical Power BI views listed in docs/POWER_BI_SETUP.md. Public account rows expose MCS criterion eligibility separately from is_ranked/ranking_status and their distinct unavailable reasons.

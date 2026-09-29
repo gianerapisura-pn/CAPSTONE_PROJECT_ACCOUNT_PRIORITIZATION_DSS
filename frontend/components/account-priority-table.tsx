@@ -54,7 +54,7 @@ const filters = useMemo(
         <select aria-label="Priority Group" value={group} onChange={(event) => { setGroup(event.target.value as PriorityGroup | ""); setPage(1); }}>
           <option value="">All priority groups</option><option>High</option><option>Medium</option><option>Low</option>
         </select>
-        <select aria-label="12-Month Transaction Class" value={risk} onChange={(event) => { setRisk(event.target.value as FutureTransactionClass | ""); setPage(1); }}>
+        <select aria-label="Operational 12-Month SI Class" value={risk} onChange={(event) => { setRisk(event.target.value as FutureTransactionClass | ""); setPage(1); }}>
           <option value="">All transaction classes</option><option>Future Transaction</option><option>No Future Transaction</option>
         </select>
         <select aria-label="Ranking status" value={eligibility} onChange={(event) => { setEligibility(event.target.value as "" | "ranked" | "not_ranked"); setPage(1); }}>
@@ -73,7 +73,7 @@ const filters = useMemo(
             </div>
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Rank</th><th>Account</th><th>Current Status</th><th>Priority</th><th>Final score</th><th>Recency</th><th>Frequency</th><th>Monetary</th><th>Avg. settlement</th><th>12-Month Transaction Class</th><th>Latest valid SI</th><th aria-label="Open details" /></tr></thead>
+                <thead><tr><th>Rank</th><th>Account</th><th>Current Status</th><th>Priority</th><th>Final score</th><th>Recency</th><th>Frequency</th><th>Monetary</th><th>Avg. settlement</th><th>Operational 12-Month SI Class</th><th>Latest valid SI</th><th aria-label="Open details" /></tr></thead>
                 <tbody>{data.items.map((row: AccountDecisionRow) => <tr key={row.account_key}>
                   <td className="rank-cell">{row.priority_rank === null ? "Not ranked" : `#${row.priority_rank}`}</td>
                   <td><strong>{row.account}</strong></td>
