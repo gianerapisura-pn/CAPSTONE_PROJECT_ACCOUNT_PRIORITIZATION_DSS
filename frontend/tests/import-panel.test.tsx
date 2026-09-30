@@ -79,5 +79,5 @@ test("successful import shows warnings and clear next actions", async () => {
   expect(screen.getByText("Predictive context is unavailable for this run.")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "View Updated Priorities" })).toHaveAttribute("href", "/accounts");
   expect(screen.getByRole("link", { name: "Open Detailed Analytics" })).toHaveAttribute("href", "/reports");
-  expect(screen.getByText(/after its configured Power BI refresh/i)).toBeInTheDocument();
+  expect(screen.getByText(/Power BI refresh is requested separately/i)).toBeInTheDocument();
 });

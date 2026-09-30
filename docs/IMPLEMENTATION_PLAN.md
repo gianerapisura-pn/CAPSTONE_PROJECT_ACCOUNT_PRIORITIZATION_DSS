@@ -10,13 +10,14 @@
 - Canonical API/UI terminology and role restrictions.
 - Immutable migrations 001-011 plus forward-only migration 012 for separately persisted final-study predictions and reporting.
 - Environment-gated private regression.
+- Optional backend-only event-triggered Power BI refresh after successful publication, with run-scoped status and admin retry; no reporting recomputation or demo calls.
 
 ## External evidence pending
 
-1. Apply migrations through 012 and validate production RLS/reader grants.
+1. Apply migrations through 013 and validate production RLS/reader grants.
 2. Register the genuine authorized `PESLC_FINAL_ANALYTICS_FINAL_REVISED.zip` Pipeline and seed its validated 6/78 final-study prediction and final-v2 robustness evidence.
 3. Bootstrap master/status/provenance from the verified package and execute the private final-package regression.
-4. Refresh and reconcile the actual PBIX against canonical views.
+4. Publish/connect the actual PBIX, configure the Power BI service principal and backend secrets, and reconcile a live automatic refresh against canonical views.
 5. Execute controlled later-year + new-account production-like import.
 6. Measure prioritized-list generation time in the target environment.
 7. Execute 6 User UAT and 8 System Validation cases with named testers/evidence.

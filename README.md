@@ -28,6 +28,6 @@ The private `PESLC_FINAL_ANALYTICS_FINAL_REVISED.zip` is the single active packa
 
 ## Deployment status
 
-Migrations through 012, application code, and reporting specifications are prepared locally. Applying pending migrations to live Supabase, registering/seeding the private authorized package, refreshing/reconciling the actual PBIX, production-like later-year import, generation-time measurement, and role-based UAT remain pending until executed with authorized external access.
+Migrations through 013, application code (including optional post-publication Power BI refresh), and reporting specifications are prepared locally. Applying pending migrations to live Supabase, registering/seeding the private authorized package, connecting/refreshing/reconciling the actual PBIX, production-like later-year import, generation-time measurement, and role-based UAT remain pending until executed with authorized external access. Automatic Power BI refresh is disabled until its backend-only credentials and workspace/model are configured; see `docs/POWER_BI_SETUP.md`.
 
 Supplementary Entropy, Equal Weighting, and CRITIC-weighted TOPSIS comparisons are locked methodological robustness evidence for Power BI only. Production FPS, ranks, and groups remain CRITIC plus additive MCS.

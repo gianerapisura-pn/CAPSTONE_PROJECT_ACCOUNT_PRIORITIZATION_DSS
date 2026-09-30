@@ -2,6 +2,7 @@
 
 import { BarChart3, Download, ExternalLink, FileSpreadsheet, LockKeyhole } from "lucide-react";
 import { PageHeader } from "@/components/page-state";
+import { PowerBIRefreshStatus } from "@/components/power-bi-refresh-status";
 import { downloadExport } from "@/lib/api";
 import { useApi } from "@/lib/use-api";
 import type { DashboardData } from "@/types/dss";
@@ -32,7 +33,7 @@ export default function ReportsPage() {
       {dashboard ? <>
         <span>Analysis reference <strong>{dashboard.run.analysis_reference_date ?? "Unavailable"}</strong></span>
         <span>Latest run <strong className="mono">{dashboard.run.analysis_run_id.slice(0, 12)}</strong></span>
-        <span>Last successful refresh <strong>{dashboard.run.completed_at ? new Date(dashboard.run.completed_at).toLocaleString() : "Unavailable"}</strong></span>
+        <span>Web run completed <strong>{dashboard.run.completed_at ? new Date(dashboard.run.completed_at).toLocaleString() : "Unavailable"}</strong></span>
       </> : <span>Latest successful analysis metadata is not available yet.</span>}
     </div>
 
@@ -44,12 +45,13 @@ export default function ReportsPage() {
         <p>{reportUrl
           ? "Open the approved organizational report for broader historical trends and analytical validation."
           : "An administrator must configure an approved secure organizational Power BI report before this action is available."}</p>
-        <p className="report-refresh">The Web DSS reflects a successful run immediately. Detailed Analytics reflects the same published results after its configured manual or scheduled refresh.</p>
+        <p className="report-refresh">The Web DSS updates at publication. Power BI shows new data only after its separate semantic-model refresh completes.</p>
       </div>
       {reportUrl
         ? <a className="button primary" href={reportUrl} target="_blank" rel="noreferrer">Open Detailed Analytics<ExternalLink size={17} /></a>
         : <span className="config-state"><LockKeyhole />Configuration required</span>}
     </section>
+    <PowerBIRefreshStatus />
 
     <section>
       <div className="section-heading"><div><span className="eyebrow">Approved operational output</span><h2>Account Prioritization export</h2></div><span>Same validated current account profile output</span></div>

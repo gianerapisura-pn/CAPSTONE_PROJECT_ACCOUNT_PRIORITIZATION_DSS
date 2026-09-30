@@ -1,11 +1,12 @@
 from __future__ import annotations
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 from dataclasses import asdict
 from datetime import date, datetime, timezone
 from io import BytesIO
 import json
 import pandas as pd
-from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel
@@ -16,7 +17,7 @@ from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
 from app.core.config import get_settings, validate_runtime_configuration
 from app.db.models import (
     AccountAlias, AccountAliasReview, AnalyticsRun, CollectionCorrectionReview, DimAccount, ImportBatch,
-    ImportRowIssue, InvoiceGroupRecord, PredictiveStudyPrediction, RFMResult, RawSourceRow,
+    ImportRowIssue, InvoiceGroupRecord, PowerBIRefresh, PredictiveStudyPrediction, RFMResult, RawSourceRow,
     SensitivityScenarioRecord, SettlementResult,
 )
 from app.db.repository import (
@@ -48,6 +49,10 @@ from app.services.model_lifecycle import (
     unavailable_prediction,
 )
 from app.services.study_predictions import final_study_prediction_payload
+from app.services.power_bi_refresh import (
+    enqueue_refresh, public_status, request_refresh, supervise_refreshes,
+    retry_refresh, sync_refresh_status,
+)
 
 settings = get_settings()
 
@@ -56,7 +61,11 @@ settings = get_settings()
 async def lifespan(_: FastAPI):
     validate_runtime_configuration(settings)
     init_database()
+    supervisor = asyncio.create_task(supervise_refreshes())
     yield
+    supervisor.cancel()
+    with suppress(asyncio.CancelledError):
+        await supervisor
 
 
 app = FastAPI(title="PESLC Account Prioritization DSS API", version="2.0.0", lifespan=lifespan)
@@ -378,9 +387,12 @@ async def preview_import(file: UploadFile = File(...),
 
 @app.post("/imports/{batch_id}/commit", response_model=ImportCommitResponse)
 def commit_import(batch_id: str, request: CommitRequest,
+                  background_tasks: BackgroundTasks,
                   user: AuthenticatedUser = Depends(require_admin),
                   db: Session = Depends(get_db)):
-    return commit_source(db, user, batch_id, request.analysis_reference_date)
+    result = commit_source(db, user, batch_id, request.analysis_reference_date)
+    background_tasks.add_task(request_refresh, result["analysis_run_id"])
+    return result
 
 
 @app.get("/imports", response_model=list[ImportBatchResponse])
@@ -442,7 +454,8 @@ def import_detail(batch_id: str, user: AuthenticatedUser = Depends(require_admin
 
 
 @app.post("/analytics/run")
-def run_analytics(request: RunRequest, user: AuthenticatedUser = Depends(require_admin),
+def run_analytics(request: RunRequest, background_tasks: BackgroundTasks,
+                  user: AuthenticatedUser = Depends(require_admin),
                   db: Session = Depends(get_db)):
     groups = load_invoice_groups(db)
     if not groups:
@@ -463,9 +476,12 @@ def run_analytics(request: RunRequest, user: AuthenticatedUser = Depends(require
         db.add(run)
         db.flush()
         persist_run_output(db, run, result)
+        enqueue_refresh(db, run.analysis_run_id)
         audit(db, user.user_id, "analytics_run", "analytics_run", run.analysis_run_id,
               {"analysis_reference_date": request.analysis_reference_date.isoformat()})
         db.commit()
+        if background_tasks is not None:
+            background_tasks.add_task(request_refresh, run.analysis_run_id)
         return serialize_run(run)
     except ValueError as exc:
         db.rollback()
@@ -473,6 +489,34 @@ def run_analytics(request: RunRequest, user: AuthenticatedUser = Depends(require
     except Exception as exc:
         db.rollback()
         raise HTTPException(500, "Analytics run failed; the previous successful run remains current.") from exc
+
+
+@app.get("/reports/power-bi-refresh")
+def power_bi_refresh_status(
+    user: AuthenticatedUser = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    run = latest_successful_run(db)
+    if not run:
+        return public_status(None, None)
+    row = db.get(PowerBIRefresh, run.analysis_run_id)
+    sync_refresh_status(db, row)
+    return public_status(row, run.analysis_run_id)
+
+
+@app.post("/reports/power-bi-refresh/retry")
+def retry_power_bi_refresh(
+    background_tasks: BackgroundTasks,
+    user: AuthenticatedUser = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    run = _latest_or_404(db)
+    if not retry_refresh(db, run.analysis_run_id):
+        raise HTTPException(409, "Refresh is unavailable or already requested. Check its status.")
+    audit(db, user.user_id, "power_bi_refresh_retry", "analytics_run", run.analysis_run_id, {})
+    db.commit()
+    background_tasks.add_task(request_refresh, run.analysis_run_id)
+    return public_status(db.get(PowerBIRefresh, run.analysis_run_id), run.analysis_run_id)
 
 
 @app.get("/analytics/latest")

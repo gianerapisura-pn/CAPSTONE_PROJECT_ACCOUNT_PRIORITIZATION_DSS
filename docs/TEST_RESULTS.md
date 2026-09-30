@@ -2,6 +2,15 @@
 
 Final validation date: 2026-09-30
 
+## Power BI Refresh Integration (2026-09-30)
+
+- Backend full suite: `python -m pytest -q --basetemp=../.test-tmp-powerbi-final` - **98 passed, 2 skipped, 28 warnings**. The two skipped tests are the opt-in private model regressions; no model code or artifact changed in this pass. A default-temp rerun encountered a Windows temp-directory permission error before two tests executed; the workspace-local rerun passed.
+- Frontend: `npm test -- --run` - **17 files, 39 tests passed**.
+- `npm run lint`, `npm run typecheck`, and `npm run build` - **passed**.
+- `npm run test:e2e` - **1 browser workflow passed**, including demo login and a committed import.
+- New mocked Microsoft tests cover disabled/demo isolation, one request per run, accepted versus completed status, refresh failure independent of analytical publication, retry, and restart recovery without automatic duplicate resend.
+- No live Power BI workspace, service principal, PBIX, or Supabase database was configured or contacted. Migration 013 and live automatic-refresh reconciliation remain deployment checks.
+
 ## Frozen Analytics Package (Audit From 2026-09-29)
 
 - Package: `PESLC_FINAL_ANALYTICS_FINAL_REVISED.zip`

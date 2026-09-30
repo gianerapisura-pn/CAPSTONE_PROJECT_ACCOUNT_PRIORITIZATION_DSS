@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     supabase_jwt_issuer: str = ""
     demo_storage_path: str = ".demo_data/source-imports"
     demo_model_storage_path: str = ".demo_data/model-artifacts"
+    power_bi_auto_refresh_enabled: bool = False
+    power_bi_tenant_id: str = ""
+    power_bi_client_id: str = ""
+    power_bi_client_secret: str = ""
+    power_bi_workspace_id: str = ""
+    power_bi_dataset_id: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -193,6 +193,20 @@ class AnalyticsRun(Base):
     code_version: Mapped[str | None] = mapped_column(String(80))
 
 
+class PowerBIRefresh(Base):
+    __tablename__ = "power_bi_refreshes"
+    analysis_run_id: Mapped[str] = mapped_column(
+        ForeignKey("analytics_runs.analysis_run_id"), primary_key=True
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    refresh_request_id: Mapped[str | None] = mapped_column(String(80))
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    error_code: Mapped[str | None] = mapped_column(String(80))
+
+
 class AccountContextSnapshot(Base):
     __tablename__ = "fact_account_context"
     account_context_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)

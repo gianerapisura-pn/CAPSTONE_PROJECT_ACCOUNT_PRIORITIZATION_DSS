@@ -2,6 +2,9 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
 vi.mock("@/lib/api", () => ({ downloadExport: vi.fn() }));
+vi.mock("@/components/auth-provider", () => ({
+  useAuth: () => ({ user: { role: "management" } }),
+}));
 vi.mock("@/lib/use-api", () => ({
   useApi: () => ({
     data: {
@@ -28,7 +31,7 @@ test("Detailed Analytics has a safe setup state, run context, and only the appro
   expect(screen.getByRole("heading", { name: "Detailed Analytics" })).toBeInTheDocument();
   expect(screen.getByText("2030-06-01")).toBeInTheDocument();
   expect(screen.getByText("run-12345678")).toBeInTheDocument();
-  expect(screen.getByText("Last successful refresh")).toBeInTheDocument();
+  expect(screen.getByText("Web run completed")).toBeInTheDocument();
   expect(screen.getByText("Configuration required")).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Account Prioritization" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /CSV/ })).toBeInTheDocument();

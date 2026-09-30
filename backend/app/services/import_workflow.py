@@ -36,6 +36,7 @@ from app.etl.status import standardize_payment_status
 from app.imports.validators import REQUIRED_COLUMNS, parse_source_file, validate_rows
 from app.services.analytics_runner import run_account_prioritization, validate_analysis_reference
 from app.services.model_lifecycle import future_transaction_for_current_run
+from app.services.power_bi_refresh import enqueue_refresh
 from app.services.storage import SourceStorage, sanitize_filename
 
 logger = logging.getLogger(__name__)
@@ -450,6 +451,7 @@ def commit_source(
         db.add(run)
         db.flush()
         persist_run_output(db, run, result)
+        enqueue_refresh(db, run.analysis_run_id)
         batch.analysis_run_id = run.analysis_run_id
         audit(db, user.user_id, "import_committed", "import_batch", batch_id, {
             "analysis_run_id": run.analysis_run_id,
