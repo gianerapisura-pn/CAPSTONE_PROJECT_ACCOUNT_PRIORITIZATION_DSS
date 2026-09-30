@@ -6,7 +6,7 @@ A future import is previewed and committed with an explicit administrator-confir
 
 Late, genuinely distinct collection rows reconstruct the same logical invoice and may add settlement evidence without increasing Frequency or Monetary. Exact duplicates are audited no-ops. A changed row with the same stable CR identity and differing SI amounts are quarantined; an administrator must select the authoritative raw row and record a reason before reconstruction. Resolution and account-context changes require an explicit new analytics publication; existing runs continue to read their immutable context snapshots.
 
-Routine runs score compatible accounts with the active frozen artifact and never retrain. Missing model/artifact compatibility produces an explicit unavailable prediction while descriptive and prescriptive branches remain usable.
+Routine runs score compatible accounts with the active frozen artifact and never retrain. Missing model/artifact compatibility produces an explicit unavailable prediction while descriptive and prescriptive branches remain usable. Prediction monitoring requires both calendar maturity and a successful run with verified complete-through SI coverage for the full outcome window. A late CR alone does not establish a Future Transaction or complete SI coverage.
 
 A production-like later-year + new-account end-to-end run remains an external validation action; the generic unit fixture does not prove live Supabase deployment.
 

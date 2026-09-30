@@ -20,6 +20,8 @@ Status: the supplied final ZIP hash was verified. Safe production parsing/bootst
 
 ROD DE GUIA is retained historically and excluded from B2B analytics. ROSTRAM PROTECTIVE SYSTEM METIER COMPANY remains in B2B descriptive, predictive, and historical evidence but is Client-Confirmed Closed and has no current FPS, rank, or Priority Group.
 
+The latest valid SI in the supplied original workbook is 2025-08-13; the latest final valid CR is 2025-12-13. The common 2025-12-31 study origin follows client-confirmed complete 2025 SI coverage, not either observed date. The workbook contains no 2026 SI or CR evidence.
+
 Current CRITIC weights are Recency 0.3744267906167242, Frequency 0.1837992490377663, Monetary 0.1755208018503358, and Average Settlement Days 0.2662531584951738.
 
 Current top ten are MEGAWORLD CORPORATION; LOXON PHILIPPINES INC; METRO WORX PROPERTIES INC; RYXEN INC; EXQUADRA INC; WILL DECENA AND ASSOCIATES, INC.; BCE PROPERTIES INC; WEE COMMUNITY DEVELOPERS INC; EXECUTIVE GENESIS SERVICES INC; and WEECOMM CENTRE PROPERTIES, INC.

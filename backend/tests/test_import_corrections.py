@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
+from fastapi import HTTPException
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
@@ -123,3 +124,15 @@ def test_audited_resolution_selects_one_collection_version_and_reconstructs(db):
     assert row.conflicting_invoice is False
     assert float(row.total_cr_amount) == 90.0
     assert row.rfm_eligible is True
+    with pytest.raises(HTTPException) as error:
+        resolve_collection_correction(
+            db,
+            AuthenticatedUser(
+                user_id="00000000-0000-4000-8000-000000000001",
+                role="administrator",
+            ),
+            review.collection_correction_review_id,
+            selected,
+            "Attempted second resolution.",
+        )
+    assert error.value.status_code == 409

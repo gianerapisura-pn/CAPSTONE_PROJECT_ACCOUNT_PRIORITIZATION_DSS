@@ -46,7 +46,7 @@ export default function DashboardPage() {
             <div className="compact-list">{groups.map(item => <Link href={"/accounts?priority_group=" + item.name} key={item.name}><div><strong>{item.name} Priority</strong><small>Recommended attention tier</small></div><span className="score">{item.value}</span></Link>)}</div>
           </div>
           <div className="data-section">
-            <div className="section-heading"><div><span className="eyebrow">Separate predictive context</span><h2>12-month Future Transaction class</h2></div><ShieldAlert /></div>
+            <div className="section-heading"><div><span className="eyebrow">Separate predictive context</span><h2>Operational 12-month Future Transaction class</h2></div><ShieldAlert /></div>
             <div className="compact-list">
               <div><div><strong>Future Transaction</strong><small>Supporting class only; not part of FPS</small></div><span className="score">{data.prediction_class_counts["Future Transaction"] ?? 0}</span></div>
               <div><div><strong>No Future Transaction</strong><small>Does not imply account closure</small></div><span className="score">{data.prediction_class_counts["No Future Transaction"] ?? 0}</span></div>

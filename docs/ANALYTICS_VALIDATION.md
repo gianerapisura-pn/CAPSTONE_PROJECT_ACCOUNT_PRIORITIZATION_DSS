@@ -16,7 +16,7 @@ The fixed study prediction at 2025-12-31 is 6 Future Transaction and 78 No Futur
 - CR evidence is unavailable before its date; a later CR neither invalidates an earlier cutoff nor creates the SI-based target.
 - Seven exact features and the 12-month target are cutoff-safe.
 - The raw sklearn Pipeline is accepted only after package/artifact SHA, sklearn 1.8.0, exact feature order, fitted imputer medians, estimator parameters, and `[0,1]` classes pass validation.
-- Routine import cannot train; prediction is excluded from FPS.
+- Routine import cannot train; prediction is excluded from FPS. Monitoring waits for both the outcome-window end and verified complete-through SI coverage before assigning actual classes.
 - Exact `k/n` is used for expected-random backtests.
 - Successful runs persist immutable account-context snapshots.
 

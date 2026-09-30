@@ -342,11 +342,16 @@ def monitor_registered_predictions(
     db: Session,
     invoice_groups: list[InvoiceGroup],
     as_of_date: date,
+    verified_data_complete_through: date | None = None,
 ) -> dict:
     rows = db.scalars(select(FutureTransactionPrediction).where(
         FutureTransactionPrediction.matured.is_(False)
     )).all()
-    matured = [row for row in rows if row.future_window_end <= as_of_date]
+    boundary = (
+        min(as_of_date, verified_data_complete_through)
+        if verified_data_complete_through else None
+    )
+    matured = [row for row in rows if boundary and row.future_window_end <= boundary]
     valid = [group for group in invoice_groups if group.rfm_eligible]
     account_names = {
         item.account_key: item.standardized_account_name
@@ -364,23 +369,49 @@ def monitor_registered_predictions(
         row.matured = True
         row.evaluated_on = as_of_date
         row.monitoring_status = "Evaluated"
-    actual = [row.actual_class for row in matured if row.actual_class]
-    predicted = [row.predicted_class for row in matured if row.actual_class]
-    metrics = classification_metrics(actual, predicted) if actual else {}
-    status = "evaluated" if actual else "pending"
+    by_version = {
+        version: [row for row in matured if row.model_version == version]
+        for version in {row.model_version for row in matured}
+    }
+    metrics_by_version = {
+        version: classification_metrics(
+            [row.actual_class for row in version_rows],
+            [row.predicted_class for row in version_rows],
+        )
+        for version, version_rows in by_version.items()
+    }
+    status = "evaluated" if matured else "pending"
     payload = {
         "status": status,
-        "matured": len(actual),
+        "matured": len(matured),
         "pending": len(rows) - len(matured),
-        "metrics": metrics,
+        "metrics": next(iter(metrics_by_version.values())) if len(metrics_by_version) == 1 else {},
+        "model_metrics": metrics_by_version,
+        "verified_data_complete_through": (
+            verified_data_complete_through.isoformat() if verified_data_complete_through else None
+        ),
+        "pending_calendar": sum(row.future_window_end > as_of_date for row in rows),
+        "pending_data_coverage": sum(
+            row.future_window_end <= as_of_date
+            and (boundary is None or row.future_window_end > boundary)
+            for row in rows
+        ),
+        "reason": (
+            "No successful run with a verified complete-through reference."
+            if verified_data_complete_through is None else None
+        ),
     }
-    active = active_model_version(db)
-    if active:
+    for version, version_rows in by_version.items():
+        model = db.scalar(select(PredictiveModelVersion).where(
+            PredictiveModelVersion.model_version == version
+        ))
+        if model is None:
+            continue
         db.add(PredictiveMonitoringEvaluation(
-            predictive_model_version_id=active.predictive_model_version_id,
-            cutoff_date=min((row.cutoff_date for row in matured), default=None),
-            status=status,
+            predictive_model_version_id=model.predictive_model_version_id,
+            cutoff_date=min(row.cutoff_date for row in version_rows),
+            status="evaluated",
             review_recommended=False,
-            payload=payload,
+            payload={**payload, "model_version": version, "metrics": metrics_by_version[version]},
         ))
     return payload

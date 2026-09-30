@@ -1,8 +1,8 @@
 # Test Results
 
-Final validation date: 2026-09-29
+Final validation date: 2026-09-30
 
-## Frozen Analytics Package
+## Frozen Analytics Package (Audit From 2026-09-29)
 
 - Package: `PESLC_FINAL_ANALYTICS_FINAL_REVISED.zip`
 - Whole-package SHA-256: `153549767fd3588a4b5694494b2495f7e030b4f9a7c12e9c5ca674a5680a90dc`
@@ -18,10 +18,10 @@ Command:
 
 ```powershell
 cd backend
-python -m pytest -q --basetemp=.pytest-tmp-final
+python -m pytest --basetemp=../.test-tmp-last
 ```
 
-Result: **82 passed, 2 skipped, 24 warnings in 13.04s**.
+Result: **92 passed, 2 skipped, 28 warnings in 13.71s**.
 
 The two skipped tests are the package-gated official regression checks when the private analytics package is not supplied to the normal test environment.
 
@@ -32,10 +32,10 @@ The regression was run in an isolated environment with scikit-learn 1.8.0, NumPy
 Command target:
 
 ```powershell
-python -m pytest -q tests/test_official_raw_regression.py --basetemp=.pytest-private-final
+python -m pytest -q tests/test_official_raw_regression.py --basetemp=../.test-tmp-private-new
 ```
 
-Result: **2 passed in 9.01s**.
+Result: **2 passed in 31.88s**.
 
 Verified outcomes:
 
@@ -52,15 +52,15 @@ Verified outcomes:
 
 Commands and results:
 
-- `npm test -- --run`: **15 test files passed; 35 tests passed**
+- `npm test -- --run`: **16 test files passed; 36 tests passed**
 - `npm run lint`: **passed**
 - `npm run typecheck`: **passed**
 - `npm run build`: **passed; 16 routes generated**
-- `npm run test:e2e`: **1 workflow passed in 1.5 minutes**
+- `npm run test:e2e`: **1 workflow passed in 1.6 minutes**
 
 The end-to-end workflow entered through the retained isolated demo button.
 
-## Local Persistence Validation
+## Local Persistence Validation (From 2026-09-29)
 
 - Registered only the hash-verified frozen model in local demo SQLite.
 - Bootstrapped 85 account identities, including 84 verified B2B accounts and 83 currently actionable accounts.

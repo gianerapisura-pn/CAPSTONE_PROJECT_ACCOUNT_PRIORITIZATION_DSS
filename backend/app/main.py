@@ -16,7 +16,7 @@ from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
 from app.core.config import get_settings, validate_runtime_configuration
 from app.db.models import (
     AccountAlias, AccountAliasReview, AnalyticsRun, CollectionCorrectionReview, DimAccount, ImportBatch,
-    ImportRowIssue, InvoiceGroupRecord, PredictiveStudyPrediction, RFMResult,
+    ImportRowIssue, InvoiceGroupRecord, PredictiveStudyPrediction, RFMResult, RawSourceRow,
     SensitivityScenarioRecord, SettlementResult,
 )
 from app.db.repository import (
@@ -208,11 +208,35 @@ def collection_correction_queue(
         CollectionCorrectionReview.status,
         CollectionCorrectionReview.detected_at,
     )).all()
+    candidate_ids = {candidate_id for row in rows for candidate_id in (row.raw_source_row_ids or [])}
+    candidates = {
+        candidate.raw_source_row_id: candidate
+        for candidate in db.scalars(select(RawSourceRow).where(
+            RawSourceRow.raw_source_row_id.in_(candidate_ids)
+        )).all()
+    } if candidate_ids else {}
     return [{
         "collection_correction_review_id": row.collection_correction_review_id,
         "collection_identity": row.collection_identity,
         "invoice_identity": row.invoice_identity,
         "raw_source_row_ids": row.raw_source_row_ids or [],
+        "candidates": [{
+            "raw_source_row_id": candidate.raw_source_row_id,
+            "import_batch_id": candidate.import_batch_id,
+            "source_sheet": candidate.source_sheet,
+            "source_row_number": candidate.source_row_number,
+            "account_name": candidate.customer_name_raw,
+            "si_no": candidate.si_no,
+            "si_date": candidate.si_date_raw,
+            "si_amount": candidate.si_amount_raw,
+            "cr_no": candidate.cr_no,
+            "cr_date": candidate.cr_date_raw,
+            "cr_amount": candidate.cr_amount_raw,
+            "ewt": candidate.ewt_raw,
+            "payment_mode": candidate.payment_mode_raw,
+            "payment_status": candidate.payment_status_raw,
+        } for candidate_id in (row.raw_source_row_ids or [])
+          if (candidate := candidates.get(candidate_id)) is not None],
         "status": row.status,
         "selected_raw_source_row_id": row.selected_raw_source_row_id,
         "detected_at": row.detected_at.isoformat(),
@@ -663,7 +687,11 @@ def current_model(user: AuthenticatedUser = Depends(require_admin), db: Session 
 @app.post("/models/monitor")
 def monitor(request: MonitorRequest, user: AuthenticatedUser = Depends(require_admin),
             db: Session = Depends(get_db)):
-    result = monitor_registered_predictions(db, load_invoice_groups(db), request.as_of_date)
+    run = latest_successful_run(db)
+    result = monitor_registered_predictions(
+        db, load_invoice_groups(db), request.as_of_date,
+        run.analysis_reference_date if run else None,
+    )
     audit(db, user.user_id, "model_monitor", "predictive_model", None,
           {"status": result["status"], "as_of_date": request.as_of_date.isoformat()})
     db.commit()
@@ -675,14 +703,14 @@ def methodology(user: AuthenticatedUser = Depends(require_admin)):
     return {
         "source_schema": list(REQUIRED_COLUMNS),
         "analytics_config": DEFAULT_ANALYTICS_CONFIG.serializable(),
-        "analysis_reference_date": "Administrator-selected and not earlier than accepted SI/CR evidence.",
+        "analysis_reference_date": "Administrator-selected verified complete-through date. It cannot precede the latest valid SI; latest SI/CR dates are source metadata, and a later CR does not advance the predictive cutoff.",
         "eligibility": ("Explicitly verified B2B accounts enter RFM and prediction; "
                         "current MCS additionally requires Client-Confirmed Active status "
                         "and complete decision criteria."),
-        "rfm": "q20/q40/q60/q80 empirical quintiles with linear interpolation and ties preserved.",
+        "rfm": "Descriptive Recency from reference, Frequency per logical SI, and Monetary SI amount; q20/q40/q60/q80 empirical quintiles with ties preserved.",
         "settlement": "Observed SI-to-final-valid-CR duration using only cutoff-known, reconciled, nonnegative evidence.",
-        "predictive": "Frozen Extra Trees stage-8 artifact; 12-month Future Transaction target; seven cutoff-safe predictors.",
-        "mcs": "CRITIC weights normalized Recency, Frequency, Monetary, and Historical Settlement Duration.",
+        "predictive": "Frozen Extra Trees stage-8 artifact; Future Transaction means a succeeding valid SI within 12 months. CR is cutoff-known settlement evidence only; prediction never changes rank.",
+        "mcs": "CRITIC weights normalized Recency, Frequency, Monetary, and Historical Settlement Duration; additive MCS determines FPS.",
         "priority_groups": "Tie-preserving ranked thirds from each discriminatory four-criterion run.",
         "backtest": "Seven annual cutoffs (2018-2024) with exact k/n random expectation.",
         "future_data_rule": "Years and accounts are derived from validated committed data.",

@@ -100,12 +100,12 @@ export default function AccountDetailsPage() {
             <dl className="method-facts">
               <div><dt>Operational 12-month SI class</dt><dd>{data.predictive.predicted_future_transaction_class || "Unavailable"}</dd></div>
               <div><dt>Operational model version</dt><dd>{data.predictive.model_version || "Unavailable"}</dd></div>
-              <div><dt>2026 study transaction class</dt><dd>{data.study_predictive?.predicted_future_transaction_class || "Unavailable"}</dd></div>
+              <div><dt>Final study Jan-Dec 2026 class</dt><dd>{data.study_predictive?.predicted_future_transaction_class || "Unavailable"}</dd></div>
               <div><dt>Study forecast origin</dt><dd>{data.study_predictive?.forecast_origin || "Unavailable"}</dd></div>
               <div><dt>Scenario rank range</dt><dd>{data.sensitivity ? `${data.sensitivity.minimum_rank}-${data.sensitivity.maximum_rank}` : "N/A"}</dd></div>
               <div><dt>Group movement rate</dt><dd>{data.sensitivity ? `${(data.sensitivity.group_movement_rate * 100).toFixed(1)}%` : "N/A"}</dd></div>
             </dl>
-            <p className="fine-print">Transaction classes do not claim permanent churn and does not determine the Final Priority Score.</p>
+            <p className="fine-print">Transaction classes do not claim permanent churn and do not determine the Final Priority Score.</p>
           </div>
         </section>
         <section className="data-section">

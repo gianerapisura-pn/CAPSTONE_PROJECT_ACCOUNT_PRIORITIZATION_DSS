@@ -105,6 +105,8 @@ export interface ImportPreview {
   rows_discovered: number;
   cancelled_count: number;
   latest_evidence_date: string | null;
+  latest_valid_si_date: string | null;
+  latest_final_cr_date: string | null;
   analysis_reference_required: boolean;
   can_commit: boolean;
   duplicate_committed_file: boolean;

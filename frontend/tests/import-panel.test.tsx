@@ -17,6 +17,9 @@ const basePreview = {
   duplicate_committed_file: false,
   quality_rates: { cancelled_row_rate: 0, reconciliation_issue_rate: 0 },
   status: "PREVIEW",
+  latest_valid_si_date: "2025-07-01",
+  latest_final_cr_date: "2026-02-01",
+  latest_evidence_date: "2026-02-01",
 };
 
 beforeEach(() => {
@@ -58,11 +61,17 @@ test("successful import shows warnings and clear next actions", async () => {
   await user.upload(hidden, new File(["valid"], "valid.csv", { type: "text/csv" }));
   await user.click(screen.getByRole("button", { name: /Validate and preview/i }));
   expect(screen.getByText("Worksheets")).toBeInTheDocument();
+  expect(screen.getAllByText("Latest valid SI").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("Latest CR evidence").length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/2025-07-01/).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/2026-02-01/).length).toBeGreaterThan(0);
   expect(screen.getByText("cancelled row rate")).toBeInTheDocument();
   await user.click(await screen.findByRole("button", { name: "Confirm import" }));
   const reference = screen.getByLabelText(/Analysis reference date/i);
   expect(reference).not.toHaveAttribute("min");
   expect(screen.getByText(/verified complete-through date/i)).toBeInTheDocument();
+  expect(screen.getByText(/a later CR does not advance the predictive cutoff/i)).toBeInTheDocument();
+  expect(reference).toHaveValue("");
   await user.type(reference, "2030-06-01");
   await user.click(screen.getByRole("button", { name: /Commit and run analytics/i }));
 

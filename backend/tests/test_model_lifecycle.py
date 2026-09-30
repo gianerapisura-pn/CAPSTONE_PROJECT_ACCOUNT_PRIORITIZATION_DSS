@@ -143,4 +143,163 @@ def test_monitoring_stays_pending_until_window_matures(db):
     db.commit()
     result = model_lifecycle.monitor_registered_predictions(
         db, [group()], date(2027, 9, 20))
-    assert result == {"status": "pending", "matured": 0, "pending": 1, "metrics": {}}
+    assert result["status"] == "pending"
+    assert result["matured"] == 0
+    assert result["pending_calendar"] == 1
+    assert result["pending_data_coverage"] == 0
+
+@pytest.mark.parametrize(
+    "as_of, coverage, expected_status, calendar, data_gap",
+    [
+        (date(2027, 9, 20), date(2027, 12, 31), "pending", 1, 0),
+        (date(2027, 10, 1), date(2027, 9, 20), "pending", 0, 1),
+        (date(2027, 10, 1), None, "pending", 0, 1),
+        (date(2027, 10, 1), date(2027, 9, 21), "evaluated", 0, 0),
+    ],
+)
+def test_monitoring_requires_calendar_and_verified_si_coverage(
+    db, as_of, coverage, expected_status, calendar, data_gap,
+):
+    account = DimAccount(standardized_account_name="A", display_name="A")
+    db.add(account)
+    db.add(PredictiveModelVersion(
+        model_version="extra_trees_stage8", status="active",
+        artifact_hash=DEFAULT_ANALYTICS_CONFIG.model_sha256,
+    ))
+    db.flush()
+    prediction = FutureTransactionPrediction(
+        analysis_run_id="00000000-0000-4000-8000-000000000010",
+        account_key=account.account_key, model_version="extra_trees_stage8",
+        cutoff_date=date(2026, 9, 21), future_window_end=date(2027, 9, 21),
+        predicted_class=NO_FUTURE_TRANSACTION,
+    )
+    db.add(prediction)
+    db.flush()
+
+    result = model_lifecycle.monitor_registered_predictions(
+        db, [group()], as_of, coverage,
+    )
+
+    assert result["status"] == expected_status
+    assert result["pending_calendar"] == calendar
+    assert result["pending_data_coverage"] == data_gap
+    assert prediction.matured is (expected_status == "evaluated")
+    assert prediction.actual_class == (
+        NO_FUTURE_TRANSACTION if expected_status == "evaluated" else None
+    )
+
+
+@pytest.mark.parametrize("future_si", [False, True])
+def test_monitoring_uses_succeeding_si_not_late_cr(db, future_si):
+    from dataclasses import replace
+
+    account = DimAccount(standardized_account_name="A", display_name="A")
+    db.add(account)
+    db.add(PredictiveModelVersion(
+        model_version="extra_trees_stage8", status="active",
+        artifact_hash=DEFAULT_ANALYTICS_CONFIG.model_sha256,
+    ))
+    db.flush()
+    prediction = FutureTransactionPrediction(
+        analysis_run_id="00000000-0000-4000-8000-000000000010",
+        account_key=account.account_key, model_version="extra_trees_stage8",
+        cutoff_date=date(2025, 12, 31), future_window_end=date(2026, 12, 31),
+        predicted_class=NO_FUTURE_TRANSACTION,
+    )
+    db.add(prediction)
+    historic = replace(group(), final_cr_date=pd.Timestamp("2026-02-01"))
+    groups = [historic]
+    if future_si:
+        groups.append(replace(
+            group(), invoice_group_id="future", si_no="2",
+            si_date=pd.Timestamp("2026-06-01"),
+            final_cr_date=pd.Timestamp("2026-06-10"),
+        ))
+    db.flush()
+
+    result = model_lifecycle.monitor_registered_predictions(
+        db, groups, date(2027, 1, 15), date(2026, 12, 31),
+    )
+
+    assert result["matured"] == 1
+    assert prediction.actual_class == (
+        "Future Transaction" if future_si else NO_FUTURE_TRANSACTION
+    )
+
+
+def test_monitor_endpoint_without_successful_run_keeps_outcomes_pending(db):
+    from app.auth.dependencies import AuthenticatedUser
+    from app.main import monitor, MonitorRequest
+
+    account = DimAccount(standardized_account_name="A", display_name="A")
+    db.add(account)
+    db.flush()
+    prediction = FutureTransactionPrediction(
+        analysis_run_id="00000000-0000-4000-8000-000000000010",
+        account_key=account.account_key, model_version="extra_trees_stage8",
+        cutoff_date=date(2025, 12, 31), future_window_end=date(2026, 12, 31),
+        predicted_class=NO_FUTURE_TRANSACTION,
+    )
+    db.add(prediction)
+    db.flush()
+
+    result = monitor(
+        MonitorRequest(as_of_date=date(2027, 1, 15)),
+        AuthenticatedUser("00000000-0000-4000-8000-000000000001", "administrator"),
+        db,
+    )
+
+    assert result["status"] == "pending"
+    assert result["pending_data_coverage"] == 1
+    assert result["reason"] == "No successful run with a verified complete-through reference."
+    assert prediction.actual_class is None
+
+
+def test_monitoring_records_original_prediction_model_version(db):
+    from sqlalchemy import select
+    from app.db.models import PredictiveMonitoringEvaluation
+
+    account = DimAccount(standardized_account_name="A", display_name="A")
+    db.add(account)
+    old = PredictiveModelVersion(
+        model_version="older_version", status="inactive", artifact_hash="a" * 64,
+    )
+    active = PredictiveModelVersion(
+        model_version="extra_trees_stage8", status="active",
+        artifact_hash=DEFAULT_ANALYTICS_CONFIG.model_sha256,
+    )
+    db.add_all([old, active])
+    db.flush()
+    second_account = DimAccount(standardized_account_name="B", display_name="B")
+    db.add(second_account)
+    db.flush()
+    db.add_all([
+        FutureTransactionPrediction(
+            analysis_run_id="00000000-0000-4000-8000-000000000010",
+            account_key=account.account_key, model_version="older_version",
+            cutoff_date=date(2025, 12, 31), future_window_end=date(2026, 12, 31),
+            predicted_class=NO_FUTURE_TRANSACTION,
+        ),
+        FutureTransactionPrediction(
+            analysis_run_id="00000000-0000-4000-8000-000000000010",
+            account_key=second_account.account_key, model_version="extra_trees_stage8",
+            cutoff_date=date(2025, 12, 31), future_window_end=date(2026, 12, 31),
+            predicted_class=NO_FUTURE_TRANSACTION,
+        ),
+    ])
+    db.flush()
+
+    result = model_lifecycle.monitor_registered_predictions(
+        db, [group()], date(2027, 1, 15), date(2026, 12, 31),
+    )
+
+    records = db.scalars(select(PredictiveMonitoringEvaluation)).all()
+    assert result["metrics"] == {}
+    assert set(result["model_metrics"]) == {"older_version", "extra_trees_stage8"}
+    assert {
+        record.payload["model_version"]: record.predictive_model_version_id
+        for record in records
+    } == {
+        "older_version": old.predictive_model_version_id,
+        "extra_trees_stage8": active.predictive_model_version_id,
+    }

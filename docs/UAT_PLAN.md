@@ -11,4 +11,4 @@ For every case leave Actual Result, Pass/Fail, Tester, Date, Comments, and Evide
 
 UAT-011 confirms High/Medium/Low Priority remains separate from Future Transaction/No Future Transaction and prediction never changes FPS/rank/group.
 
-UAT-014 confirms routine import scores with a compatible active frozen artifact, never retrains it, and monitoring evaluates matured outcomes separately.
+UAT-014 confirms routine import scores with a compatible active frozen artifact and never retrains it. Monitoring stays pending until both the outcome window ends and a successful run verifies complete SI coverage through that window.

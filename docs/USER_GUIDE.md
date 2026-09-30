@@ -11,7 +11,7 @@
 
 ## Administrator
 
-Administrators additionally preview/commit files, choose the analysis reference date, use Pending or All Account Context views to maintain controlled taxonomy, status, and verification provenance, resolve quarantined collection corrections by selecting one authoritative raw row and recording a reason, inspect run history and technical analytics, manage aliases, register the private frozen Pipeline/package through the controlled backend process, and evaluate matured predictions. Context/correction changes require an explicit analytics rerun; they never mutate an old publication.
+Administrators additionally preview/commit files, choose the analysis reference date, use Pending or All Account Context views to maintain controlled taxonomy, status, and verification provenance, resolve quarantined collection corrections by selecting one authoritative raw row and recording a reason, inspect run history and technical analytics, manage aliases, register the private frozen Pipeline/package through the controlled backend process, and evaluate predictions only after the window has ended and a successful run verifies complete SI coverage through that date. Settings also provides Collection Correction Review: inspect candidate rows, select one authoritative row, and record a reason. A separate analytics rerun publishes any resulting decision change. Context/correction changes require an explicit analytics rerun; they never mutate an old publication.
 
 Exact duplicate files are blocked as audited no-ops. Unknown account context is not guessed. Routine import never retrains. Model unavailable warnings do not disable descriptive/prescriptive outputs.
 

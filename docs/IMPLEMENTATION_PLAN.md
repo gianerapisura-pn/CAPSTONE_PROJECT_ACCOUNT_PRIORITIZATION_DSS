@@ -5,7 +5,7 @@
 - Explicit analysis reference, separate B2B/current-actionability rules, and status provenance.
 - Cumulative logical-invoice reconstruction, duplicate no-op, late CR handling, and cent tolerance.
 - Final RFM field/scoring contract.
-- Frozen Extra Trees registration, hash/version validation, scoring registry, and maturity monitoring without retraining.
+- Frozen Extra Trees registration, hash/version validation, scoring registry, and monitoring gated by both calendar maturity and verified complete-through SI coverage without retraining.
 - Four-criterion CRITIC/MCS, 400 sensitivity scenarios, leave-one-out influence, and seven exact-baseline backtests.
 - Canonical API/UI terminology and role restrictions.
 - Immutable migrations 001-011 plus forward-only migration 012 for separately persisted final-study predictions and reporting.

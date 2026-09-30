@@ -19,6 +19,8 @@ class ImportPreviewResponse(BaseModel):
     rows_discovered: int
     cancelled_count: int
     latest_evidence_date: str | None = None
+    latest_valid_si_date: str | None = None
+    latest_final_cr_date: str | None = None
     analysis_reference_required: bool = True
     issues: list[ValidationIssueResponse]
     duplicate_committed_file: bool

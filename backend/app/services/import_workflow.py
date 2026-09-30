@@ -233,6 +233,8 @@ def resolve_collection_correction(
     review = db.get(CollectionCorrectionReview, review_id)
     if review is None:
         raise HTTPException(404, "Collection correction review not found.")
+    if review.status != "pending":
+        raise HTTPException(409, "Collection correction review has already been resolved.")
     if selected_raw_source_row_id not in (review.raw_source_row_ids or []):
         raise HTTPException(422, "Selected raw row is not part of this correction conflict.")
     if not reason.strip():
@@ -291,7 +293,6 @@ def preview_source(db: Session, user: AuthenticatedUser, file_name: str, content
     issues = list(parsed.issues)
     rows_discovered = 0
     cancelled = 0
-    evidence_dates: list[pd.Timestamp] = []
     for frame in parsed.frames.values():
         rows_discovered += len(frame)
         cancelled += sum(
@@ -299,22 +300,18 @@ def preview_source(db: Session, user: AuthenticatedUser, file_name: str, content
             for value in frame["PAYMENT STATUS"]
         )
         issues.extend(validate_rows(frame))
-        for column in ("SI DATE", "CR DATE"):
-            evidence_dates.extend(
-                value for value in pd.to_datetime(frame[column], errors="coerce")
-                if not pd.isna(value)
-            )
-    preview_rows = [
-        row for frame in parsed.frames.values()
-        for row in dataframe_to_source_rows(frame, import_batch_id="preview")
-        if row.standardized_account_name and row.si_no
-        and not pd.isna(row.si_date) and row.si_amount > 0
-    ]
-    preview_groups = group_invoices(preview_rows)
     error_rows = {
         (issue.source_sheet, issue.row_number) for issue in issues
         if issue.severity == "error" and issue.row_number is not None
     }
+    preview_rows = [
+        row for frame in parsed.frames.values()
+        for row in dataframe_to_source_rows(frame, import_batch_id="preview")
+        if (row.source_sheet, row.source_row_number) not in error_rows
+        and row.standardized_account_name and row.si_no
+        and not pd.isna(row.si_date) and row.si_amount > 0
+    ]
+    preview_groups = group_invoices(preview_rows)
     warning_rows = {
         (issue.source_sheet, issue.row_number) for issue in issues
         if issue.severity == "warning" and issue.row_number is not None
@@ -353,7 +350,12 @@ def preview_source(db: Session, user: AuthenticatedUser, file_name: str, content
         "duplicate": bool(duplicate),
     })
     db.commit()
-    latest_evidence = max(evidence_dates).date().isoformat() if evidence_dates else None
+    valid_groups = [group for group in preview_groups if group.rfm_eligible]
+    si_dates = [group.si_date for group in valid_groups]
+    cr_dates = [group.final_cr_date for group in valid_groups if group.settlement_eligible]
+    latest_si = max(si_dates).date().isoformat() if si_dates else None
+    latest_cr = max(cr_dates).date().isoformat() if cr_dates else None
+    latest_evidence = max((value for value in (latest_si, latest_cr) if value), default=None)
     return {
         "import_batch_id": batch.import_batch_id,
         "file_name": safe_name,
@@ -362,6 +364,8 @@ def preview_source(db: Session, user: AuthenticatedUser, file_name: str, content
         "rows_discovered": rows_discovered,
         "cancelled_count": cancelled,
         "latest_evidence_date": latest_evidence,
+        "latest_valid_si_date": latest_si,
+        "latest_final_cr_date": latest_cr,
         "analysis_reference_required": True,
         "issues": [asdict(issue) for issue in issues],
         "duplicate_committed_file": bool(duplicate),
