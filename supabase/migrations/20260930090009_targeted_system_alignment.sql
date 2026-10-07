@@ -76,11 +76,16 @@ begin
     create role peslc_reporting_reader
       nologin nosuperuser nocreatedb nocreaterole inherit noreplication nobypassrls;
   end if;
+  if exists (
+    select 1 from pg_roles
+    where rolname = 'peslc_reporting_reader'
+      and (rolcanlogin or rolsuper or rolcreatedb or rolcreaterole
+           or rolreplication or rolbypassrls or not rolinherit)
+  ) then
+    raise exception 'peslc_reporting_reader does not satisfy the restricted reporting-role contract';
+  end if;
 end
 $$;
-
-alter role peslc_reporting_reader
-  nologin nosuperuser nocreatedb nocreaterole inherit noreplication nobypassrls;
 
 grant usage on schema public to peslc_reporting_reader;
 grant select on analytics_runs, dim_account, fact_account_rfm,

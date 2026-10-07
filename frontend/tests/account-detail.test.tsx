@@ -21,6 +21,11 @@ vi.mock("@/lib/use-api", () => ({ useApi: () => ({
       account_status: "Client-Confirmed Closed", verification_type: "Client confirmation",
       verification_date: "2026-09-20", last_verified: "2026-09-21",
       verification_basis: "Direct PESLC client confirmation", current_actionable: false,
+      status_confirming_role: "PESLC client representative",
+      status_claim_scope: "PESLC account actionability",
+      identity_source_type: "Official company/organization",
+      identity_source_reference: "Official company page",
+      identity_source_checked_on: "2026-10-04",
     },
     predictive: { predicted_future_transaction_class: "No Future Transaction", model_version: "extra_trees_stage8" },
     critic_weights: {}, sensitivity: null,
@@ -33,6 +38,7 @@ test("closed B2B detail keeps descriptive and predictive evidence but no current
   expect(screen.getAllByText("Client-Confirmed Closed").length).toBeGreaterThan(0);
   expect(screen.getByText("Client-confirmed closed; excluded from the current actionable ranking.")).toBeInTheDocument();
   expect(screen.getByText("Direct PESLC client confirmation")).toBeInTheDocument();
+  expect(screen.getByText("Official company/organization / Official company page")).toBeInTheDocument();
   expect(screen.getByText("Not actionable")).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: /RFM profile/ })).toBeInTheDocument();
   expect(screen.getAllByText("No Future Transaction").length).toBeGreaterThan(0);

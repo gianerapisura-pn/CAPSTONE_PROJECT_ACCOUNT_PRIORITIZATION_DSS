@@ -107,6 +107,13 @@ def persist_run_output(db, run, result):
             verification_type=account.verification_type,
             verification_date=account.verification_date,
             verification_basis=account.verification_basis,
+            status_confirming_role=account.status_confirming_role,
+            status_claim_scope=account.status_claim_scope,
+            identity_source_type=account.identity_source_type,
+            identity_source_reference=account.identity_source_reference,
+            identity_source_url=account.identity_source_url,
+            identity_source_checked_on=account.identity_source_checked_on,
+            identity_source_note=account.identity_source_note,
             current_actionable=(
                 account.b2b_priority_eligible
                 and account.account_status == CLIENT_CONFIRMED_ACTIVE
@@ -294,6 +301,13 @@ def current_account_rows(db, run):
             "verification_type": account.verification_type,
             "verification_date": _iso(account.verification_date),
             "verification_basis": account.verification_basis,
+            "status_confirming_role": account.status_confirming_role,
+            "status_claim_scope": account.status_claim_scope,
+            "identity_source_type": account.identity_source_type,
+            "identity_source_reference": account.identity_source_reference,
+            "identity_source_url": account.identity_source_url,
+            "identity_source_checked_on": _iso(account.identity_source_checked_on),
+            "identity_source_note": account.identity_source_note,
             "current_actionable": account.current_actionable,
             "criteria_complete": criteria_complete,
             "analysis_run_id": run.analysis_run_id,

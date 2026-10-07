@@ -38,7 +38,7 @@ def test_no_production_cart_module_or_training_endpoint():
 
 
 def test_migration_009_has_canonical_views_and_least_privilege():
-    sql = Path("../supabase/migrations/009_final_locked_analytics_alignment.sql").read_text(
+    sql = Path("../supabase/migrations/20260930090011_final_locked_analytics_alignment.sql").read_text(
         encoding="utf-8")
     required = (
         "reporting_latest_run_summary",
@@ -78,7 +78,7 @@ def test_power_bi_rejects_public_publish_to_web():
     assert 'hostname.toLowerCase() !== "app.powerbi.com"' in reports
 
 def test_migration_010_is_forward_only_read_only_and_latest_run_scoped():
-    sql = Path("../supabase/migrations/010_post_lock_corrective_alignment.sql").read_text(
+    sql = Path("../supabase/migrations/20260930090012_post_lock_corrective_alignment.sql").read_text(
         encoding="utf-8"
     ).lower()
     assert "collection_correction_reviews" in sql
@@ -106,7 +106,7 @@ def test_prediction_and_business_context_do_not_enter_fps():
 
 
 def test_migration_011_snapshots_context_and_preserves_reporting_least_privilege():
-    sql = Path("../supabase/migrations/011_current_actionability_and_provenance.sql").read_text(
+    sql = Path("../supabase/migrations/20260930090013_current_actionability_and_provenance.sql").read_text(
         encoding="utf-8"
     ).lower()
     required = (
@@ -126,7 +126,7 @@ def test_migration_011_snapshots_context_and_preserves_reporting_least_privilege
     assert "revoke all on raw_source_rows" in sql
 
 def test_migration_012_separates_study_predictions_and_keeps_reporting_read_only():
-    sql = Path("../supabase/migrations/012_final_study_prediction_alignment.sql").read_text(
+    sql = Path("../supabase/migrations/20260930090014_final_study_prediction_alignment.sql").read_text(
         encoding="utf-8"
     ).lower()
     assert "predictive_study_predictions" in sql

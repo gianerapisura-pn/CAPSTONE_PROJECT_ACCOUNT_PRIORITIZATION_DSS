@@ -129,6 +129,13 @@ class AccountDecisionRowResponse(BaseModel):
     verification_type: str | None = None
     verification_date: str | None = None
     verification_basis: str | None = None
+    status_confirming_role: str | None = None
+    status_claim_scope: str | None = None
+    identity_source_type: str | None = None
+    identity_source_reference: str | None = None
+    identity_source_url: str | None = None
+    identity_source_checked_on: str | None = None
+    identity_source_note: str | None = None
     current_actionable: bool
     criteria_complete: bool
     analysis_run_id: str

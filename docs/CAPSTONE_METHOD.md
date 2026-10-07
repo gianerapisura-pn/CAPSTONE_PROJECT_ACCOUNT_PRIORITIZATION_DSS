@@ -14,7 +14,7 @@ Historical Settlement Duration uses only reconciled, nonnegative SI-to-final-CR 
 
 ## Predictive branch
 
-The official study forecast origin is 2025-12-31 and its 12-month window is 2026-01-01 through 2026-12-31. It contains 6 Future Transaction and 78 No Future Transaction classifications for 84 verified B2B accounts. This immutable study evidence is separate from the current 2026-09-21 prescriptive/actionability snapshot and later operational re-scores.
+The official study forecast origin is 2025-12-31 and its 12-month window is 2026-01-01 through 2026-12-31. It contains 6 Future Transaction and 78 No Future Transaction classifications for 84 verified B2B accounts. The latest authorized package also uses 2025-12-31 for its prescriptive/actionability snapshot. The immutable study forecast remains separate from operational re-scores and never determines ranking.
 
 The target is at least one valid logical SI in (T, T+12 months], labelled Future Transaction; otherwise No Future Transaction. Seven predictors are Recency Days, Frequency 24m, Monetary 24m, Average Settlement Days, Account Activity Gap, Recent Transaction Count 12m, and Recent Monetary Value 12m. All evidence is cutoff-safe; first-transaction activity-gap missingness is structural.
 

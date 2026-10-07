@@ -109,6 +109,13 @@ class DimAccount(Base):
     verification_type: Mapped[str | None] = mapped_column(String(120))
     verification_date: Mapped[datetime | None] = mapped_column(Date)
     verification_basis: Mapped[str | None] = mapped_column(Text)
+    status_confirming_role: Mapped[str | None] = mapped_column(String(160))
+    status_claim_scope: Mapped[str | None] = mapped_column(String(160))
+    identity_source_type: Mapped[str | None] = mapped_column(String(160))
+    identity_source_reference: Mapped[str | None] = mapped_column(Text)
+    identity_source_url: Mapped[str | None] = mapped_column(Text)
+    identity_source_checked_on: Mapped[datetime | None] = mapped_column(Date)
+    identity_source_note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 
@@ -222,6 +229,13 @@ class AccountContextSnapshot(Base):
     verification_type: Mapped[str | None] = mapped_column(String(120))
     verification_date: Mapped[datetime | None] = mapped_column(Date)
     verification_basis: Mapped[str | None] = mapped_column(Text)
+    status_confirming_role: Mapped[str | None] = mapped_column(String(160))
+    status_claim_scope: Mapped[str | None] = mapped_column(String(160))
+    identity_source_type: Mapped[str | None] = mapped_column(String(160))
+    identity_source_reference: Mapped[str | None] = mapped_column(Text)
+    identity_source_url: Mapped[str | None] = mapped_column(Text)
+    identity_source_checked_on: Mapped[datetime | None] = mapped_column(Date)
+    identity_source_note: Mapped[str | None] = mapped_column(Text)
     current_actionable: Mapped[bool] = mapped_column(Boolean)
     __table_args__ = (UniqueConstraint("analysis_run_id", "account_key"),)
 

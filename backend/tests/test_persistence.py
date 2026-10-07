@@ -37,7 +37,10 @@ def test_final_run_persistence_and_public_contract():
                 standardized_account_name=item.standardized_account_name,
                 display_name=item.standardized_account_name,
                 entity_type="Business", business_category="Corporate",
-                b2b_priority_eligible=True, account_status="Client-Confirmed Active"))
+                b2b_priority_eligible=True, account_status="Client-Confirmed Active",
+                status_confirming_role="PESLC client representative",
+                identity_source_type="Official company/organization",
+                identity_source_reference="Verified account registry"))
         db.flush()
         predictions = {item.standardized_account_name: "No Future Transaction"
                        for item in groups}
@@ -61,11 +64,14 @@ def test_final_run_persistence_and_public_contract():
         snapshotted = db.scalars(select(DimAccount)).first()
         snapshotted.entity_type = "Property/Building"
         snapshotted.account_status = "Client-Confirmed Closed"
+        snapshotted.identity_source_reference = "Later mutable edit"
         db.commit()
         rows = current_account_rows(db, latest)
         assert rows[0]["entity_type"] == "Business"
         assert rows[0]["account_status"] == "Client-Confirmed Active"
         assert rows[0]["current_actionable"] is True
+        assert all(x["status_confirming_role"] == "PESLC client representative" for x in rows)
+        assert all(x["identity_source_reference"] == "Verified account registry" for x in rows)
         assert all(x["b2b_priority_eligible"] for x in rows)
         assert {x["predicted_future_transaction_class"] for x in rows} == {
             "No Future Transaction"}

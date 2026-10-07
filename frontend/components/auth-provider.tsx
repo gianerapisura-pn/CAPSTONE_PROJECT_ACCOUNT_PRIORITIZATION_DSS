@@ -3,7 +3,7 @@
 import type { User } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { getSupabaseClient, isDemoEnvironment } from "@/lib/supabase";
+import { getSupabaseClient, isDemoEnvironment, isolatedDemoApiUrl } from "@/lib/supabase";
 
 export type AppUser = { userId: string; email: string; role: "administrator" | "management"; displayName: string; demo: boolean };
 type AuthContextValue = { user: AppUser | null; loading: boolean; demo: boolean;
@@ -16,13 +16,18 @@ function mapUser(authUser: User, profile: Record<string, unknown>): AppUser {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const demo = isDemoEnvironment();
+  const demoOnly = isDemoEnvironment();
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const demo = demoOnly || Boolean(user?.demo);
   useEffect(() => {
-    if (demo) {
+    if (demoOnly || sessionStorage.getItem("peslc-demo-session")) {
       const timer = window.setTimeout(() => {
-        if (sessionStorage.getItem("peslc-demo-session")) setUser({ userId: "00000000-0000-4000-8000-000000000001", email: "demo@local.invalid", role: "administrator", displayName: "Demo Administrator", demo: true });
+        if (sessionStorage.getItem("peslc-demo-session") && isolatedDemoApiUrl()) {
+          setUser({ userId: "00000000-0000-4000-8000-000000000001", email: "demo@local.invalid", role: "administrator", displayName: "Demo Administrator", demo: true });
+        } else {
+          sessionStorage.removeItem("peslc-demo-session");
+        }
         setLoading(false);
       }, 0);
       return () => window.clearTimeout(timer);
@@ -36,20 +41,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.user) setUser(mapUser(data.user, await apiFetch<Record<string, unknown>>("/auth/me")));
       setLoading(false);
     }).catch(() => setLoading(false));
-    const { data: listener } = client.auth.onAuthStateChange((_event, session) => { if (!session) setUser(null) });
+    const { data: listener } = client.auth.onAuthStateChange((_event, session) => { if (!session) setUser(current => current?.demo ? current : null) });
     return () => listener.subscription.unsubscribe();
-  }, [demo]);
+  }, [demoOnly]);
   const value = useMemo<AuthContextValue>(() => ({ user, loading, demo,
     async signIn(email, password) {
+      if (demoOnly) throw new Error("Production sign-in is unavailable in the isolated demo environment.");
+      sessionStorage.removeItem("peslc-demo-session");
       const client = getSupabaseClient();
       if (!client) throw new Error("Production sign-in is not configured. Use the labeled demo access instead.");
       const { data, error } = await client.auth.signInWithPassword({ email, password });
       if (error || !data.user) throw new Error(error?.message || "Sign-in failed.");
       setUser(mapUser(data.user, await apiFetch<Record<string, unknown>>("/auth/me")));
     },
-    demoSignIn() { sessionStorage.setItem("peslc-demo-session", "administrator"); setUser({ userId: "00000000-0000-4000-8000-000000000001", email: "demo@local.invalid", role: "administrator", displayName: "Demo Administrator", demo: true }) },
-    async signOut() { sessionStorage.removeItem("peslc-demo-session"); if (!demo) await getSupabaseClient()!.auth.signOut(); setUser(null) },
-  }), [demo, loading, user]);
+    demoSignIn() {
+      if (!isolatedDemoApiUrl()) throw new Error("The isolated demo backend is not configured.");
+      sessionStorage.setItem("peslc-demo-session", "administrator");
+      setUser({ userId: "00000000-0000-4000-8000-000000000001", email: "demo@local.invalid", role: "administrator", displayName: "Demo Administrator", demo: true });
+    },
+    async signOut() { sessionStorage.removeItem("peslc-demo-session"); if (!demoOnly && !user?.demo) await getSupabaseClient()!.auth.signOut(); setUser(null) },
+  }), [demo, demoOnly, loading, user]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

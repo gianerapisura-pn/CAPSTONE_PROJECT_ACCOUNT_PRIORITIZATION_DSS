@@ -20,6 +20,8 @@
 
 The service-role key and private bucket credentials remain backend-only. The peslc_reporting_reader role is NOLOGIN, SELECT-only, cannot bypass RLS, and has no RAW/private-storage access.
 
+Local real-user sign-in uses the production-configured Supabase API. The optional demo button uses a separately configured demo API and isolated SQLite backend; a missing demo URL fails closed and never falls back to the production API.
+
 ## Locked evidence boundaries
 
 The deployed artifact is the unchanged sklearn Pipeline containing the fitted median imputer and Extra Trees classifier; model metadata and locked evaluation evidence are loaded separately from a hash-verified package. Entropy, Equal Weighting, and CRITIC-weighted TOPSIS exist only as supplementary robustness evidence for Power BI and are never operational ranking methods.

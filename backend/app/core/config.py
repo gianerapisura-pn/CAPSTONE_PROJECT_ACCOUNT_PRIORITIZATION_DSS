@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     supabase_jwt_audience: str = "authenticated"
     supabase_storage_bucket: str = "source-imports"
     supabase_model_storage_bucket: str = "model-artifacts"
-    cors_allowed_origins: str = "http://localhost:3000"
+    cors_allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     app_env: str = "development"
     demo_mode: bool = True
     log_level: str = "INFO"

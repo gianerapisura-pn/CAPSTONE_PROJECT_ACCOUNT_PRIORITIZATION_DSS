@@ -3,6 +3,7 @@
 import { BarChart3, Download, ExternalLink, FileSpreadsheet, LockKeyhole } from "lucide-react";
 import { PageHeader } from "@/components/page-state";
 import { PowerBIRefreshStatus } from "@/components/power-bi-refresh-status";
+import { useAuth } from "@/components/auth-provider";
 import { downloadExport } from "@/lib/api";
 import { useApi } from "@/lib/use-api";
 import type { DashboardData } from "@/types/dss";
@@ -20,7 +21,8 @@ export function approvedPowerBiReportUrl(value: string | undefined): string | nu
 }
 
 export default function ReportsPage() {
-  const reportUrl = approvedPowerBiReportUrl(process.env.NEXT_PUBLIC_POWER_BI_REPORT_URL);
+  const { user } = useAuth();
+  const reportUrl = user?.demo ? null : approvedPowerBiReportUrl(process.env.NEXT_PUBLIC_POWER_BI_REPORT_URL);
   const { data: dashboard } = useApi<DashboardData>("/dashboard");
 
   return <div className="page-stack">

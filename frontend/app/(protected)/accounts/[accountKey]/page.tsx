@@ -62,6 +62,11 @@ export default function AccountDetailsPage() {
               <div><dt>Verification Type</dt><dd>{String(data.context.verification_type ?? "Pending")}</dd></div>
               <div><dt>Verification Date / Last Verified</dt><dd>{String(data.context.verification_date ?? "Pending")} / {String(data.context.last_verified ?? "Pending")}</dd></div>
               <div><dt>Verification Basis</dt><dd>{String(data.context.verification_basis ?? "Pending")}</dd></div>
+              <div><dt>Confirming Role / Claim Scope</dt><dd>{String(data.context.status_confirming_role ?? "Not recorded")} / {String(data.context.status_claim_scope ?? "Not recorded")}</dd></div>
+              <div><dt>Identity Source</dt><dd>{String(data.context.identity_source_type ?? "Not recorded")} / {String(data.context.identity_source_reference ?? "Not recorded")}</dd></div>
+              <div><dt>Source Checked On</dt><dd>{String(data.context.identity_source_checked_on ?? "Not recorded")}</dd></div>
+              {typeof data.context.identity_source_url === "string" && data.context.identity_source_url.startsWith("https://") && <div><dt>Source URL</dt><dd><a href={data.context.identity_source_url} target="_blank" rel="noreferrer">Open source</a></dd></div>}
+              {data.context.identity_source_note && <div><dt>Source Note</dt><dd>{String(data.context.identity_source_note)}</dd></div>}
               <div><dt>Current Actionability</dt><dd>{data.context.current_actionable ? "Actionable" : "Not actionable"}</dd></div>
             </dl>
           </div>

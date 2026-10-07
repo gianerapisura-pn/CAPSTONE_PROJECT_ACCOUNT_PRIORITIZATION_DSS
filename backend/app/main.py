@@ -312,6 +312,13 @@ def account_context_queue(
                 row.verification_date.isoformat() if row.verification_date else None
             ),
             "verification_basis": row.verification_basis,
+            "status_confirming_role": row.status_confirming_role,
+            "status_claim_scope": row.status_claim_scope,
+            "identity_source_type": row.identity_source_type,
+            "identity_source_reference": row.identity_source_reference,
+            "identity_source_url": row.identity_source_url,
+            "identity_source_checked_on": row.identity_source_checked_on.isoformat() if row.identity_source_checked_on else None,
+            "identity_source_note": row.identity_source_note,
             "b2b_priority_eligible": row.b2b_priority_eligible,
             "current_actionable": (
                 row.b2b_priority_eligible
@@ -365,6 +372,19 @@ def update_account_context(account_key: str, request: AccountContextRequest,
     }
     for field, value in values.items():
         setattr(row, field, value)
+    if any(previous[field] != values[field] for field in (
+        "account_status", "last_verified", "verification_type", "verification_date", "verification_basis"
+    )):
+        row.status_confirming_role = None
+        row.status_claim_scope = None
+    if any(previous[field] != values[field] for field in (
+        "entity_type", "business_category", "primary_business_type"
+    )):
+        row.identity_source_type = None
+        row.identity_source_reference = None
+        row.identity_source_url = None
+        row.identity_source_checked_on = None
+        row.identity_source_note = None
     audit(db, user.user_id, "account_context_updated", "dim_account", account_key, {
         "previous": previous,
         "updated": request.model_dump(mode="json"),
@@ -613,6 +633,9 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
             "entity_type", "business_category", "primary_business_type",
             "b2b_priority_eligible", "account_status", "last_verified",
             "verification_type", "verification_date", "verification_basis",
+            "status_confirming_role", "status_claim_scope", "identity_source_type",
+            "identity_source_reference", "identity_source_url", "identity_source_checked_on",
+            "identity_source_note",
             "current_actionable")},
         "decision": decision, "priority": decision if decision["is_ranked"] else None,
         "rfm": rfm.payload if rfm else None,

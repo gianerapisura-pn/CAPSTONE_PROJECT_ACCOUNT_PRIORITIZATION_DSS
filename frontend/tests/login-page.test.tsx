@@ -17,6 +17,7 @@ vi.mock("@/components/auth-provider", () => ({
 }));
 
 test("demo mode retains the isolated demo workspace button", async () => {
+  vi.stubEnv("NEXT_PUBLIC_DEMO_API_URL", "http://127.0.0.1:8011");
   render(<LoginPage />);
   expect(await screen.findByRole("button", {
     name: /Enter isolated demo workspace/i,

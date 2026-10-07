@@ -56,7 +56,6 @@ EXPECTED_SALES = {
     2017: 22685859.51, 2018: 28141212.85, 2019: 25104956.78,
     2020: 7422135.75, 2021: 17072550.27, 2022: 16803717.74,
     2023: 20244551.54, 2024: 21069452.09, 2025: 8923088.40,
-    2026: 0.0,
 }
 
 
@@ -132,15 +131,18 @@ def test_private_current_prescriptive_regression():
         "account_key", "account_name", "entity_type", "business_category",
         "primary_business_type",
     ]
-    assert list(status.columns) == ["account_key", "account_status", "last_verified"]
+    assert list(status.columns) == ["account_key", "account_status"]
     assert len(status) == 84
     assert Counter(status["account_status"]) == {
         "Client-Confirmed Active": 83, "Client-Confirmed Closed": 1,
     }
-    assert list(provenance.columns) == ["account_key", "verification_type", "verification_date", "basis"]
+    assert list(provenance.columns) == [
+        "account_key", "account_status", "source_type", "confirmed_on",
+        "confirming_role", "claim_scope", "basis",
+    ]
     assert len(provenance) == 84
-    assert set(provenance["verification_type"]) == {"Client confirmation"}
-    assert set(provenance["basis"]) == {"Direct PESLC client confirmation"}
+    assert set(provenance["source_type"]) == {"Client confirmation"}
+    assert status.merge(provenance, on="account_key", suffixes=("", "_source"))["account_status"].equals(status["account_status"])
     master = master.copy()
     master["standardized"] = master["account_name"].map(standardize_account_name)
     eligible = set(master.loc[
@@ -160,7 +162,7 @@ def test_private_current_prescriptive_regression():
     assert closed["standardized"].tolist() == ["ROSTRAM PROTECTIVE SYSTEM METIER COMPANY"]
     assert sha256(model_bytes).hexdigest() == DEFAULT_ANALYTICS_CONFIG.model_sha256
     result = run_account_prioritization(
-        groups, pd.Timestamp("2026-09-21"), eligible, actionable
+        groups, pd.Timestamp("2025-12-31"), eligible, actionable
     )
     assert result.latest_valid_si_date == "2025-08-13"
     assert result.latest_final_cr_date == "2025-12-13"
@@ -175,6 +177,18 @@ def test_private_current_prescriptive_regression():
         "settlement": 0.2662531584951738,
     }, abs=1e-12)
     assert [item["account"] for item in result.priorities[:10]] == EXPECTED_TOP_TEN
+    expected_priority = read_package_csv(
+        verified_package(PACKAGE, FINAL_PACKAGE_SHA256)[1],
+        "01_DATA/06_PRIORITY/current_priority.csv",
+    )
+    assert set(expected_priority["analysis_reference"]) == {"2025-12-31"}
+    actual_priority = {item["account"]: item for item in result.priorities}
+    for expected in expected_priority.to_dict(orient="records"):
+        actual = actual_priority[expected["account_name"]]
+        assert actual["recency_days"] == expected["recency_days"]
+        assert actual["priority_rank"] == expected["priority_rank"]
+        assert actual["priority_group"] == expected["priority_group"]
+        assert actual["final_priority_score"] == pytest.approx(expected["final_priority_score"], abs=1e-12)
     assert "ROSTRAM PROTECTIVE SYSTEM METIER COMPANY" not in {item["account"] for item in result.priorities}
     assert len(result.sensitivity) == 4
     assert sum(summary["iterations"] for summary in result.sensitivity) == 400
@@ -187,13 +201,11 @@ def test_private_current_prescriptive_regression():
         assert summary["max_group_movement_rate"] == pytest.approx(expected[3], abs=1e-12)
         assert summary["accounts_changing_group_at_least_once"] == expected[4]
         assert summary["baseline_top_ten_remain_high"] is True
-    baseline = annual_business_baselines(groups, pd.Timestamp("2026-09-21"), eligible)
+    baseline = annual_business_baselines(groups, pd.Timestamp("2025-12-31"), eligible)
     assert {row["year"]: row["all_recorded_sales"] for row in baseline} == pytest.approx(EXPECTED_SALES)
     assert next(row for row in baseline if row["year"] == 2018)["b2b_recorded_sales"] == pytest.approx(28128062.85)
     assert next(row for row in baseline if row["year"] == 2025)["period_status"] == "Complete year"
-    ytd = next(row for row in baseline if row["year"] == 2026)
-    assert ytd["period_status"] == "YTD through 2026-09-21"
-    assert ytd["all_sales_yoy_change_pct"] is None
+    assert [row["year"] for row in baseline] == list(range(2017, 2026))
     cutoffs = result.backtest["cutoffs"]
     assert [(item["eligible_account_count"], item["selected_account_count"]) for item in cutoffs] == [
         (49, 5), (57, 6), (62, 7), (67, 7), (69, 7), (77, 8), (79, 8),

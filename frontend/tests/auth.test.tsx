@@ -9,6 +9,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 test("demo login persists for the current browser session and logout clears it",async()=>{
  vi.stubEnv("NEXT_PUBLIC_DEMO_MODE","true");
+ vi.stubEnv("NEXT_PUBLIC_DEMO_API_URL","http://127.0.0.1:8011");
  const user=userEvent.setup();render(<AuthProvider><Harness/></AuthProvider>);
  expect(await screen.findByText("Signed out")).toBeInTheDocument();
  expect(screen.getByText("Demo mode")).toBeInTheDocument();

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.db.models import DimAccount, PredictiveModelVersion, PredictiveStudyPrediction
 from app.services.locked_packages import (
     FINAL_PACKAGE_SHA256,
+    LEGACY_FINAL_PACKAGE_SHA256,
     read_package_csv,
     read_package_json,
     verified_package,
@@ -185,7 +186,8 @@ def seed_final_study_predictions(db: Session, package_path: str | Path) -> dict:
         }
         actual = {row.account_key: row.predicted_class for row in existing}
         if actual != expected or any(
-            row.source_package_hash != FINAL_PACKAGE_SHA256 for row in existing
+            row.source_package_hash not in {FINAL_PACKAGE_SHA256, LEGACY_FINAL_PACKAGE_SHA256}
+            for row in existing
         ):
             raise ValueError("An incompatible immutable final study snapshot already exists.")
         return {"study_predictions": len(existing), "already_seeded": True}

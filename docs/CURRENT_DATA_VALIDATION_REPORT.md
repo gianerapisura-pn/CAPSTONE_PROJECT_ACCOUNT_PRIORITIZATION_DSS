@@ -1,11 +1,11 @@
 # Current Data Validation Report
 
-Status: the supplied final ZIP hash was verified. Safe production parsing/bootstrap/evidence validation passed, and the explicitly authorized frozen-model regression passed under pinned scikit-learn 1.8.0 without warnings.
+Status: the latest ZIP hash was verified. Strict parsing, the pinned scikit-learn 1.8.0 frozen-model regression, and a guarded live Supabase account-provenance bootstrap passed. A new immutable 2025-12-31 run published the updated context; the prior run remains unchanged. All 83 latest priorities match the package by account, reference, recency, rank, group, and score. Power BI semantic-model publication and automatic refresh remain unconfigured.
 
 | Anchor | Locked value |
 |---|---:|
 | Study forecast origin / window | 2025-12-31 / 2026-01-01 to 2026-12-31 |
-| Current prescriptive reference | 2026-09-21 |
+| Current prescriptive reference | 2025-12-31 |
 | Physical rows | 363 |
 | Fully Paid / Cancelled | 292 / 71 |
 | Logical invoices | 282 |

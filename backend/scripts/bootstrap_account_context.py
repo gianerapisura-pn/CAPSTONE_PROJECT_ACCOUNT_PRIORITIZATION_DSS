@@ -18,6 +18,8 @@ from app.services.locked_packages import FINAL_PACKAGE_SHA256, read_package_csv,
 MASTER_MEMBER = "01_DATA/01_ACCOUNTS/account_master.csv"
 STATUS_MEMBER = "01_DATA/01_ACCOUNTS/account_status.csv"
 PROVENANCE_MEMBER = "01_DATA/01_ACCOUNTS/status_provenance.csv"
+IDENTITY_PROVENANCE_MEMBER = "01_DATA/01_ACCOUNTS/account_master_provenance.csv"
+BUSINESS_MAPPING_MEMBER = "01_DATA/01_ACCOUNTS/business_type_mapping.csv"
 
 
 def _require_schema(frame: pd.DataFrame, expected: list[str], name: str) -> None:
@@ -30,9 +32,13 @@ def bootstrap(db, package_path: str, actor: str | None = None) -> dict:
     master = read_package_csv(content, MASTER_MEMBER)
     statuses = read_package_csv(content, STATUS_MEMBER)
     provenance = read_package_csv(content, PROVENANCE_MEMBER)
+    identity_provenance = read_package_csv(content, IDENTITY_PROVENANCE_MEMBER)
+    business_mapping = read_package_csv(content, BUSINESS_MAPPING_MEMBER)
     _require_schema(master, ["account_key", "account_name", "entity_type", "business_category", "primary_business_type"], "account_master.csv")
-    _require_schema(statuses, ["account_key", "account_status", "last_verified"], "account_status.csv")
-    _require_schema(provenance, ["account_key", "verification_type", "verification_date", "basis"], "status_provenance.csv")
+    _require_schema(statuses, ["account_key", "account_status"], "account_status.csv")
+    _require_schema(provenance, ["account_key", "account_status", "source_type", "confirmed_on", "confirming_role", "claim_scope", "basis"], "status_provenance.csv")
+    _require_schema(identity_provenance, ["account_key", "account_name", "entity_type", "primary_business_type", "source_type", "source_reference", "source_url", "source_checked_on", "note"], "account_master_provenance.csv")
+    _require_schema(business_mapping, ["primary_business_type", "business_category"], "business_type_mapping.csv")
     if len(master) != 85:
         raise ValueError(f"Locked account master must contain 85 identities; found {len(master)}.")
     personal = master.loc[master["entity_type"] == "Individual/Personal"]
@@ -42,6 +48,23 @@ def bootstrap(db, package_path: str, actor: str | None = None) -> dict:
     b2b_keys = set(b2b["account_key"].astype(str))
     if len(b2b_keys) != 84 or set(statuses["account_key"].astype(str)) != b2b_keys or set(provenance["account_key"].astype(str)) != b2b_keys:
         raise ValueError("B2B master, status, and provenance key sets must match exactly across 84 identities.")
+    for frame, name in ((master, "master"), (statuses, "status"), (provenance, "status provenance"), (identity_provenance, "identity provenance")):
+        if frame["account_key"].isna().any() or frame["account_key"].duplicated().any():
+            raise ValueError(f"Duplicate or missing account keys in {name}.")
+    if len(identity_provenance) != len(master) or set(identity_provenance["account_key"]) != set(master["account_key"]):
+        raise ValueError("Identity provenance must cover every master account exactly once.")
+    identity_match = master.merge(identity_provenance, on="account_key", validate="one_to_one", suffixes=("", "_source"))
+    for field in ("account_name", "entity_type", "primary_business_type"):
+        if not identity_match[field].equals(identity_match[f"{field}_source"]):
+            raise ValueError(f"Identity provenance {field} differs from account master.")
+    if business_mapping["primary_business_type"].duplicated().any():
+        raise ValueError("Business type mapping contains duplicate types.")
+    mapped = master.merge(business_mapping, on="primary_business_type", how="left", validate="many_to_one", suffixes=("", "_mapped"))
+    if mapped["business_category_mapped"].isna().any() or not mapped["business_category"].equals(mapped["business_category_mapped"]):
+        raise ValueError("Account business categories do not match the approved mapping.")
+    status_match = statuses.merge(provenance, on="account_key", validate="one_to_one", suffixes=("", "_source"))
+    if not status_match["account_status"].equals(status_match["account_status_source"]):
+        raise ValueError("Status provenance differs from the approved account status.")
     status_counts = statuses["account_status"].value_counts().to_dict()
     if status_counts != {CLIENT_CONFIRMED_ACTIVE: 83, CLIENT_CONFIRMED_CLOSED: 1}:
         raise ValueError(f"Unexpected account status distribution: {status_counts}")
@@ -49,13 +72,16 @@ def bootstrap(db, package_path: str, actor: str | None = None) -> dict:
     closed_master = closed.merge(master, on="account_key", validate="one_to_one")
     if closed_master.iloc[0]["account_key"] != "A064" or standardize_account_name(closed_master.iloc[0]["account_name"]) != "ROSTRAM PROTECTIVE SYSTEM METIER COMPANY":
         raise ValueError("The sole closed B2B identity must be A064 ROSTRAM PROTECTIVE SYSTEM METIER COMPANY.")
-    if set(provenance["verification_type"].astype(str)) != {"Client confirmation"}:
+    if set(provenance["source_type"].astype(str)) != {"Client confirmation"}:
         raise ValueError("All B2B provenance must use Client confirmation.")
-    if set(provenance["basis"].astype(str)) != {"Direct PESLC client confirmation"}:
-        raise ValueError("All B2B provenance must use the direct PESLC client-confirmation basis.")
+    if provenance[["confirmed_on", "confirming_role", "claim_scope", "basis"]].isna().any().any():
+        raise ValueError("Client-confirmed status provenance must be complete.")
 
     merged = master.merge(statuses, on="account_key", how="left", validate="one_to_one").merge(
-        provenance, on="account_key", how="left", validate="one_to_one"
+        provenance.drop(columns="account_status"), on="account_key", how="left", validate="one_to_one"
+    ).merge(
+        identity_provenance.drop(columns=["account_name", "entity_type", "primary_business_type"]),
+        on="account_key", how="left", validate="one_to_one", suffixes=("_status", "_identity")
     )
     existing = {row.standardized_account_name: row for row in db.scalars(select(DimAccount)).all()}
     for source in merged.to_dict(orient="records"):
@@ -70,12 +96,21 @@ def bootstrap(db, package_path: str, actor: str | None = None) -> dict:
         row.primary_business_type = str(source["primary_business_type"]).strip()
         row.b2b_priority_eligible = row.entity_type != "Individual/Personal"
         row.account_status = None if pd.isna(source["account_status"]) else str(source["account_status"]).strip()
-        last_verified = pd.to_datetime(source["last_verified"], errors="coerce")
+        last_verified = pd.to_datetime(source["confirmed_on"], errors="coerce")
         row.last_verified = None if pd.isna(last_verified) else last_verified.date()
-        row.verification_type = None if pd.isna(source["verification_type"]) else str(source["verification_type"]).strip()
-        verification_date = pd.to_datetime(source["verification_date"], errors="coerce")
-        row.verification_date = None if pd.isna(verification_date) else verification_date.date()
+        if row.b2b_priority_eligible and row.last_verified is None:
+            raise ValueError("Confirmed-on date must be valid for every verified B2B account.")
+        row.verification_type = None if pd.isna(source["source_type_status"]) else str(source["source_type_status"]).strip()
+        row.verification_date = row.last_verified
         row.verification_basis = None if pd.isna(source["basis"]) else str(source["basis"]).strip()
+        row.status_confirming_role = None if pd.isna(source["confirming_role"]) else str(source["confirming_role"]).strip()
+        row.status_claim_scope = None if pd.isna(source["claim_scope"]) else str(source["claim_scope"]).strip()
+        row.identity_source_type = None if pd.isna(source["source_type_identity"]) else str(source["source_type_identity"]).strip()
+        row.identity_source_reference = None if pd.isna(source["source_reference"]) else str(source["source_reference"]).strip()
+        row.identity_source_url = None if pd.isna(source["source_url"]) else str(source["source_url"]).strip()
+        checked = pd.to_datetime(source["source_checked_on"], errors="coerce")
+        row.identity_source_checked_on = None if pd.isna(checked) else checked.date()
+        row.identity_source_note = None if pd.isna(source["note"]) else str(source["note"]).strip()
     result = {"historical_identity_count": 85, "b2b_analytical_count": 84, "current_actionable_count": 83}
     audit(db, actor, "locked_account_context_bootstrap", "dim_account", None, {
         "package_sha256": FINAL_PACKAGE_SHA256, **result, "publication_required": True,

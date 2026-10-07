@@ -113,3 +113,36 @@ def test_final_study_package_rejects_wrong_distribution():
         assert "official 6/78" in str(exc) or "predicted_future_transaction" in str(exc)
     else:
         raise AssertionError("Wrong final study distribution was accepted.")
+
+
+def test_legacy_study_snapshot_is_kept_when_latest_package_labels_match(monkeypatch):
+    content = package_bytes()
+    monkeypatch.setattr(study_predictions, "verified_package", lambda path, digest: (path, content))
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        for index in range(84):
+            name = f"ACCOUNT {index + 1:03d}"
+            account = DimAccount(standardized_account_name=name, display_name=name)
+            db.add(account)
+            db.flush()
+            db.add(PredictiveStudyPrediction(
+                model_version="extra_trees_stage8", account_key=account.account_key,
+                forecast_origin=study_predictions.FORECAST_ORIGIN,
+                future_window_start=study_predictions.FUTURE_WINDOW_START,
+                future_window_end=study_predictions.FUTURE_WINDOW_END,
+                predicted_class="Future Transaction" if index < 6 else "No Future Transaction",
+                source_package_hash=study_predictions.LEGACY_FINAL_PACKAGE_SHA256,
+                source_package_member=study_predictions.STUDY_PREDICTION_MEMBER,
+            ))
+        db.add(PredictiveModelVersion(
+            model_version="extra_trees_stage8", status="active",
+            artifact_hash=study_predictions.MODEL_ARTIFACT_SHA256,
+        ))
+        db.flush()
+        assert study_predictions.seed_final_study_predictions(db, "latest.zip") == {
+            "study_predictions": 84, "already_seeded": True,
+        }
+        assert {row.source_package_hash for row in db.scalars(select(PredictiveStudyPrediction))} == {
+            study_predictions.LEGACY_FINAL_PACKAGE_SHA256,
+        }

@@ -1,5 +1,16 @@
 # Test Results
 
+## Latest-Package Alignment (2026-10-07)
+
+- Private latest-ZIP regression: 2 passed under the project's pinned scikit-learn 1.8.0 without version warnings, including exact 2025-12-31 priority score/rank/group comparison and unchanged 6/78 frozen-model classes. An earlier system-Python 1.7.1 run emitted version warnings and is not the pinned acceptance run.
+- In-memory latest-package account bootstrap: 85 identities, 84 B2B, 83 actionable; 85 identity-source rows and 84 status-provenance rows; transaction rolled back.
+- Backend suite: 101 passed, 2 package-gated skipped, 28 warnings. The first run hit a Windows system-temp permission error in two fixture setups; a fresh workspace-local temp run passed.
+- Frontend: 18 files, 42 tests passed after the fail-closed dual-mode routing change; TypeScript and final production build passed.
+- Supabase migration 017: transaction-rollback dry run passed, then applied to the existing project. Guarded latest-ZIP provenance bootstrap and one new immutable 2025-12-31 run succeeded. Post-check: 17 migrations, 363 raw rows, 2 successful historical runs, 83 latest priorities, 84 B2B context snapshots with source provenance, 1 unchanged active frozen model, and 84 unchanged immutable study predictions. Power BI refresh is still `not_configured`.
+- Restricted reporting reader: all 83 live priorities matched latest-ZIP account/reference/recency/rank/group/score; new certified columns readable; RAW SELECT denied. Existing owner/client Auth accounts were confirmed without password or role changes. First interactive sign-in was not tested.
+- Final pinned backend suite with private latest-ZIP regression enabled: **103 passed**, 28 analytical fixture warnings. Final frontend production build passed; 18 frontend files / 42 tests passed.
+- Latest ZIP SHA-256: `7ae729205ddcfc942cf6eb5db60adbd3cd957ea3e30a29be2c675e75c2e4146b`; frozen model SHA-256 remains `7c606fceb6a5e9515e68dc53430789352128ad2e1cad7bd2941c826bbcff91d8`.
+
 Final validation date: 2026-09-30
 
 ## Power BI Refresh Integration (2026-09-30)

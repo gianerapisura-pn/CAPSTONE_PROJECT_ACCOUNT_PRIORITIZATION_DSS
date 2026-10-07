@@ -30,20 +30,33 @@ def test_locked_account_master_status_provenance_and_population_contract(monkeyp
             "Client-Confirmed Closed" if key == "A064" else "Client-Confirmed Active"
             for key in b2b_keys
         ],
-        "last_verified": ["2026-09-21"] * 84,
     })
     provenance = pd.DataFrame({
         "account_key": b2b_keys,
-        "verification_type": ["Client confirmation"] * 84,
-        "verification_date": ["2026-09-20"] * 84,
-        "basis": ["Direct PESLC client confirmation"] * 84,
+        "account_status": status["account_status"],
+        "source_type": ["Client confirmation"] * 84,
+        "confirmed_on": ["2026-09-20"] * 84,
+        "confirming_role": ["PESLC client representative"] * 84,
+        "claim_scope": ["PESLC account actionability"] * 84,
+        "basis": ["Direct PESLC confirmation collected for the study"] * 84,
     })
+    identity = master[["account_key", "account_name", "entity_type", "primary_business_type"]].copy()
+    identity["source_type"] = "Client confirmation"
+    identity["source_reference"] = "PESLC account master"
+    identity["source_url"] = None
+    identity["source_checked_on"] = "2026-10-04"
+    identity["note"] = "Approved context"
+    mapping = master[["primary_business_type", "business_category"]].drop_duplicates()
     monkeypatch.setattr(bootstrap_account_context, "verified_package", lambda path, digest: (path, b"verified"))
     def source(_content, suffix):
         if suffix.endswith("account_status.csv"):
             return status.copy()
         if suffix.endswith("status_provenance.csv"):
             return provenance.copy()
+        if suffix.endswith("account_master_provenance.csv"):
+            return identity.copy()
+        if suffix.endswith("business_type_mapping.csv"):
+            return mapping.copy()
         return master.copy()
     monkeypatch.setattr(bootstrap_account_context, "read_package_csv", source)
     engine = create_engine("sqlite:///:memory:")
@@ -65,7 +78,9 @@ def test_locked_account_master_status_provenance_and_population_contract(monkeyp
         assert closed.account_status == "Client-Confirmed Closed"
         assert closed.verification_type == "Client confirmation"
         assert closed.verification_date == date(2026, 9, 20)
-        assert closed.verification_basis == "Direct PESLC client confirmation"
+        assert closed.verification_basis == "Direct PESLC confirmation collected for the study"
+        assert closed.status_claim_scope == "PESLC account actionability"
+        assert closed.identity_source_reference == "PESLC account master"
 
 
 def test_unknown_future_account_defaults_ineligible():

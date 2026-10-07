@@ -10,6 +10,6 @@ Routine runs score compatible accounts with the active frozen artifact and never
 
 A production-like later-year + new-account end-to-end run remains an external validation action; the generic unit fixture does not prove live Supabase deployment.
 
-The controlled bootstrap reads `account_master.csv`, `account_status.csv`, and `status_provenance.csv` from hash-verified `PESLC_FINAL_ANALYTICS_FINAL_REVISED.zip`. The package stays private and is never copied into Git.
+The controlled bootstrap reads `account_master.csv`, `account_status.csv`, `status_provenance.csv`, `account_master_provenance.csv`, and `business_type_mapping.csv` from the hash-verified `PESLC_FINAL_ANALYTICS_FINAL (1).zip`. The package stays private and is never copied into Git. A new publication snapshots imported provenance; prior published runs remain immutable.
 
 The revised package also carries data_completeness_provenance.csv. Its client-confirmed 2025 SI coverage through 2025-12-31 supports the fixed study origin; later operational references still require their own verified complete-through basis.

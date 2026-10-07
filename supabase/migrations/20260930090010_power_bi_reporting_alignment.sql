@@ -133,7 +133,7 @@ create or replace view reporting_latest_cart_class_metrics with (security_invoke
 select r.analysis_run_id,
        r.model_version,
        class_label,
-       (o.payload->'report'->'per_class'->class_label->>'precision')::numeric precision,
+       (o.payload->'report'->'per_class'->class_label->>'precision')::numeric as "precision",
        (o.payload->'report'->'per_class'->class_label->>'recall')::numeric recall,
        (o.payload->'report'->'per_class'->class_label->>'f1')::numeric f1_score,
        (o.payload->'report'->'per_class'->class_label->>'support')::integer support
