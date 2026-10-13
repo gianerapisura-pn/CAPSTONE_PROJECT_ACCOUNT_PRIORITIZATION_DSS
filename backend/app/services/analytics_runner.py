@@ -73,6 +73,7 @@ def run_account_prioritization(
     current_actionable_accounts: set[str] | None = None,
     config: AnalyticsConfig = DEFAULT_ANALYTICS_CONFIG,
     predictive_result: FutureTransactionResult | None = None,
+    predictive_closure_years: dict[str, int] | None = None,
 ) -> AnalyticsRunResult:
     started = datetime.now(timezone.utc)
     reference = pd.Timestamp(analysis_reference_date)
@@ -163,7 +164,7 @@ def run_account_prioritization(
     if predictive.status != "Validated":
         warnings.append(
             "Future Transaction prediction is unavailable because the genuine frozen "
-            "Extra Trees artifact is not registered and validated."
+            "CatBoost artifact is not registered and validated."
         )
     completed = datetime.now(timezone.utc)
     return AnalyticsRunResult(
@@ -187,6 +188,7 @@ def run_account_prioritization(
         predictive=asdict(predictive),
         backtest=asdict(run_historical_backtest(
             analytical_groups, config=config, eligible_accounts=b2b_accounts,
+            closure_years=predictive_closure_years,
         )),
         business_baselines=annual_business_baselines(
             invoice_groups, reference, b2b_accounts,

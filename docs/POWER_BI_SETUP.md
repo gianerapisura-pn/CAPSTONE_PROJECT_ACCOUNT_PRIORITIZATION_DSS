@@ -2,7 +2,7 @@
 
 Use the dedicated PostgreSQL login that inherits `peslc_reporting_reader`. It must be SELECT-only, non-superuser, without BYPASSRLS, RAW/private access, correction-review access, or write grants.
 
-Connect Power BI to the certified views from migrations 009-012:
+Connect Power BI to the certified views through migration 018:
 - `reporting_latest_run_summary`
 - `reporting_latest_account_context`
 - `reporting_latest_account_priorities`
@@ -35,9 +35,9 @@ After a successful import commit **or explicit analytics rerun**, the new run an
 
 The standard REST refresh has shared-capacity request limits, including scheduled requests. Avoid scheduling extra refreshes that exhaust that quota. The service principal, workspace access, data-source credentials, gateway if required, PBIX/report wiring, first live refresh, and reconciliation still require one-time authorized Power BI setup. A successful API request alone does not prove the PBIX is connected to the intended views. See [Microsoft refresh API](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/refresh-dataset-in-group) and [execution details API](https://learn.microsoft.com/en-us/rest/api/power-bi/datasets/get-refresh-execution-details-in-group).
 
-After refresh reconcile 85 historical identities if shown, 84 B2B analytical profiles, 83 current actionable/MCS/ranked accounts, 28/27/28 groups, 84 final-study predictive outputs with a 6/78 split, current CRITIC weights, 400 scenarios and 33,200 sensitivity detail rows, seven cutoff-safe backtests, and final-v2 robustness evidence. Preserve NULL as unavailable.
+After refresh reconcile 85 historical identities if shown, 84 B2B analytical profiles, 83 current actionable/MCS/ranked accounts, 28/27/28 groups, 83 final-study predictive outputs with a 10/73 split, current CRITIC weights, 400 scenarios and 33,200 sensitivity detail rows, seven closure-aware cutoff-safe backtests, and final-v2 robustness evidence. Preserve NULL as unavailable.
 
-The four-page contract remains: Page 1 distinguishes 85/84/83 current context; Page 2 shows status/actionability while retaining closed-account history; Page 3 reports the fixed 84-account study prediction; Page 4 reports 83-account current CRITIC/sensitivity/LOO plus supplementary robustness.
+The four-page contract remains: Page 1 distinguishes 85/84/83 current context; Page 2 shows status/actionability while retaining closed-account history; Page 3 reports the fixed 83-account study prediction; Page 4 reports 83-account current CRITIC/sensitivity/LOO plus supplementary robustness.
 
 No PBIX exists in this repository. PBIX wiring, live refresh, screenshot evidence, and reconciliation remain external pending work.
 ## Live data checkpoint (2026-09-30)
@@ -53,3 +53,7 @@ Migration 017 appends identity-source and status-confirmation provenance to the 
 The existing Supabase project is unchanged. The backend has its database/Supabase settings and a Power BI workspace ID, but no configured `POWER_BI_DATASET_ID`, Microsoft service-principal credentials, or approved `NEXT_PUBLIC_POWER_BI_REPORT_URL`. Therefore the automatic-refresh API path and secure report link remain intentionally unconfigured, and no completed live Power BI refresh or embedded report is claimed. The existing workspace can be reused; the one-time semantic-model publication, reporting-reader credentials, service-principal workspace permission, report URL, and first verified refresh remain necessary. Do not replace the client's Microsoft account or use public Publish to web.
 
 After migration 017 and the new immutable publication, the restricted reporting login returned 83 priorities, 84 B2B context snapshots with identity provenance, and no RAW SELECT privilege. Every live priority row matched the latest ZIP on account, 2025-12-31 reference, recency, rank, group, and score (maximum floating-point score difference 1.1e-16). The previous run's immutable context was not rewritten. The backend correctly records the newest Power BI refresh status as `not_configured` until the actual semantic model and Microsoft credentials exist. A local `D:\Downloads\capstone.pbix` has four pages, but its certified-view connection and publication remain unverified; do not treat its presence as a connected live report.
+
+## CatBoost package alignment (2026-10-12)
+
+The latest private package changes only the predictive model/evidence and closure-aware predictive eligibility. Migration 018 keeps historical publications intact, adds A064 closure provenance to future snapshots, and makes certified predictive views follow the active model instead of a hardcoded model version. After deployment, reconcile active `catboost_stage8`, artifact hash `09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3`, 83 study predictions, and the 10/73 class split. Until migration, registration, seed, publication, and Power BI refresh are completed, the prior live checkpoint above is historical state rather than the desired current state.

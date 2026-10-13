@@ -36,7 +36,11 @@ def bootstrap(db, package_path: str, actor: str | None = None) -> dict:
     business_mapping = read_package_csv(content, BUSINESS_MAPPING_MEMBER)
     _require_schema(master, ["account_key", "account_name", "entity_type", "business_category", "primary_business_type"], "account_master.csv")
     _require_schema(statuses, ["account_key", "account_status"], "account_status.csv")
-    _require_schema(provenance, ["account_key", "account_status", "source_type", "confirmed_on", "confirming_role", "claim_scope", "basis"], "status_provenance.csv")
+    _require_schema(provenance, [
+        "account_key", "account_status", "source_type", "confirmed_on",
+        "confirming_role", "claim_scope", "basis", "closed_since_year",
+        "closure_date_precision", "closure_reported_on",
+    ], "status_provenance.csv")
     _require_schema(identity_provenance, ["account_key", "account_name", "entity_type", "primary_business_type", "source_type", "source_reference", "source_url", "source_checked_on", "note"], "account_master_provenance.csv")
     _require_schema(business_mapping, ["primary_business_type", "business_category"], "business_type_mapping.csv")
     if len(master) != 85:
@@ -76,6 +80,16 @@ def bootstrap(db, package_path: str, actor: str | None = None) -> dict:
         raise ValueError("All B2B provenance must use Client confirmation.")
     if provenance[["confirmed_on", "confirming_role", "claim_scope", "basis"]].isna().any().any():
         raise ValueError("Client-confirmed status provenance must be complete.")
+    closure_rows = provenance.loc[provenance["closed_since_year"].notna()]
+    if (
+        len(closure_rows) != 1
+        or str(closure_rows.iloc[0]["account_key"]) != "A064"
+        or int(closure_rows.iloc[0]["closed_since_year"]) != 2021
+        or str(closure_rows.iloc[0]["closure_date_precision"]).strip() !=
+            "Year only; month/day not supplied"
+        or str(closure_rows.iloc[0]["closure_reported_on"]).strip() != "2026-10-11"
+    ):
+        raise ValueError("Closure provenance must identify only A064 as closed since 2021.")
 
     merged = master.merge(statuses, on="account_key", how="left", validate="one_to_one").merge(
         provenance.drop(columns="account_status"), on="account_key", how="left", validate="one_to_one"
@@ -105,6 +119,16 @@ def bootstrap(db, package_path: str, actor: str | None = None) -> dict:
         row.verification_basis = None if pd.isna(source["basis"]) else str(source["basis"]).strip()
         row.status_confirming_role = None if pd.isna(source["confirming_role"]) else str(source["confirming_role"]).strip()
         row.status_claim_scope = None if pd.isna(source["claim_scope"]) else str(source["claim_scope"]).strip()
+        row.closed_since_year = (
+            None if pd.isna(source["closed_since_year"])
+            else int(source["closed_since_year"])
+        )
+        row.closure_date_precision = (
+            None if pd.isna(source["closure_date_precision"])
+            else str(source["closure_date_precision"]).strip()
+        )
+        reported = pd.to_datetime(source["closure_reported_on"], errors="coerce")
+        row.closure_reported_on = None if pd.isna(reported) else reported.date()
         row.identity_source_type = None if pd.isna(source["source_type_identity"]) else str(source["source_type_identity"]).strip()
         row.identity_source_reference = None if pd.isna(source["source_reference"]) else str(source["source_reference"]).strip()
         row.identity_source_url = None if pd.isna(source["source_url"]) else str(source["source_url"]).strip()

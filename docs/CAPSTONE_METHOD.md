@@ -1,6 +1,6 @@
 # Final Capstone Method
 
-Methodology version: 2026.09-final-locked. Predictive model version: extra_trees_stage8.
+Methodology version: 2026.09-final-locked. Predictive model version: catboost_stage8.
 
 ## Data and eligibility
 
@@ -14,11 +14,11 @@ Historical Settlement Duration uses only reconciled, nonnegative SI-to-final-CR 
 
 ## Predictive branch
 
-The official study forecast origin is 2025-12-31 and its 12-month window is 2026-01-01 through 2026-12-31. It contains 6 Future Transaction and 78 No Future Transaction classifications for 84 verified B2B accounts. The latest authorized package also uses 2025-12-31 for its prescriptive/actionability snapshot. The immutable study forecast remains separate from operational re-scores and never determines ranking.
+The official study forecast origin is 2025-12-31 and its 12-month window is 2026-01-01 through 2026-12-31. It contains 10 Future Transaction and 73 No Future Transaction classifications for 83 predictively eligible B2B accounts. A064 is client-reported closed since 2021 at year-only precision, so it is included only at predictive/backtest cutoffs before 2021. Descriptive analysis still contains 84 verified B2B accounts, while current prescriptive actionability remains 83 accounts. The immutable study forecast remains separate from operational re-scores and never determines ranking.
 
 The target is at least one valid logical SI in (T, T+12 months], labelled Future Transaction; otherwise No Future Transaction. Seven predictors are Recency Days, Frequency 24m, Monetary 24m, Average Settlement Days, Account Activity Gap, Recent Transaction Count 12m, and Recent Monetary Value 12m. All evidence is cutoff-safe; first-transaction activity-gap missingness is structural.
 
-Routine scoring uses only the private frozen Extra Trees artifact extra_trees_stage8, expected SHA-256 7c606fceb6a5e9515e68dc53430789352128ad2e1cad7bd2941c826bbcff91d8, with scikit-learn 1.8.0. The genuine artifact is an unchanged sklearn Pipeline with a fitted median imputer and Extra Trees classifier; metadata is loaded separately. Model code 0 maps to Future Transaction and code 1 maps to No Future Transaction. No endpoint retrains it. Output is categorical only and never enters ranking. Monitoring stays Pending until both the 12-month outcome window has ended and a successful run verifies complete SI coverage through its end. Calendar passage or a later CR alone cannot establish No Future Transaction; single-class periods suppress class-balanced metrics.
+Routine scoring uses only the private frozen CatBoost artifact catboost_stage8, expected SHA-256 09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3, with CatBoost 1.2.8 and scikit-learn 1.8.0. The artifact is the unchanged authorized FrozenCatBoost object with its fitted median imputer and CatBoost classifier; metadata is loaded separately. Model code 0 maps to Future Transaction and code 1 maps to No Future Transaction. No endpoint retrains it. Output is categorical only and never enters ranking. Monitoring stays Pending until both the 12-month outcome window has ended and a successful run verifies complete SI coverage through its end. Calendar passage or a later CR alone cannot establish No Future Transaction; single-class periods suppress class-balanced metrics.
 
 ## Prescriptive branch
 

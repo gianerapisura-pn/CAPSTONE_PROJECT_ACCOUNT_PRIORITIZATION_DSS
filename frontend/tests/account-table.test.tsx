@@ -16,7 +16,7 @@ const base = {
   baseline_monetary_weight: .25, baseline_settlement_weight: .25,
   r_score: 5, f_score: 4, m_score: 3,
   mcs_eligible: true, mcs_eligibility_reason: null, is_ranked: true,
-  ranking_status: "Ranked", ranking_unavailable_reason: null, model_version: "extra_trees_stage8",
+  ranking_status: "Ranked", ranking_unavailable_reason: null, model_version: "catboost_stage8",
 };
 const rows: AccountDecisionRow[] = [
   { ...base, account: "ALPHA", account_key: "a", priority_rank: 1, priority_group: "High", final_priority_score: .9, predicted_future_transaction_class: "Future Transaction" },

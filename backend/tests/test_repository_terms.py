@@ -27,7 +27,7 @@ def test_active_code_has_no_obsolete_public_contract_terms():
 def test_final_method_and_model_versions_are_distinct():
     text = Path("app/core/analytics_config.py").read_text(encoding="utf-8")
     assert 'version: str = "2026.09-final-locked"' in text
-    assert 'model_version: str = "extra_trees_stage8"' in text
+    assert 'model_version: str = "catboost_stage8"' in text
 
 
 def test_no_production_cart_module_or_training_endpoint():
@@ -74,8 +74,9 @@ def test_service_role_secret_is_not_exposed_to_frontend():
 def test_power_bi_rejects_public_publish_to_web():
     reports = Path("../frontend/app/(protected)/reports/page.tsx").read_text(
         encoding="utf-8")
-    assert 'startsWith("/view")' in reports
-    assert 'hostname.toLowerCase() !== "app.powerbi.com"' in reports
+    assert 'url.origin !== "https://app.powerbi.com"' in reports
+    assert '(!reportPath && !embedPath)' in reports
+    assert 'url.pathname.toLowerCase() === "/reportembed"' in reports
 
 def test_migration_010_is_forward_only_read_only_and_latest_run_scoped():
     sql = Path("../supabase/migrations/20260930090012_post_lock_corrective_alignment.sql").read_text(

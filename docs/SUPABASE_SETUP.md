@@ -6,7 +6,7 @@
 4. Create Auth users and administrator/management user_profiles.
 5. Create a separate Power BI login and grant only peslc_reporting_reader membership.
 6. Verify the login has SELECT-only access to certified views and prescriptive validation evidence, cannot bypass RLS, and cannot select RAW/import/audit/correction-review tables.
-7. Reuse the already registered hash-verified extra_trees_stage8 Pipeline and immutable study/robustness evidence. The latest-package account provenance was bootstrapped separately; never re-register or retrain the unchanged model.
+7. Register the hash-verified `catboost_stage8` artifact from the authorized latest package, then seed its separate immutable study/robustness evidence. Never retrain or alter the artifact during registration.
 8. Run read-only checks before any live mutation and never print secrets.
 
 Migration 009 adds account context, operational prediction registry, benchmark and CRITIC influence tables. Migrations 010-011 add correction review, current actionability/provenance, immutable run context, and reporting controls. Migration 012 adds the separate immutable final-study prediction and certified reporting view.

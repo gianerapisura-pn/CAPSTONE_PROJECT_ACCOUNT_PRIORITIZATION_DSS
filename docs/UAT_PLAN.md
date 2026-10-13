@@ -5,7 +5,7 @@ Execute against an authorized deployed environment. Automated tests do not pre-f
 ## Structure
 
 - 6 User UAT cases: management overview, prioritization list, filtering/export, account detail explanation, secure detailed-report link, and role/navigation behavior.
-- 8 System Validation cases: import preview/commit, duplicate and late evidence, account-context/B2B/actionability/provenance control, immutable run-context publication, Future Transaction separation, migration/RLS, future-data continuity/timing, and frozen Extra Trees lifecycle.
+- 8 System Validation cases: import preview/commit, duplicate and late evidence, account-context/B2B/actionability/provenance control, immutable run-context publication, Future Transaction separation, migration/RLS, future-data continuity/timing, and frozen CatBoost lifecycle.
 
 For every case leave Actual Result, Pass/Fail, Tester, Date, Comments, and Evidence blank until a named tester executes it.
 

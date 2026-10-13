@@ -9,7 +9,7 @@ Production-style capstone prototype with a Next.js Web DSS, FastAPI analytics/ET
 - An administrator supplies an explicit verified complete-through reference date; latest SI/CR dates remain source metadata and do not automatically set the reference.
 - Historical identities remain preserved. Verified B2B accounts enter descriptive and predictive analytics; current CRITIC/MCS additionally requires Client-Confirmed Active status and complete criteria.
 - RFM uses q20/q40/q60/q80 empirical quintiles with linear interpolation and tie preservation.
-- The separate predictive branch uses the frozen extra_trees_stage8 artifact and seven cutoff-safe predictors for a 12-month Future Transaction class.
+- The separate predictive branch uses the frozen catboost_stage8 artifact and seven cutoff-safe predictors for a 12-month Future Transaction class.
 - CRITIC objectively weights Recency, Frequency, Monetary, and Historical Settlement Duration. Prediction and business category never enter FPS.
 - Sensitivity uses one deterministic RNG stream across 4 ranges x 100 scenarios. Leave-one-account-out CRITIC influence is separate.
 - Historical usefulness uses seven 2018-2024 cutoffs and exact selected k / eligible n random expectation.
@@ -28,6 +28,6 @@ The private `PESLC_FINAL_ANALYTICS_FINAL_REVISED.zip` is the single active packa
 
 ## Deployment status
 
-Migrations through 013, application code (including optional post-publication Power BI refresh), and reporting specifications are prepared locally. Applying pending migrations to live Supabase, registering/seeding the private authorized package, connecting/refreshing/reconciling the actual PBIX, production-like later-year import, generation-time measurement, and role-based UAT remain pending until executed with authorized external access. Automatic Power BI refresh is disabled until its backend-only credentials and workspace/model are configured; see `docs/POWER_BI_SETUP.md`.
+Migrations through 018, application code (including optional post-publication Power BI refresh), and reporting specifications are prepared locally. Applying pending migrations to live Supabase, registering/seeding the private authorized package, connecting/refreshing/reconciling the actual PBIX, production-like later-year import, generation-time measurement, and role-based UAT remain pending until executed with authorized external access. Automatic Power BI refresh is disabled until its backend-only credentials and workspace/model are configured; see `docs/POWER_BI_SETUP.md`.
 
 Supplementary Entropy, Equal Weighting, and CRITIC-weighted TOPSIS comparisons are locked methodological robustness evidence for Power BI only. Production FPS, ranks, and groups remain CRITIC plus additive MCS.

@@ -10,7 +10,7 @@ import joblib
 import pandas as pd
 import pytest
 
-from app.analytics.predictive.future_transaction import score_extra_trees_artifact
+from app.analytics.predictive.future_transaction import score_frozen_artifact
 from app.analytics.validation.baselines import annual_business_baselines
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
 from app.etl.invoices import dataframe_to_source_rows, group_invoices
@@ -45,6 +45,10 @@ EXPECTED_TOP_TEN = [
     "EXECUTIVE GENESIS SERVICES INC", "WEECOMM CENTRE PROPERTIES, INC.",
 ]
 EXPECTED_FUTURE_ACCOUNTS = {
+    "3M PHILIPPINES INC",
+    "LOXON PHILIPPINES INC",
+    "MEGAWORLD CORPORATION",
+    "METRO WORX PROPERTIES INC",
     "WEECOMM CENTRE PROPERTIES, INC.",
     "WEE COMMUNITY DEVELOPERS INC",
     "BCE PROPERTIES INC",
@@ -66,14 +70,14 @@ def _private_inputs():
         read_package_csv(package_content, "01_DATA/01_ACCOUNTS/account_master.csv"),
         read_package_csv(package_content, "01_DATA/01_ACCOUNTS/account_status.csv"),
         read_package_csv(package_content, "01_DATA/01_ACCOUNTS/status_provenance.csv"),
-        read_package_member(package_content, "03_MODEL/extra_trees.joblib"),
+        read_package_member(package_content, "03_MODEL/catboost.joblib"),
     )
 
 
 
 
 def test_private_final_study_predictive_regression(monkeypatch):
-    raw_bytes, master, _status, _provenance, model_bytes = _private_inputs()
+    raw_bytes, master, _status, provenance, model_bytes = _private_inputs()
     parsed = parse_source_file("PESLC_RAW.xlsx", raw_bytes)
     rows = [
         row
@@ -86,6 +90,15 @@ def test_private_final_study_predictive_regression(monkeypatch):
     eligible = set(master.loc[
         master["entity_type"].astype(str) != "Individual/Personal", "standardized"
     ])
+    closure_context = provenance.merge(
+        master[["account_key", "standardized"]], on="account_key", validate="one_to_one"
+    )
+    closed_by_origin = set(closure_context.loc[
+        closure_context["closed_since_year"].notna()
+        & (closure_context["closed_since_year"].astype(float) <= 2025),
+        "standardized",
+    ])
+    predictive_eligible = eligible - closed_by_origin
 
     assert sha256(model_bytes).hexdigest() == DEFAULT_ANALYTICS_CONFIG.model_sha256
     monkeypatch.setattr("app.services.model_lifecycle.sklearn.__version__", "1.8.0")
@@ -93,20 +106,21 @@ def test_private_final_study_predictive_regression(monkeypatch):
         joblib.load(BytesIO(model_bytes)),
         DEFAULT_ANALYTICS_CONFIG,
     )
-    predictive = score_extra_trees_artifact(
+    predictive = score_frozen_artifact(
         groups,
         artifact,
         pd.Timestamp("2025-12-31"),
-        eligible,
+        predictive_eligible,
         DEFAULT_ANALYTICS_CONFIG.model_version,
         DEFAULT_ANALYTICS_CONFIG.model_sha256,
+        DEFAULT_ANALYTICS_CONFIG.model_family,
     )
 
     assert predictive.analysis_reference_date == "2025-12-31"
     assert predictive.target_horizon_months == 12
     assert Counter(predictive.predictions.values()) == {
-        "Future Transaction": 6,
-        "No Future Transaction": 78,
+        "Future Transaction": 10,
+        "No Future Transaction": 73,
     }
     assert {
         account
@@ -138,7 +152,8 @@ def test_private_current_prescriptive_regression():
     }
     assert list(provenance.columns) == [
         "account_key", "account_status", "source_type", "confirmed_on",
-        "confirming_role", "claim_scope", "basis",
+        "confirming_role", "claim_scope", "basis", "closed_since_year",
+        "closure_date_precision", "closure_reported_on",
     ]
     assert len(provenance) == 84
     assert set(provenance["source_type"]) == {"Client confirmation"}
@@ -162,7 +177,10 @@ def test_private_current_prescriptive_regression():
     assert closed["standardized"].tolist() == ["ROSTRAM PROTECTIVE SYSTEM METIER COMPANY"]
     assert sha256(model_bytes).hexdigest() == DEFAULT_ANALYTICS_CONFIG.model_sha256
     result = run_account_prioritization(
-        groups, pd.Timestamp("2025-12-31"), eligible, actionable
+        groups, pd.Timestamp("2025-12-31"), eligible, actionable,
+        predictive_closure_years={
+            "ROSTRAM PROTECTIVE SYSTEM METIER COMPANY": 2021,
+        },
     )
     assert result.latest_valid_si_date == "2025-08-13"
     assert result.latest_final_cr_date == "2025-12-13"
@@ -208,9 +226,13 @@ def test_private_current_prescriptive_regression():
     assert [row["year"] for row in baseline] == list(range(2017, 2026))
     cutoffs = result.backtest["cutoffs"]
     assert [(item["eligible_account_count"], item["selected_account_count"]) for item in cutoffs] == [
-        (49, 5), (57, 6), (62, 7), (67, 7), (69, 7), (77, 8), (79, 8),
+        (49, 5), (57, 6), (62, 7), (66, 7), (68, 7), (76, 8), (78, 8),
     ]
-    expected_lifts = [6.563563, 0.387212, 3.714688, 2.582215, 2.683938, 6.203005, 2.795802]
+    expected_lifts = [
+        6.563563167489584, 0.387212359351214, 3.714687692810974,
+        2.543674176004408, 2.645040383733523, 6.411002161203225,
+        2.760412086579304,
+    ]
     for item, expected in zip(cutoffs, expected_lifts, strict=True):
         assert item["expected_random_capture"] == pytest.approx(
             item["selected_account_count"] / item["eligible_account_count"]

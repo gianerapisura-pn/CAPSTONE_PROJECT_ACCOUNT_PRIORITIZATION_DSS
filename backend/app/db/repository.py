@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pandas as pd
@@ -61,6 +61,27 @@ def current_actionable_accounts(db):
     )).all())
 
 
+def predictive_accounts_at(db, reference_date: date | pd.Timestamp):
+    reference_year = pd.Timestamp(reference_date).year
+    rows = db.scalars(select(DimAccount).where(
+        DimAccount.b2b_priority_eligible.is_(True)
+    )).all()
+    return {
+        row.standardized_account_name for row in rows
+        if row.closed_since_year is None or reference_year < row.closed_since_year
+    }
+
+
+def predictive_closure_years(db):
+    return {
+        row.standardized_account_name: row.closed_since_year
+        for row in db.scalars(select(DimAccount).where(
+            DimAccount.b2b_priority_eligible.is_(True),
+            DimAccount.closed_since_year.is_not(None),
+        )).all()
+    }
+
+
 def eligible_b2b_accounts(db):
     return b2b_analytical_accounts(db)
 
@@ -109,6 +130,9 @@ def persist_run_output(db, run, result):
             verification_basis=account.verification_basis,
             status_confirming_role=account.status_confirming_role,
             status_claim_scope=account.status_claim_scope,
+            closed_since_year=account.closed_since_year,
+            closure_date_precision=account.closure_date_precision,
+            closure_reported_on=account.closure_reported_on,
             identity_source_type=account.identity_source_type,
             identity_source_reference=account.identity_source_reference,
             identity_source_url=account.identity_source_url,
@@ -303,6 +327,9 @@ def current_account_rows(db, run):
             "verification_basis": account.verification_basis,
             "status_confirming_role": account.status_confirming_role,
             "status_claim_scope": account.status_claim_scope,
+            "closed_since_year": account.closed_since_year,
+            "closure_date_precision": account.closure_date_precision,
+            "closure_reported_on": _iso(account.closure_reported_on),
             "identity_source_type": account.identity_source_type,
             "identity_source_reference": account.identity_source_reference,
             "identity_source_url": account.identity_source_url,

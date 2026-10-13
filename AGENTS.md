@@ -25,7 +25,7 @@ Non-negotiable rules:
 14. Preview and COMMITTED are distinct; successful analytical runs are immutable and atomically published.
 15. Demo persistence/authentication remains visibly isolated.
 16. Logical invoice identity excludes import batch, worksheet, and row lineage.
-17. Routine imports score only with the active hash-verified extra_trees_stage8 artifact; retraining is separate and controlled.
+17. Routine imports score only with the active hash-verified catboost_stage8 artifact; retraining is separate and controlled.
 18. Analysis reference is explicit; cutoff-sensitive features use only SI/CR evidence available on or before it. A later CR does not advance a predictive cutoff, and operational references represent a verified complete-through boundary.
 19. Only explicitly verified B2B accounts enter the analytical population.
 20. B2B descriptive/predictive eligibility and current Client-Confirmed Active prescriptive actionability remain separate.

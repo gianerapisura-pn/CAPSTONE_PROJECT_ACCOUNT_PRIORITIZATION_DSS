@@ -10,13 +10,13 @@ from app.services.model_lifecycle import register_frozen_model
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Register the authorized frozen Extra Trees Pipeline after exact package/artifact "
+            "Register the authorized frozen CatBoost artifact after exact package/artifact "
             "hash and metadata validation."
         )
     )
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--package", help="Authorized PESLC_FINAL_ANALYTICS_FINAL_REVISED.zip")
-    source.add_argument("--artifact", help="Authorized private 03_MODEL/extra_trees.joblib")
+    source.add_argument("--artifact", help="Authorized private 03_MODEL/catboost.joblib")
     parser.add_argument(
         "--metadata",
         help="Authorized 03_MODEL/model_metadata.json; required with --artifact",

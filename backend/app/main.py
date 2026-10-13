@@ -30,6 +30,8 @@ from app.db.repository import (
     filter_current_account_rows,
     latest_successful_run,
     load_invoice_groups,
+    predictive_accounts_at,
+    predictive_closure_years,
     persist_run_output,
     run_payload,
     serialize_run,
@@ -314,6 +316,9 @@ def account_context_queue(
             "verification_basis": row.verification_basis,
             "status_confirming_role": row.status_confirming_role,
             "status_claim_scope": row.status_claim_scope,
+            "closed_since_year": row.closed_since_year,
+            "closure_date_precision": row.closure_date_precision,
+            "closure_reported_on": row.closure_reported_on.isoformat() if row.closure_reported_on else None,
             "identity_source_type": row.identity_source_type,
             "identity_source_reference": row.identity_source_reference,
             "identity_source_url": row.identity_source_url,
@@ -484,11 +489,15 @@ def run_analytics(request: RunRequest, background_tasks: BackgroundTasks,
         validate_analysis_reference(groups, pd.Timestamp(request.analysis_reference_date))
         b2b_accounts = b2b_analytical_accounts(db)
         actionable_accounts = current_actionable_accounts(db)
+        predictive_accounts = predictive_accounts_at(
+            db, request.analysis_reference_date
+        )
         predictive = future_transaction_for_current_run(
-            db, groups, pd.Timestamp(request.analysis_reference_date), b2b_accounts)
+            db, groups, pd.Timestamp(request.analysis_reference_date), predictive_accounts)
         result = asdict(run_account_prioritization(
             groups, pd.Timestamp(request.analysis_reference_date), b2b_accounts,
-            actionable_accounts, predictive_result=predictive))
+            actionable_accounts, predictive_result=predictive,
+            predictive_closure_years=predictive_closure_years(db)))
         run = AnalyticsRun(status="running",
                            analysis_reference_date=request.analysis_reference_date,
                            methodology_version=DEFAULT_ANALYTICS_CONFIG.version,
@@ -634,6 +643,7 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
             "b2b_priority_eligible", "account_status", "last_verified",
             "verification_type", "verification_date", "verification_basis",
             "status_confirming_role", "status_claim_scope", "identity_source_type",
+            "closed_since_year", "closure_date_precision", "closure_reported_on",
             "identity_source_reference", "identity_source_url", "identity_source_checked_on",
             "identity_source_note",
             "current_actionable")},
@@ -776,7 +786,7 @@ def methodology(user: AuthenticatedUser = Depends(require_admin)):
                         "and complete decision criteria."),
         "rfm": "Descriptive Recency from reference, Frequency per logical SI, and Monetary SI amount; q20/q40/q60/q80 empirical quintiles with ties preserved.",
         "settlement": "Observed SI-to-final-valid-CR duration using only cutoff-known, reconciled, nonnegative evidence.",
-        "predictive": "Frozen Extra Trees stage-8 artifact; Future Transaction means a succeeding valid SI within 12 months. CR is cutoff-known settlement evidence only; prediction never changes rank.",
+        "predictive": "Frozen CatBoost stage-8 artifact; Future Transaction means a succeeding valid SI within 12 months. CR is cutoff-known settlement evidence only; prediction never changes rank.",
         "mcs": "CRITIC weights normalized Recency, Frequency, Monetary, and Historical Settlement Duration; additive MCS determines FPS.",
         "priority_groups": "Tie-preserving ranked thirds from each discriminatory four-criterion run.",
         "backtest": "Seven annual cutoffs (2018-2024) with exact k/n random expectation.",

@@ -39,6 +39,14 @@ def test_locked_account_master_status_provenance_and_population_contract(monkeyp
         "confirming_role": ["PESLC client representative"] * 84,
         "claim_scope": ["PESLC account actionability"] * 84,
         "basis": ["Direct PESLC confirmation collected for the study"] * 84,
+        "closed_since_year": [2021 if key == "A064" else None for key in b2b_keys],
+        "closure_date_precision": [
+            "Year only; month/day not supplied" if key == "A064" else None
+            for key in b2b_keys
+        ],
+        "closure_reported_on": [
+            "2026-10-11" if key == "A064" else None for key in b2b_keys
+        ],
     })
     identity = master[["account_key", "account_name", "entity_type", "primary_business_type"]].copy()
     identity["source_type"] = "Client confirmation"
@@ -80,6 +88,9 @@ def test_locked_account_master_status_provenance_and_population_contract(monkeyp
         assert closed.verification_date == date(2026, 9, 20)
         assert closed.verification_basis == "Direct PESLC confirmation collected for the study"
         assert closed.status_claim_scope == "PESLC account actionability"
+        assert closed.closed_since_year == 2021
+        assert closed.closure_date_precision == "Year only; month/day not supplied"
+        assert closed.closure_reported_on == date(2026, 10, 11)
         assert closed.identity_source_reference == "PESLC account master"
 
 

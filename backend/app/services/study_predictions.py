@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from app.db.models import DimAccount, PredictiveModelVersion, PredictiveStudyPrediction
 from app.services.locked_packages import (
     FINAL_PACKAGE_SHA256,
-    LEGACY_FINAL_PACKAGE_SHA256,
     read_package_csv,
     read_package_json,
     verified_package,
@@ -24,10 +23,11 @@ STUDY_SUMMARY_MEMBER = (
 )
 MODEL_METADATA_MEMBER = "03_MODEL/model_metadata.json"
 COMPLETENESS_MEMBER = "01_DATA/02_SOURCE/data_completeness_provenance.csv"
-MODEL_VERSION = "extra_trees_stage8"
+MODEL_VERSION = "catboost_stage8"
 MODEL_ARTIFACT_SHA256 = (
-    "7c606fceb6a5e9515e68dc53430789352128ad2e1cad7bd2941c826bbcff91d8"
+    "09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3"
 )
+MODEL_FAMILY = "CatBoost Classifier"
 FORECAST_ORIGIN = date(2025, 12, 31)
 FUTURE_WINDOW_START = date(2026, 1, 1)
 FUTURE_WINDOW_END = date(2026, 12, 31)
@@ -95,7 +95,9 @@ def validate_study_prediction_package(content: bytes) -> list[dict]:
     protocol = metadata.get("final_study_scoring_protocol") or {}
     if protocol.get("forecast_origin") != FORECAST_ORIGIN.isoformat():
         raise ValueError("Model metadata has the wrong final study forecast origin.")
-    if "CR does not define Future Transaction" not in str(protocol.get("cr_role", "")):
+    if "cr does not define a future transaction" not in str(
+        protocol.get("cr_role", "")
+    ).casefold():
         raise ValueError("Model metadata does not preserve the SI-only target contract.")
 
     if len(summary) != 1:
@@ -105,9 +107,10 @@ def validate_study_prediction_package(content: bytes) -> list[dict]:
         "analysis_reference": FORECAST_ORIGIN.isoformat(),
         "future_window_start": FUTURE_WINDOW_START.isoformat(),
         "future_window_end": FUTURE_WINDOW_END.isoformat(),
-        "eligible_b2b_accounts": 84,
-        "predicted_future_transaction": 6,
-        "predicted_no_future_transaction": 78,
+        "eligible_b2b_accounts": 83,
+        "predicted_future_transaction": 10,
+        "predicted_no_future_transaction": 73,
+        "model_family": MODEL_FAMILY,
         "model_version": MODEL_VERSION,
     }
     for field, expected in summary_expected.items():
@@ -125,20 +128,22 @@ def validate_study_prediction_package(content: bytes) -> list[dict]:
         raise ValueError(
             "Final study predictions are missing columns: " + ", ".join(sorted(missing))
         )
-    if len(predictions) != 84:
-        raise ValueError("Final study prediction evidence must contain 84 rows.")
+    if len(predictions) != 83:
+        raise ValueError("Final study prediction evidence must contain 83 rows.")
     records = predictions.to_dict(orient="records")
     account_keys = [str(row["account_key"]).strip() for row in records]
     account_names = [str(row["account_name"]).strip() for row in records]
-    if len(set(account_keys)) != 84 or len(set(account_names)) != 84:
+    if len(set(account_keys)) != 83 or len(set(account_names)) != 83:
         raise ValueError("Final study prediction accounts must be unique.")
     labels = [str(row["predicted_target"]).strip() for row in records]
     if set(labels) - VALID_LABELS:
         raise ValueError("Final study prediction evidence contains an invalid class.")
     if Counter(labels) != Counter(
-        {"Future Transaction": 6, "No Future Transaction": 78}
+        {"Future Transaction": 10, "No Future Transaction": 73}
     ):
-        raise ValueError("Final study prediction evidence must preserve the official 6/78 result.")
+        raise ValueError("Final study prediction evidence must preserve the official 10/73 result.")
+    if "A064" in set(account_keys):
+        raise ValueError("Closed-since-2021 account A064 must not enter the 2025 forecast.")
     for row in records:
         if str(row["scoring_role"]).strip() != "Final study forecast":
             raise ValueError("Every final study row must declare its scoring role.")
@@ -186,7 +191,7 @@ def seed_final_study_predictions(db: Session, package_path: str | Path) -> dict:
         }
         actual = {row.account_key: row.predicted_class for row in existing}
         if actual != expected or any(
-            row.source_package_hash not in {FINAL_PACKAGE_SHA256, LEGACY_FINAL_PACKAGE_SHA256}
+            row.source_package_hash != FINAL_PACKAGE_SHA256
             for row in existing
         ):
             raise ValueError("An incompatible immutable final study snapshot already exists.")
@@ -221,7 +226,7 @@ def final_study_prediction_payload(db: Session) -> dict:
             "target_horizon_months": 12,
             "target_event": "At least one succeeding valid Sales Invoice",
             "model_version": MODEL_VERSION,
-            "model_family": "Extra Trees Classifier",
+            "model_family": MODEL_FAMILY,
             "artifact_hash": MODEL_ARTIFACT_SHA256,
             "source_package_hash": None,
             "class_counts": {},
@@ -252,7 +257,7 @@ def final_study_prediction_payload(db: Session) -> dict:
         "target_horizon_months": 12,
         "target_event": "At least one succeeding valid Sales Invoice",
         "model_version": MODEL_VERSION,
-        "model_family": "Extra Trees Classifier",
+        "model_family": MODEL_FAMILY,
         "artifact_hash": MODEL_ARTIFACT_SHA256,
         "source_package_hash": next(iter(hashes)),
         "class_counts": dict(counts),

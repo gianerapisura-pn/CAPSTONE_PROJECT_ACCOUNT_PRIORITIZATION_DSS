@@ -12,7 +12,7 @@ Provide RFM distributions or a concise profile table, Historical Settlement Dura
 
 ## Page 3: Predictive Model Evaluation
 
-Show the official 2025-12-31 forecast origin, 2026-01-01 through 2026-12-31 window, 6 Future / 78 No Future result, SI-based target, 3/6/12 horizon comparison, selected Extra Trees model, Macro F1 primary metric, classification error, balanced accuracy, Future Transaction recall/F1, XGBoost lower-error tradeoff, CatBoost near-tie caution, clearly labelled later-period checks, and pending monitoring window. Do not show tree-depth/leaves, uncalibrated raw scores, old labels, or imply superiority over CatBoost.
+Show the official 2025-12-31 forecast origin, 2026-01-01 through 2026-12-31 window, 10 Future / 73 No Future result for 83 predictively eligible accounts, SI-based target, 3/6/12 horizon comparison, selected CatBoost model, Macro F1 primary metric, classification error, balanced accuracy, Future Transaction recall/F1, XGBoost lower-error tradeoff, Extra Trees challenger result, clearly labelled later-period checks, and pending monitoring window. The CatBoost lead follows the prespecified selection rule but is not statistically established superiority. Do not show uncalibrated raw scores or old labels.
 
 ## Page 4: Ranking Robustness and Historical Usefulness
 

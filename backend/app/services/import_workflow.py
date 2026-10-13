@@ -29,6 +29,8 @@ from app.db.repository import (
     current_actionable_accounts,
     ensure_accounts,
     load_invoice_groups,
+    predictive_accounts_at,
+    predictive_closure_years,
     persist_run_output,
 )
 from app.etl.invoices import SourceRow, dataframe_to_source_rows, group_invoices
@@ -431,8 +433,9 @@ def commit_source(
         db.flush()
         b2b_accounts = b2b_analytical_accounts(db)
         actionable_accounts = current_actionable_accounts(db)
+        predictive_accounts = predictive_accounts_at(db, analysis_reference_date)
         predictive = future_transaction_for_current_run(
-            db, cumulative_groups, pd.Timestamp(analysis_reference_date), b2b_accounts,
+            db, cumulative_groups, pd.Timestamp(analysis_reference_date), predictive_accounts,
         )
         result = asdict(run_account_prioritization(
             cumulative_groups,
@@ -440,6 +443,7 @@ def commit_source(
             b2b_accounts,
             actionable_accounts,
             predictive_result=predictive,
+            predictive_closure_years=predictive_closure_years(db),
         ))
         run = AnalyticsRun(
             status="running",

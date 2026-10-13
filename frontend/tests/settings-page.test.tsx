@@ -16,7 +16,7 @@ vi.mock("@/lib/use-api", () => ({
       future_data_rule: "Validated committed data.",
     }, error: "", loading: false, reload: vi.fn() };
     if (path === "/models/current") return { data: {
-      status: "active", model_version: "extra_trees_stage8", model_family: "Extra Trees",
+      status: "active", model_version: "catboost_stage8", model_family: "CatBoost Classifier",
       selected_outcome_horizon: 12, validation_metrics: { macro_f1: 0.8015103929068558 },
     }, error: "", loading: false, reload: vi.fn() };
     if (path.startsWith("/account-context")) return { data: {

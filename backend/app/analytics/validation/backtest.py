@@ -70,6 +70,7 @@ def run_historical_backtest(
     invoice_groups: list[InvoiceGroup],
     config: AnalyticsConfig = DEFAULT_ANALYTICS_CONFIG,
     eligible_accounts: set[str] | None = None,
+    closure_years: dict[str, int] | None = None,
 ) -> HistoricalBacktestSummary:
     valid = [
         group for group in invoice_groups
@@ -79,11 +80,28 @@ def run_historical_backtest(
     results: list[dict] = []
     for cutoff_text in config.backtest_cutoffs:
         cutoff = pd.Timestamp(cutoff_text)
+        eligible_at_cutoff = (
+            None if eligible_accounts is None else {
+                account for account in eligible_accounts
+                if (
+                    not closure_years
+                    or account not in closure_years
+                    or cutoff.year < closure_years[account]
+                )
+            }
+        )
         evaluation_end = cutoff + pd.DateOffset(months=config.backtest_horizon_months)
-        future = [group for group in valid if cutoff < group.si_date <= evaluation_end]
+        cutoff_valid = [
+            group for group in valid
+            if eligible_at_cutoff is None
+            or group.standardized_account_name in eligible_at_cutoff
+        ]
+        future = [
+            group for group in cutoff_valid if cutoff < group.si_date <= evaluation_end
+        ]
         priorities, _ = compute_priorities(
-            compute_rfm(valid, cutoff, eligible_accounts),
-            compute_settlement_metrics(valid, cutoff),
+            compute_rfm(cutoff_valid, cutoff, eligible_at_cutoff),
+            compute_settlement_metrics(cutoff_valid, cutoff),
         )
         results.append(asdict(top_decile_backtest(
             priorities, future, cutoff.date().isoformat(), evaluation_end.date().isoformat()

@@ -5,9 +5,9 @@ from decimal import Decimal
 @dataclass(frozen=True)
 class AnalyticsConfig:
     version: str = "2026.09-final-locked"
-    model_version: str = "extra_trees_stage8"
-    model_family: str = "Extra Trees Classifier"
-    model_sha256: str = "7c606fceb6a5e9515e68dc53430789352128ad2e1cad7bd2941c826bbcff91d8"
+    model_version: str = "catboost_stage8"
+    model_family: str = "CatBoost Classifier"
+    model_sha256: str = "09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3"
     target_horizon_months: int = 12
     candidate_outcome_windows: tuple[int, ...] = (3, 6, 12)
     predictive_lookback_months: int = 24

@@ -13,7 +13,7 @@ Status: the latest ZIP hash was verified. Strict parsing, the pinned scikit-lear
 | Historical identities | 85 |
 | B2B descriptive/predictive | 84 |
 | Current actionable / MCS / ranked | 83 / 83 / 83 |
-| Final study prediction | 6 Future / 78 No Future Transaction |
+| Final study prediction | 10 Future / 73 No Future Transaction |
 | Priority groups | 28 / 27 / 28 |
 | Sensitivity | 400 scenarios / 33,200 detail rows |
 | Backtests | 7 annual cutoffs |
@@ -26,4 +26,4 @@ Current CRITIC weights are Recency 0.3744267906167242, Frequency 0.1837992490377
 
 Current top ten are MEGAWORLD CORPORATION; LOXON PHILIPPINES INC; METRO WORX PROPERTIES INC; RYXEN INC; EXQUADRA INC; WILL DECENA AND ASSOCIATES, INC.; BCE PROPERTIES INC; WEE COMMUNITY DEVELOPERS INC; EXECUTIVE GENESIS SERVICES INC; and WEECOMM CENTRE PROPERTIES, INC.
 
-Package output CSVs are acceptance references, not production runtime inputs. Production reruns recompute from committed data and the registered hash-verified Extra Trees artifact.
+Package output CSVs are acceptance references, not production runtime inputs. Production reruns recompute from committed data and the registered hash-verified CatBoost artifact.

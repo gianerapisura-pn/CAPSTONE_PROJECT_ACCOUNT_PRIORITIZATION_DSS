@@ -27,7 +27,7 @@ vi.mock("@/lib/use-api", () => ({ useApi: () => ({
       identity_source_reference: "Official company page",
       identity_source_checked_on: "2026-10-04",
     },
-    predictive: { predicted_future_transaction_class: "No Future Transaction", model_version: "extra_trees_stage8" },
+    predictive: { predicted_future_transaction_class: "No Future Transaction", model_version: "catboost_stage8" },
     critic_weights: {}, sensitivity: null,
     transactions: [{ invoice_group_id: "i1", si_no: "SI-1", si_date: "2025-01-01", si_amount: 100000, final_cr_date: "2025-01-13", payment_status: "Fully Paid", reconciled: true, import_batch_id: "batch-12345678" }],
   }, error: "", loading: false, reload: vi.fn(),

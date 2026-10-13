@@ -12,9 +12,9 @@ import joblib
 import numpy as np
 import pandas as pd
 import sklearn
-from sklearn.ensemble import ExtraTreesClassifier
+import catboost
+from catboost import CatBoostClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
 from sqlalchemy import delete, desc, select
 from sqlalchemy.orm import Session
 
@@ -24,8 +24,9 @@ from app.analytics.predictive.future_transaction import (
     NO_FUTURE_TRANSACTION,
     FutureTransactionResult,
     classification_metrics,
-    score_extra_trees_artifact,
+    score_frozen_artifact,
 )
+from catboost_model import FrozenCatBoost
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG, AnalyticsConfig
 from app.db.models import (
     DimAccount,
@@ -51,25 +52,29 @@ TARGET_DEFINITION = (
     "and on or before the end of the next 12 months."
 )
 LOCKED_PARAMETERS = {
-    "n_estimators": 300,
-    "criterion": "gini",
-    "max_depth": None,
-    "min_samples_split": 2,
-    "min_samples_leaf": 3,
-    "max_features": 0.75,
-    "class_weight": "balanced",
-    "bootstrap": False,
-    "random_state": 42,
+    "iterations": 150,
+    "depth": 5,
+    "learning_rate": 0.05,
+    "loss_function": "Logloss",
+    "auto_class_weights": "Balanced",
+    "verbose": False,
+    "random_seed": 42,
+    "thread_count": 1,
+    "allow_writing_files": False,
 }
-LOCKED_IMPUTER_MEDIANS = (750.5, 0.0, 0.0, 10.0, 94.0, 0.0, 0.0)
+PUBLIC_PARAMETERS = {
+    key: value for key, value in LOCKED_PARAMETERS.items()
+    if key not in {"verbose", "thread_count", "allow_writing_files"}
+}
+LOCKED_IMPUTER_MEDIANS = (746.5, 0.0, 0.0, 10.0, 94.0, 0.0, 0.0)
 LOCKED_DEVELOPMENT_METRICS = {
-    "macro_f1": 0.8015103929068558,
-    "classification_error": 0.0650150370168791,
-    "accuracy": 0.9349849629831208,
-    "balanced_accuracy": 0.817073754789272,
+    "macro_f1": 0.7997344352724599,
+    "classification_error": 0.0704674831809556,
+    "accuracy": 0.9295325168190444,
+    "balanced_accuracy": 0.8138836074861483,
     "future_transaction_f1": 0.6388888888888888,
     "future_transaction_recall": 0.6722222222222222,
-    "mcc": 0.6103695900043568,
+    "mcc": 0.6025330115316253,
 }
 
 
@@ -92,21 +97,27 @@ def _artifact_bytes(record: PredictiveModelVersion) -> bytes:
     return content
 
 
-def _validate_artifact(artifact: object, config: AnalyticsConfig) -> Pipeline:
+def _validate_artifact(artifact: object, config: AnalyticsConfig) -> FrozenCatBoost:
     if sklearn.__version__ != "1.8.0":
         raise ValueError(
             f"Frozen artifact requires scikit-learn 1.8.0; runtime is {sklearn.__version__}."
         )
-    if not isinstance(artifact, Pipeline):
-        raise ValueError("Frozen artifact must be the raw fitted scikit-learn Pipeline.")
-    if list(getattr(artifact, "feature_names_in_", [])) != list(FEATURE_COLUMNS):
-        raise ValueError("Frozen artifact does not declare the seven locked predictors in order.")
-    if list(artifact.named_steps) != ["imputer", "model"]:
-        raise ValueError("Frozen Pipeline must contain exactly the fitted imputer and model steps.")
+    if catboost.__version__ != "1.2.8":
+        raise ValueError(
+            f"Frozen artifact requires CatBoost 1.2.8; runtime is {catboost.__version__}."
+        )
+    if type(artifact) is not FrozenCatBoost:
+        raise ValueError("Frozen artifact must be the authorized FrozenCatBoost object.")
+    if artifact.params != LOCKED_PARAMETERS:
+        raise ValueError("Frozen CatBoost wrapper parameters do not match the locked contract.")
+    if list(getattr(artifact, "named_steps", {})) != ["imputer", "model"]:
+        raise ValueError("Frozen CatBoost must contain exactly the fitted imputer and model steps.")
     imputer = artifact.named_steps["imputer"]
     estimator = artifact.named_steps["model"]
     if not isinstance(imputer, SimpleImputer) or imputer.strategy != "median":
-        raise ValueError("Frozen Pipeline imputer must be SimpleImputer(strategy='median').")
+        raise ValueError("Frozen CatBoost imputer must be SimpleImputer(strategy='median').")
+    if list(getattr(imputer, "feature_names_in_", [])) != list(FEATURE_COLUMNS):
+        raise ValueError("Frozen artifact does not declare the seven locked predictors in order.")
     if not hasattr(imputer, "statistics_") or not np.allclose(
         np.asarray(imputer.statistics_, dtype=float),
         np.asarray(LOCKED_IMPUTER_MEDIANS, dtype=float),
@@ -114,30 +125,22 @@ def _validate_artifact(artifact: object, config: AnalyticsConfig) -> Pipeline:
         atol=1e-12,
         equal_nan=False,
     ):
-        raise ValueError("Frozen Pipeline imputer medians do not match the locked values.")
-    if not isinstance(estimator, ExtraTreesClassifier):
-        raise ValueError("Frozen Pipeline model step must be ExtraTreesClassifier.")
-    parameters = estimator.get_params(deep=False)
-    mismatches = {
-        key: (parameters.get(key), expected)
-        for key, expected in LOCKED_PARAMETERS.items()
-        if parameters.get(key) != expected
-    }
-    if mismatches:
-        raise ValueError(f"Frozen Extra Trees parameters do not match the locked contract: {mismatches}.")
+        raise ValueError("Frozen CatBoost imputer medians do not match the locked values.")
+    if not isinstance(estimator, CatBoostClassifier):
+        raise ValueError("Frozen CatBoost model step must be CatBoostClassifier.")
     if list(getattr(estimator, "classes_", [])) != [0, 1]:
-        raise ValueError("Frozen Extra Trees classes must be exactly [0, 1].")
-    if config.model_version != "extra_trees_stage8" or config.model_family != "Extra Trees Classifier":
-        raise ValueError("Runtime configuration does not identify the locked Extra Trees model.")
+        raise ValueError("Frozen CatBoost classes must be exactly [0, 1].")
+    if config.model_version != "catboost_stage8" or config.model_family != "CatBoost Classifier":
+        raise ValueError("Runtime configuration does not identify the locked CatBoost model.")
     return artifact
 
 
 def _load_artifact(
     record: PredictiveModelVersion,
     config: AnalyticsConfig = DEFAULT_ANALYTICS_CONFIG,
-) -> Pipeline:
+) -> FrozenCatBoost:
     if record.model_version != config.model_version:
-        raise ValueError("Active artifact is not the locked Extra Trees model version.")
+        raise ValueError("Active artifact is not the locked CatBoost model version.")
     if record.artifact_hash != config.model_sha256:
         raise ValueError("Registered artifact SHA-256 is not the locked expected SHA-256.")
     return _validate_artifact(joblib.load(BytesIO(_artifact_bytes(record))), config)
@@ -196,12 +199,12 @@ def seed_locked_predictive_evidence(
         db.add(PredictiveBenchmarkRecord(predictive_model_version_id=record.predictive_model_version_id, benchmark_scope="supplemental_nine_classifier_audit", model_name=str(source["family"]), payload={"source_member": "supplemental_model_benchmark.csv", **source}))
 
     later = read_package_csv(package_content, "01_DATA/05_PREDICTIVE/07_LATER_CHECKS/later_period_summary.csv")
-    if len(later) != 3:
-        raise ValueError("Locked later-period summary must contain exactly three periods.")
+    if len(later) != 2:
+        raise ValueError("Locked later-period summary must contain exactly two periods.")
     for source in _rows(later):
         parsed = pd.to_datetime(source.get("cutoff_date"), errors="coerce")
         db.add(PredictiveOOPEvaluation(predictive_model_version_id=record.predictive_model_version_id, oop_cutoff=None if pd.isna(parsed) else parsed.date(), payload={"source_member": "later_period_summary.csv", **source}))
-    return {"horizons": 3, "canonical_benchmarks": 22, "supplemental_benchmarks": 9, "later_checks": 3}
+    return {"horizons": 3, "canonical_benchmarks": 22, "supplemental_benchmarks": 9, "later_checks": 2}
 
 
 def _metadata_date(metadata: dict, *keys: str) -> date | None:
@@ -224,7 +227,7 @@ def register_frozen_model(
     package_content: bytes | None = None
     if package_path is not None:
         _, package_content = verified_package(package_path, FINAL_PACKAGE_SHA256)
-        content = read_package_member(package_content, "03_MODEL/extra_trees.joblib")
+        content = read_package_member(package_content, "03_MODEL/catboost.joblib")
         metadata = read_package_json(package_content, "03_MODEL/model_metadata.json")
     else:
         if local_artifact_path is None or metadata_path is None:
@@ -266,7 +269,7 @@ def register_frozen_model(
     record = PredictiveModelVersion(
         model_version=config.model_version,
         model_family=config.model_family,
-        model_parameters=LOCKED_PARAMETERS,
+        model_parameters=PUBLIC_PARAMETERS,
         target_definition=TARGET_DEFINITION,
         primary_selection_metric="Equal-year mean outer Macro F1",
         decision_threshold=config.decision_threshold,
@@ -284,7 +287,7 @@ def register_frozen_model(
             },
             "scaling": None,
         },
-        tree_hyperparameters=LOCKED_PARAMETERS,
+        tree_hyperparameters=PUBLIC_PARAMETERS,
         random_seed=config.random_seed,
         development_metrics=development_metrics,
         oop_metrics=validation_metrics,
@@ -324,13 +327,14 @@ def future_transaction_for_current_run(
         return unavailable_prediction(config)
     try:
         artifact = _load_artifact(active, config)
-        result = score_extra_trees_artifact(
+        result = score_frozen_artifact(
             invoice_groups,
             artifact,
             analysis_reference_date,
             eligible_accounts,
             active.model_version,
             active.artifact_hash or "",
+            active.model_family or config.model_family,
         )
         return replace(result, report=dict(active.oop_metrics or {}))
     except (OSError, ValueError, EOFError, KeyError):

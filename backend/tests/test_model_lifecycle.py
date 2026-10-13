@@ -7,12 +7,10 @@ import joblib
 import numpy as np
 import pandas as pd
 import pytest
-from sklearn.ensemble import ExtraTreesClassifier
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from catboost_model import FrozenCatBoost
 from app.analytics.predictive.future_transaction import FEATURE_COLUMNS, NO_FUTURE_TRANSACTION
 from app.core.analytics_config import AnalyticsConfig, DEFAULT_ANALYTICS_CONFIG
 from app.db.models import Base, DimAccount, FutureTransactionPrediction, PredictiveModelVersion
@@ -20,14 +18,14 @@ from app.etl.invoices import InvoiceGroup
 from app.services import model_lifecycle
 
 
-def locked_pipeline() -> Pipeline:
-    medians = list(model_lifecycle.LOCKED_IMPUTER_MEDIANS)
-    frame = pd.DataFrame([medians, medians], columns=FEATURE_COLUMNS)
-    pipeline = Pipeline([
-        ("imputer", SimpleImputer(strategy="median")),
-        ("model", ExtraTreesClassifier(**model_lifecycle.LOCKED_PARAMETERS)),
-    ])
-    pipeline.fit(frame, [0, 1])
+def locked_pipeline() -> FrozenCatBoost:
+    medians = np.asarray(model_lifecycle.LOCKED_IMPUTER_MEDIANS, dtype=float)
+    frame = pd.DataFrame(
+        [medians - 1.0, medians, medians + 1.0],
+        columns=FEATURE_COLUMNS,
+    )
+    pipeline = FrozenCatBoost(**model_lifecycle.LOCKED_PARAMETERS)
+    pipeline.fit(frame, [0, 1, 1])
     return pipeline
 
 
@@ -52,6 +50,7 @@ def db():
 @pytest.fixture(autouse=True)
 def exact_runtime(monkeypatch):
     monkeypatch.setattr(model_lifecycle.sklearn, "__version__", "1.8.0")
+    monkeypatch.setattr(model_lifecycle.catboost, "__version__", "1.2.8")
 
 
 def test_wrong_artifact_hash_is_rejected_before_storage(db, tmp_path):
@@ -64,34 +63,38 @@ def test_wrong_artifact_hash_is_rejected_before_storage(db, tmp_path):
 
 
 def test_raw_pipeline_registration_validates_hash_and_separate_metadata(db, tmp_path, monkeypatch):
-    path = tmp_path / "extra_trees.joblib"
+    path = tmp_path / "catboost.joblib"
     metadata = tmp_path / "model_metadata.json"
     joblib.dump(locked_pipeline(), path)
     metadata.write_text(json.dumps({
-        "development_metrics": {"macro_f1": 0.8015103929068558},
-        "validation_report": {"balanced_accuracy": 0.817073754789272},
+        "development_metrics": {"macro_f1": 0.7997344352724599},
+        "validation_report": {"balanced_accuracy": 0.8138836074861483},
     }), encoding="utf-8")
     digest = sha256(path.read_bytes()).hexdigest()
     config = AnalyticsConfig(model_sha256=digest)
     monkeypatch.setattr(model_lifecycle.ModelStorage, "put",
                         lambda self, version, content: "private/model.joblib")
     record = model_lifecycle.register_frozen_model(db, path, metadata, config=config)
-    assert record.model_version == "extra_trees_stage8"
+    assert record.model_version == "catboost_stage8"
     assert record.artifact_hash == digest
     assert record.retained_features == list(FEATURE_COLUMNS)
-    assert record.preprocessing_config["deployment_imputation_values"]["recency_days"] == 750.5
+    assert record.preprocessing_config["deployment_imputation_values"]["recency_days"] == 746.5
     assert record.last_validation_date is None
 
 
 def test_pipeline_contract_rejects_wrappers_runtime_features_parameters_medians_and_classes(monkeypatch):
     pipeline = locked_pipeline()
     assert model_lifecycle._validate_artifact(pipeline, DEFAULT_ANALYTICS_CONFIG) is pipeline
-    with pytest.raises(ValueError, match="raw fitted"):
+    with pytest.raises(ValueError, match="authorized FrozenCatBoost"):
         model_lifecycle._validate_artifact({"pipeline": pipeline}, DEFAULT_ANALYTICS_CONFIG)
     monkeypatch.setattr(model_lifecycle.sklearn, "__version__", "1.7.1")
     with pytest.raises(ValueError, match="requires scikit-learn 1.8.0"):
         model_lifecycle._validate_artifact(pipeline, DEFAULT_ANALYTICS_CONFIG)
     monkeypatch.setattr(model_lifecycle.sklearn, "__version__", "1.8.0")
+    monkeypatch.setattr(model_lifecycle.catboost, "__version__", "1.2.7")
+    with pytest.raises(ValueError, match="requires CatBoost 1.2.8"):
+        model_lifecycle._validate_artifact(pipeline, DEFAULT_ANALYTICS_CONFIG)
+    monkeypatch.setattr(model_lifecycle.catboost, "__version__", "1.2.8")
     wrong_order = locked_pipeline()
     wrong_order.named_steps["imputer"].feature_names_in_ = np.asarray(
         list(reversed(FEATURE_COLUMNS)), dtype=object
@@ -99,15 +102,19 @@ def test_pipeline_contract_rejects_wrappers_runtime_features_parameters_medians_
     with pytest.raises(ValueError, match="predictors in order"):
         model_lifecycle._validate_artifact(wrong_order, DEFAULT_ANALYTICS_CONFIG)
     wrong_parameter = locked_pipeline()
-    wrong_parameter.named_steps["model"].min_samples_leaf = 1
+    wrong_parameter.params["depth"] = 4
     with pytest.raises(ValueError, match="parameters"):
         model_lifecycle._validate_artifact(wrong_parameter, DEFAULT_ANALYTICS_CONFIG)
     wrong_medians = locked_pipeline()
-    wrong_medians.named_steps["imputer"].statistics_[0] = 751.0
+    wrong_medians.named_steps["imputer"].statistics_[0] = 747.0
     with pytest.raises(ValueError, match="medians"):
         model_lifecycle._validate_artifact(wrong_medians, DEFAULT_ANALYTICS_CONFIG)
     wrong_classes = locked_pipeline()
-    wrong_classes.named_steps["model"].classes_ = np.asarray([1, 2])
+    monkeypatch.setattr(
+        model_lifecycle.CatBoostClassifier,
+        "classes_",
+        property(lambda self: np.asarray([1, 2])),
+    )
     with pytest.raises(ValueError, match="classes"):
         model_lifecycle._validate_artifact(wrong_classes, DEFAULT_ANALYTICS_CONFIG)
 
@@ -136,7 +143,7 @@ def test_monitoring_stays_pending_until_window_matures(db):
     db.flush()
     db.add(FutureTransactionPrediction(
         analysis_run_id="00000000-0000-4000-8000-000000000010",
-        account_key=account.account_key, model_version="extra_trees_stage8",
+        account_key=account.account_key, model_version="catboost_stage8",
         cutoff_date=date(2026, 9, 21), future_window_end=date(2027, 9, 21),
         predicted_class=NO_FUTURE_TRANSACTION,
     ))
@@ -163,13 +170,13 @@ def test_monitoring_requires_calendar_and_verified_si_coverage(
     account = DimAccount(standardized_account_name="A", display_name="A")
     db.add(account)
     db.add(PredictiveModelVersion(
-        model_version="extra_trees_stage8", status="active",
+        model_version="catboost_stage8", status="active",
         artifact_hash=DEFAULT_ANALYTICS_CONFIG.model_sha256,
     ))
     db.flush()
     prediction = FutureTransactionPrediction(
         analysis_run_id="00000000-0000-4000-8000-000000000010",
-        account_key=account.account_key, model_version="extra_trees_stage8",
+        account_key=account.account_key, model_version="catboost_stage8",
         cutoff_date=date(2026, 9, 21), future_window_end=date(2027, 9, 21),
         predicted_class=NO_FUTURE_TRANSACTION,
     )
@@ -196,13 +203,13 @@ def test_monitoring_uses_succeeding_si_not_late_cr(db, future_si):
     account = DimAccount(standardized_account_name="A", display_name="A")
     db.add(account)
     db.add(PredictiveModelVersion(
-        model_version="extra_trees_stage8", status="active",
+        model_version="catboost_stage8", status="active",
         artifact_hash=DEFAULT_ANALYTICS_CONFIG.model_sha256,
     ))
     db.flush()
     prediction = FutureTransactionPrediction(
         analysis_run_id="00000000-0000-4000-8000-000000000010",
-        account_key=account.account_key, model_version="extra_trees_stage8",
+        account_key=account.account_key, model_version="catboost_stage8",
         cutoff_date=date(2025, 12, 31), future_window_end=date(2026, 12, 31),
         predicted_class=NO_FUTURE_TRANSACTION,
     )
@@ -236,7 +243,7 @@ def test_monitor_endpoint_without_successful_run_keeps_outcomes_pending(db):
     db.flush()
     prediction = FutureTransactionPrediction(
         analysis_run_id="00000000-0000-4000-8000-000000000010",
-        account_key=account.account_key, model_version="extra_trees_stage8",
+        account_key=account.account_key, model_version="catboost_stage8",
         cutoff_date=date(2025, 12, 31), future_window_end=date(2026, 12, 31),
         predicted_class=NO_FUTURE_TRANSACTION,
     )
@@ -265,7 +272,7 @@ def test_monitoring_records_original_prediction_model_version(db):
         model_version="older_version", status="inactive", artifact_hash="a" * 64,
     )
     active = PredictiveModelVersion(
-        model_version="extra_trees_stage8", status="active",
+        model_version="catboost_stage8", status="active",
         artifact_hash=DEFAULT_ANALYTICS_CONFIG.model_sha256,
     )
     db.add_all([old, active])
@@ -282,7 +289,7 @@ def test_monitoring_records_original_prediction_model_version(db):
         ),
         FutureTransactionPrediction(
             analysis_run_id="00000000-0000-4000-8000-000000000010",
-            account_key=second_account.account_key, model_version="extra_trees_stage8",
+            account_key=second_account.account_key, model_version="catboost_stage8",
             cutoff_date=date(2025, 12, 31), future_window_end=date(2026, 12, 31),
             predicted_class=NO_FUTURE_TRANSACTION,
         ),
@@ -295,11 +302,11 @@ def test_monitoring_records_original_prediction_model_version(db):
 
     records = db.scalars(select(PredictiveMonitoringEvaluation)).all()
     assert result["metrics"] == {}
-    assert set(result["model_metrics"]) == {"older_version", "extra_trees_stage8"}
+    assert set(result["model_metrics"]) == {"older_version", "catboost_stage8"}
     assert {
         record.payload["model_version"]: record.predictive_model_version_id
         for record in records
     } == {
         "older_version": old.predictive_model_version_id,
-        "extra_trees_stage8": active.predictive_model_version_id,
+        "catboost_stage8": active.predictive_model_version_id,
     }

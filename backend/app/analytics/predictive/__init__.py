@@ -6,6 +6,7 @@ from app.analytics.predictive.future_transaction import (
     FutureTransactionResult,
     build_cutoff_dataset,
     classification_metrics,
+    score_frozen_artifact,
     score_extra_trees_artifact,
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     "FutureTransactionResult",
     "build_cutoff_dataset",
     "classification_metrics",
+    "score_frozen_artifact",
     "score_extra_trees_artifact",
 ]

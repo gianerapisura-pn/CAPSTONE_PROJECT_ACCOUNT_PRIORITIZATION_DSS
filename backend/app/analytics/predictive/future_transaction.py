@@ -36,7 +36,7 @@ class FutureTransactionResult:
     feature_columns: list[str]
     predictions: dict[str, str]
     model_version: str = ""
-    model_family: str = "Extra Trees Classifier"
+    model_family: str = "CatBoost Classifier"
     artifact_hash: str | None = None
     analysis_reference_date: str | None = None
     report: dict | None = None
@@ -165,19 +165,23 @@ def _canonical_class(value: object) -> str:
     raise ValueError(f"Frozen artifact returned unsupported class label: {value!r}")
 
 
-def score_extra_trees_artifact(
+def score_frozen_artifact(
     invoice_groups: list[InvoiceGroup],
     artifact: object,
     analysis_reference_date: pd.Timestamp,
     eligible_accounts: set[str],
     model_version: str,
     artifact_hash: str,
+    model_family: str,
 ) -> FutureTransactionResult:
     feature_columns = list(getattr(artifact, "feature_names_in_", []))
+    if not feature_columns:
+        imputer = getattr(artifact, "named_steps", {}).get("imputer")
+        feature_columns = list(getattr(imputer, "feature_names_in_", []))
     if feature_columns != list(FEATURE_COLUMNS):
         raise ValueError("Frozen artifact feature contract does not match the seven locked predictors.")
     if not hasattr(artifact, "predict"):
-        raise ValueError("Frozen artifact is not a fitted scikit-learn prediction pipeline.")
+        raise ValueError("Frozen artifact does not expose the locked prediction contract.")
     frame = build_cutoff_dataset(
         invoice_groups,
         pd.Timestamp(analysis_reference_date),
@@ -195,8 +199,29 @@ def score_extra_trees_artifact(
         feature_columns=feature_columns,
         predictions=predictions,
         model_version=model_version,
+        model_family=model_family,
         artifact_hash=artifact_hash,
         analysis_reference_date=pd.Timestamp(analysis_reference_date).date().isoformat(),
         report=None,
         monitoring_status="Pending outcome maturity",
+    )
+
+
+def score_extra_trees_artifact(
+    invoice_groups: list[InvoiceGroup],
+    artifact: object,
+    analysis_reference_date: pd.Timestamp,
+    eligible_accounts: set[str],
+    model_version: str,
+    artifact_hash: str,
+) -> FutureTransactionResult:
+    """Backward-compatible alias for retired Extra Trees artifact tests."""
+    return score_frozen_artifact(
+        invoice_groups,
+        artifact,
+        analysis_reference_date,
+        eligible_accounts,
+        model_version,
+        artifact_hash,
+        "Extra Trees Classifier",
     )
