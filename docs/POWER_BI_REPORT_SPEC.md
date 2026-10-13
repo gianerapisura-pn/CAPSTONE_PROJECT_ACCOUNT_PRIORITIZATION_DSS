@@ -8,7 +8,7 @@ Show current run/reference metadata, all-valid annual SI sales, 85 historical id
 
 ## Page 2: Account Profile and Prioritization Context
 
-Provide RFM distributions or a concise profile table, Historical Settlement Duration, current status/actionability and provenance, descriptive Business Category context, and drill-through with exact R/F/M/Settlement values, normalized criteria, contributions, FPS, rank/group, and separate Future Transaction class. Closed B2B accounts retain descriptive/predictive history but show no current rank. Business Category is not a criterion.
+Provide RFM distributions or a concise profile table, Historical Settlement Duration, current status/actionability and provenance, descriptive Business Category context, and drill-through with exact R/F/M/Settlement values, normalized criteria, contributions, FPS, rank/group, and separate Future Transaction class when eligible. Closed B2B accounts retain descriptive history and any prediction evidence from eligible earlier cutoffs, but A064 has no 2025 study/current operational class or current rank. Business Category is not a criterion.
 
 ## Page 3: Predictive Model Evaluation
 

@@ -17,7 +17,7 @@ vi.mock("@/lib/use-api", () => ({
     }, error: "", loading: false, reload: vi.fn() };
     if (path === "/models/current") return { data: {
       status: "active", model_version: "catboost_stage8", model_family: "CatBoost Classifier",
-      selected_outcome_horizon: 12, validation_metrics: { macro_f1: 0.8015103929068558 },
+      selected_outcome_horizon: 12, validation_metrics: { macro_f1: 0.7997344352724599 },
     }, error: "", loading: false, reload: vi.fn() };
     if (path.startsWith("/account-context")) return { data: {
       items: [], total: 0, publication_note: "A new run is required.",
@@ -33,5 +33,5 @@ test("settings displays settlement and real registered Macro F1 contracts", () =
     "Observed SI-to-final-valid-CR duration using only cutoff-known, reconciled, nonnegative evidence.",
   )).toBeInTheDocument();
   expect(screen.getByText("Macro F1")).toBeInTheDocument();
-  expect(screen.getByText("0.8015")).toBeInTheDocument();
+  expect(screen.getByText("0.7997")).toBeInTheDocument();
 });

@@ -11,14 +11,14 @@ Status: the latest ZIP hash was verified. Strict parsing, the pinned scikit-lear
 | Logical invoices | 282 |
 | All-valid SI sales | PHP 167,467,524.93 |
 | Historical identities | 85 |
-| B2B descriptive/predictive | 84 |
+| B2B descriptive / 2025 study predictive | 84 / 83 |
 | Current actionable / MCS / ranked | 83 / 83 / 83 |
 | Final study prediction | 10 Future / 73 No Future Transaction |
 | Priority groups | 28 / 27 / 28 |
 | Sensitivity | 400 scenarios / 33,200 detail rows |
 | Backtests | 7 annual cutoffs |
 
-ROD DE GUIA is retained historically and excluded from B2B analytics. ROSTRAM PROTECTIVE SYSTEM METIER COMPANY remains in B2B descriptive, predictive, and historical evidence but is Client-Confirmed Closed and has no current FPS, rank, or Priority Group.
+ROD DE GUIA is retained historically and excluded from B2B analytics. ROSTRAM PROTECTIVE SYSTEM METIER COMPANY remains in B2B descriptive and historical evidence. Closure since 2021 permits predictive/backtest eligibility only at earlier cutoffs; it has no 2025 study prediction or current operational prediction, FPS, rank, or Priority Group.
 
 The latest valid SI in the supplied original workbook is 2025-08-13; the latest final valid CR is 2025-12-13. The common 2025-12-31 study origin follows client-confirmed complete 2025 SI coverage, not either observed date. The workbook contains no 2026 SI or CR evidence.
 

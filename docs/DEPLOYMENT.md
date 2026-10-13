@@ -2,7 +2,7 @@
 
 ## Backend
 
-Install backend/requirements.txt, which pins scikit-learn 1.8.0 for artifact compatibility. Configure production PostgreSQL/Supabase values and DEMO_MODE=false. Production startup fails closed when required settings are missing.
+Install backend/requirements.txt, which pins CatBoost 1.2.8 and scikit-learn 1.8.0 for artifact compatibility. Configure production PostgreSQL/Supabase values and DEMO_MODE=false. Production startup fails closed when required settings are missing.
 
 Register the private frozen artifact using the controlled local registration utility/authorized backend process. The exact expected hash is fixed in analytics_config.py. Do not place the joblib in Git or browser-accessible storage. Routine imports never train.
 
@@ -14,7 +14,7 @@ Keep `NEXT_PUBLIC_DEMO_MODE=false` for real Supabase sign-in. To retain the demo
 
 ## Database
 
-Apply the 17 timestamped migrations in order and verify latest-successful-run and final-study views plus RLS using a dedicated reporting login. Migration 20260930090015 adds server-only Power BI refresh state; grant no access to the reporting reader. Migration 20260930090016 provisions the two private storage buckets. Migration 20261007090017 adds latest-package provenance to future run snapshots and certified reporting views without changing old runs.
+Apply the 18 timestamped migrations in order and verify latest-successful-run and final-study views plus RLS using a dedicated reporting login. Migration 20260930090015 adds server-only Power BI refresh state; grant no access to the reporting reader. Migration 20260930090016 provisions the two private storage buckets. Migration 20261007090017 adds package provenance to future run snapshots. Migration 20261012090018 adds CatBoost-aligned predictive reporting and closure provenance without rewriting old publications.
 
 ## Power BI automatic refresh
 

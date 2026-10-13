@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { AccountPriorityTable } from "@/components/account-priority-table";
@@ -21,7 +21,7 @@ const base = {
 const rows: AccountDecisionRow[] = [
   { ...base, account: "ALPHA", account_key: "a", priority_rank: 1, priority_group: "High", final_priority_score: .9, predicted_future_transaction_class: "Future Transaction" },
   { ...base, account: "BETA", account_key: "b", priority_rank: 2, priority_group: "Low", final_priority_score: .4, predicted_future_transaction_class: "No Future Transaction" },
-  { ...base, account: "ROSTRAM PROTECTIVE SYSTEM METIER COMPANY", account_key: "c", account_status: "Client-Confirmed Closed", current_actionable: false, priority_rank: null, priority_group: null, final_priority_score: null, predicted_future_transaction_class: "No Future Transaction", average_settlement_days: null, settlement_invoice_count: 0, valid_settlement_record_count: 0, mcs_eligible: false, mcs_eligibility_reason: "Client-confirmed closed; excluded from the current actionable ranking.", is_ranked: false, ranking_status: "Not ranked", ranking_unavailable_reason: "Client-confirmed closed; excluded from the current actionable ranking.", normalized_recency: null, normalized_frequency: null, normalized_monetary: null, normalized_settlement: null, recency_contribution: null, frequency_contribution: null, monetary_contribution: null, settlement_contribution: null },
+  { ...base, account: "ROSTRAM PROTECTIVE SYSTEM METIER COMPANY", account_key: "c", account_status: "Client-Confirmed Closed", current_actionable: false, priority_rank: null, priority_group: null, final_priority_score: null, predicted_future_transaction_class: null, model_version: null, average_settlement_days: null, settlement_invoice_count: 0, valid_settlement_record_count: 0, mcs_eligible: false, mcs_eligibility_reason: "Client-confirmed closed; excluded from the current actionable ranking.", is_ranked: false, ranking_status: "Not ranked", ranking_unavailable_reason: "Client-confirmed closed; excluded from the current actionable ranking.", normalized_recency: null, normalized_frequency: null, normalized_monetary: null, normalized_settlement: null, recency_contribution: null, frequency_contribution: null, monetary_contribution: null, settlement_contribution: null },
 ];
 
 vi.mock("@/lib/use-api", () => ({
@@ -44,6 +44,7 @@ test("search and priority filters operate on the unified API account data", asyn
   render(<AccountPriorityTable />);
   expect(screen.getByText("ALPHA")).toBeInTheDocument();
   expect(screen.getByText("ROSTRAM PROTECTIVE SYSTEM METIER COMPANY")).toBeInTheDocument();
+  expect(within(screen.getByText("ROSTRAM PROTECTIVE SYSTEM METIER COMPANY").closest("tr")!).getByText("Unavailable")).toBeInTheDocument();
   expect(screen.getByText("Analysis reference")).toBeInTheDocument();
   expect(screen.getByText("2030-06-10")).toBeInTheDocument();
   expect(screen.getByText("Last successful refresh")).toBeInTheDocument();

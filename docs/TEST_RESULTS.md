@@ -1,5 +1,15 @@
 # Test Results
 
+## CatBoost Progress Branch Check (2026-10-13)
+
+- Active private package: `PESLC_FINAL_ANALYTICS_FINAL (3).zip`, whole-package SHA-256 `6f5d033f23988788fbd5dce91800123308df1251c290bc17f2e35b9d4a429cb9`.
+- Read-only ZIP inspection: the enclosed `development_modeling_dataset.csv` SHA-256 and `model_metadata.json`'s `development_dataset_sha256` both equal `d6010cd4c113983ea4d5268bc437101829b8736cafc6ca645cda835fe0ddde8b`.
+- The enclosed CatBoost joblib member hashes to `09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3`. This pass did not load or execute that member, retrain, or alter it.
+- Backend suite: 100 passed, 2 private-package-gated tests skipped, 28 warnings. A unique D: `--basetemp` was used because the default C: pytest temp directory denied access.
+- Frontend suite: 18 files, 43 tests passed. TypeScript typecheck passed.
+- The 2025-12-31 fixed CatBoost study contract is 83 predictively eligible B2B accounts: 10 Future Transaction and 73 No Future Transaction. A064, closed since 2021, remains in 84-account B2B descriptive history but is excluded from the 2025 study and current operational prediction.
+- The private opt-in end-to-end regression and a new live Power BI report refresh were not run in this documentation/fixture pass. The dated Extra Trees results below are historical checkpoints, not current CatBoost acceptance evidence.
+
 ## Latest-Package Alignment (2026-10-07)
 
 - Private latest-ZIP regression: 2 passed under the project's pinned scikit-learn 1.8.0 without version warnings, including exact 2025-12-31 priority score/rank/group comparison and unchanged 6/78 frozen-model classes. An earlier system-Python 1.7.1 run emitted version warnings and is not the pinned acceptance run.
