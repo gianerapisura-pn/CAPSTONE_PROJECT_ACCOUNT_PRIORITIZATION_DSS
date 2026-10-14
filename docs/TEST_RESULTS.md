@@ -2,7 +2,7 @@
 
 ## Revised Later-Period Package Check (2026-10-14)
 
-- Revised private ZIP `PESLC_FINAL_ANALYTICS_FINAL (3)(9).zip`: SHA-256 `6739aad9d809f72cb397c6b226cdcb002e25ee0019e404bb52d7a24e765d125e`. The enclosed frozen CatBoost artifact remains SHA-256 `09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3`; it was loaded for authorized regression only, not retrained or replaced.
+- Revised private ZIP `PESLC_FINAL_ANALYTICS_FINAL (3)(9).zip`: SHA-256 `6739aad9d809f72cb397c6b226cdcb002e25ee0019e404bb52d7a24e765d125e`. The enclosed frozen CatBoost artifact remains SHA-256 `09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3`; it was loaded for authorized regression and isolated demo scoring, not retrained or replaced.
 - With `PESLC_FINAL_ANALYTICS_PACKAGE_PATH` set to the revised ZIP, `python -m pytest -q --basetemp=../.pytest-revision-final-20261014`: **119 passed, 0 failed, 0 skipped, 30 warnings**. This includes the original source/prescriptive regression, the revised 2024 historical confirmation, and an isolated existing-database evidence transition with rerun and mismatch rollback checks.
 - Without that environment variable, the private regression file reports **3 skipped**, not passed.
 - Frontend `npm test -- --maxWorkers=1 --no-file-parallelism`: **18 files, 45 tests passed**. `npm run lint`, `npm run typecheck`, and `npm run build` passed; the build generated 16 routes. `npm run test:e2e -- --workers=1`: **1 isolated browser workflow passed**. The first uncapped frontend test attempt ran out of memory; the one-worker rerun passed.

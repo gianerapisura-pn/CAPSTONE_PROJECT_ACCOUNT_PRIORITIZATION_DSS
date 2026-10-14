@@ -1,6 +1,6 @@
 # Current Data Validation Report
 
-Status: the revised ZIP SHA-256 `6739aad9d809f72cb397c6b226cdcb002e25ee0019e404bb52d7a24e765d125e` and frozen CatBoost artifact SHA-256 `09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3` were verified locally. The existing live Supabase publication described below is a historical checkpoint from the predecessor package; this revision has not been deployed there. A local isolated database transition preserves the existing study snapshot and published-run provenance. Power BI semantic-model publication and automatic refresh remain unconfigured.
+Status: the revised ZIP SHA-256 `6739aad9d809f72cb397c6b226cdcb002e25ee0019e404bb52d7a24e765d125e` and frozen CatBoost artifact SHA-256 `09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3` were verified locally. Previously reported live Supabase results are historical checkpoints from the predecessor package; this revision has not been deployed there. A local isolated database transition preserves the existing study snapshot and published-run provenance. Power BI semantic-model publication and automatic refresh remain unconfigured.
 
 | Anchor | Locked value |
 |---|---:|
