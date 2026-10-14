@@ -49,6 +49,7 @@ def test_administrator_detail_routes_enforce_admin_dependency():
         "/analytics/runs",
         "/analytics/runs/{run_id}",
         "/models/current",
+        "/reports/native/validation",
     }
     dependencies = {
         route.path: {dependency.call for dependency in route.dependant.dependencies}
@@ -57,3 +58,19 @@ def test_administrator_detail_routes_enforce_admin_dependency():
     }
     assert set(dependencies) == protected_paths
     assert all(require_admin in calls for calls in dependencies.values())
+
+
+def test_management_cannot_fetch_native_validation_over_http():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.db.session import get_db
+
+    app.dependency_overrides[require_user] = lambda: AuthenticatedUser("test-user", "management")
+    app.dependency_overrides[get_db] = lambda: None
+    try:
+        response = TestClient(app).get("/reports/native/validation")
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Administrator role required."
+    finally:
+        app.dependency_overrides.pop(require_user, None)
+        app.dependency_overrides.pop(get_db, None)

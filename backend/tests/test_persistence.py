@@ -14,6 +14,8 @@ from app.db.repository import (
 from app.etl.invoices import InvoiceGroup
 from app.services.analytics_runner import run_account_prioritization
 from app.analytics.predictive.future_transaction import FutureTransactionResult
+from app.auth.dependencies import AuthenticatedUser
+from app.main import native_insights, native_overview
 
 
 def group(i):
@@ -78,6 +80,14 @@ def test_final_run_persistence_and_public_contract():
         assert all("predicted_inactivity_risk" not in x for x in rows)
         assert db.scalar(select(FutureTransactionPrediction)) is not None
         assert serialize_run(latest)["analysis_reference_date"] == "2026-09-21"
+        viewer = AuthenticatedUser("test-user", "management")
+        overview = native_overview(viewer, db)
+        insights = native_insights(viewer, db)
+        assert overview["run"]["analysis_run_id"] == latest.analysis_run_id
+        assert insights["run"]["analysis_run_id"] == latest.analysis_run_id
+        assert overview["accounts"][0]["account_status"] == "Client-Confirmed Active"
+        assert insights["accounts"][0]["account_status"] == "Client-Confirmed Active"
+        assert overview["business_baselines"] == payload["business_baselines"]
 
 
 def test_filters_do_not_rerank_or_mutate_scores():

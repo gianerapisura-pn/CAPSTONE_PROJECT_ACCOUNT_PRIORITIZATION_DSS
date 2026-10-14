@@ -32,7 +32,12 @@ test("demo administrator imports future data and reaches updated decision output
   await expect(page.getByText("2030-07-10")).toBeVisible();
   await page.goto("/reports");
   await expect(page.getByRole("heading", { name: "Detailed Analytics", exact: true })).toBeVisible();
-  await expect(page.getByText("Configuration required")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Annual Valid Sales Invoice Sales" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Priority Group Counts" })).toBeVisible();
+  await page.getByRole("tab", { name: "Account & Prioritization Insights" }).click();
+  await expect(page.getByRole("heading", { name: "RFM Score Distribution" })).toBeVisible();
+  await page.getByRole("tab", { name: "Analytics Validation" }).click();
+  await expect(page.getByRole("heading", { name: "Prediction Horizon Comparison" })).toBeVisible();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "CSV" }).first().click();
   expect((await download).suggestedFilename()).toContain("priorities");

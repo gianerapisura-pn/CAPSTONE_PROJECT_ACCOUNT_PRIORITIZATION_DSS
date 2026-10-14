@@ -21,7 +21,7 @@ vi.mock("@/lib/use-api", () => ({ useApi: () => ({
       model_family: "CatBoost Classifier",
       artifact_hash: "model-hash",
       source_package_hash: "package-hash",
-      class_counts: { "Future Transaction": 6, "No Future Transaction": 78 },
+      class_counts: { "Future Transaction": 10, "No Future Transaction": 73 },
       predictions: {},
     },
     operational: {
@@ -45,8 +45,8 @@ test("predictive page separates fixed study evidence from operational scoring", 
   expect(screen.getByText("Final study prediction")).toBeInTheDocument();
   expect(screen.getByText("2025-12-31")).toBeInTheDocument();
   expect(screen.getByText("2026-01-01 to 2026-12-31")).toBeInTheDocument();
-  expect(screen.getByText("6")).toBeInTheDocument();
-  expect(screen.getByText("78")).toBeInTheDocument();
+  expect(screen.getByText("10")).toBeInTheDocument();
+  expect(screen.getByText("73")).toBeInTheDocument();
   expect(screen.getByText("Operational scoring")).toBeInTheDocument();
   expect(screen.getByText("2026-09-21")).toBeInTheDocument();
   expect(screen.getByText(/never changes Final Priority Score/i)).toBeInTheDocument();

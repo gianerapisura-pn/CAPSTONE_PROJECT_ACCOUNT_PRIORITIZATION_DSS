@@ -12,7 +12,9 @@ from app.db.models import (
     PredictiveModelVersion, PredictiveOOPEvaluation, PrescriptiveValidationEvidence,
 )
 from app.services import prescriptive_evidence
+from app.services.locked_packages import FINAL_PACKAGE_SHA256
 from app.services.model_lifecycle import seed_locked_predictive_evidence
+from app.main import _selected_confusion_summary
 
 
 def predictive_package_bytes() -> bytes:
@@ -26,6 +28,19 @@ def predictive_package_bytes() -> bytes:
             "01_DATA/05_PREDICTIVE/05_BENCHMARK/model_benchmark.csv",
             "family,macro_f1,error\n" + "\n".join(
                 f"Model {index},0.8,0.1" for index in range(1, 23)
+            ) + "\n",
+        )
+        archive.writestr(
+            "01_DATA/05_PREDICTIVE/05_BENCHMARK/confusion_matrices.csv",
+            "family,outer_year,actual_class,predicted_future_transaction,predicted_no_future_transaction\n"
+            + "\n".join(
+                f"CatBoost,{year},{actual},{future},{no_future}"
+                for year, values in ((2020, ((3, 1), (1, 57))),
+                                     (2021, ((6, 3), (3, 54))),
+                                     (2022, ((3, 2), (4, 59))))
+                for actual, (future, no_future) in zip(
+                    ("Future Transaction", "No Future Transaction"), values, strict=True
+                )
             ) + "\n",
         )
         archive.writestr(
@@ -52,7 +67,7 @@ def test_predictive_locked_evidence_seeding_uses_only_purposeful_summaries():
         db.commit()
         assert result == {
             "horizons": 3, "canonical_benchmarks": 22,
-            "supplemental_benchmarks": 9, "later_checks": 2,
+            "selected_confusion_rows": 6, "supplemental_benchmarks": 9, "later_checks": 2,
         }
         assert db.scalar(select(func.count()).select_from(PredictiveHorizonEvaluation)) == 3
         canonical = db.scalars(select(PredictiveBenchmarkRecord).where(
@@ -63,6 +78,16 @@ def test_predictive_locked_evidence_seeding_uses_only_purposeful_summaries():
         )).all()
         assert len(canonical) == 22
         assert len(supplemental) == 9
+        confusion_rows = db.scalars(select(PredictiveBenchmarkRecord).where(
+            PredictiveBenchmarkRecord.benchmark_scope == "selected_confusion_matrix"
+        )).all()
+        assert len(confusion_rows) == 6
+        assert _selected_confusion_summary([row.payload for row in confusion_rows]) == {
+            "source_member": "confusion_matrices.csv",
+            "source_package_sha256": FINAL_PACKAGE_SHA256,
+            "observations": 196, "errors": 14, "true_future": 12, "missed_future": 6,
+            "true_no_future": 170, "false_future": 8,
+        }
         assert db.scalar(select(func.count()).select_from(PredictiveOOPEvaluation)) == 2
 
 

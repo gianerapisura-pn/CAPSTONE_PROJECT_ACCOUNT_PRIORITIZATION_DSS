@@ -10,7 +10,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Quer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 from app.auth.dependencies import AuthenticatedUser, require_admin, require_user
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
@@ -18,7 +18,9 @@ from app.core.config import get_settings, validate_runtime_configuration
 from app.db.models import (
     AccountAlias, AccountAliasReview, AnalyticsRun, CollectionCorrectionReview, DimAccount, ImportBatch,
     ImportRowIssue, InvoiceGroupRecord, PowerBIRefresh, PredictiveStudyPrediction, RFMResult, RawSourceRow,
-    SensitivityScenarioRecord, SettlementResult,
+    SensitivityScenarioRecord, SettlementResult, CriticInfluenceRecord,
+    PredictiveBenchmarkRecord, PredictiveHorizonEvaluation, PredictiveOOPEvaluation,
+    PrescriptiveValidationEvidence,
 )
 from app.db.repository import (
     CLIENT_CONFIRMED_ACTIVE,
@@ -50,7 +52,9 @@ from app.services.model_lifecycle import (
     active_model_version, future_transaction_for_current_run, monitor_registered_predictions,
     unavailable_prediction,
 )
-from app.services.study_predictions import final_study_prediction_payload
+from app.services.study_predictions import MODEL_ARTIFACT_SHA256, final_study_prediction_payload
+from app.services.prescriptive_evidence import EVIDENCE_VERSION
+from app.services.locked_packages import FINAL_PACKAGE_SHA256
 from app.services.power_bi_refresh import (
     enqueue_refresh, public_status, request_refresh, supervise_refreshes,
     retry_refresh, sync_refresh_status,
@@ -582,6 +586,103 @@ def dashboard(user: AuthenticatedUser = Depends(require_user), db: Session = Dep
                        "maximum_group_movement_rate": max(
                            x["max_group_movement_rate"] for x in payload["sensitivity"])}
                       if payload["sensitivity"] else None),
+    }
+
+
+@app.get("/reports/native/overview")
+def native_overview(user: AuthenticatedUser = Depends(require_user),
+                    db: Session = Depends(get_db)):
+    run = _latest_or_404(db)
+    payload = run_payload(db, run)
+    accounts = payload["accounts"]
+    return {
+        "run": serialize_run(run),
+        "historical_identities": int(payload["context_metrics"].get("historical_account_count", 0)),
+        "b2b_analytical_accounts": len(accounts),
+        "current_actionable_accounts": sum(bool(row["current_actionable"]) for row in accounts),
+        "ranked_accounts": sum(bool(row["is_ranked"]) for row in accounts),
+        "business_baselines": payload["business_baselines"],
+        "accounts": accounts,
+    }
+
+
+@app.get("/reports/native/insights")
+def native_insights(user: AuthenticatedUser = Depends(require_user),
+                    db: Session = Depends(get_db)):
+    run = _latest_or_404(db)
+    payload = run_payload(db, run)
+    return {"run": serialize_run(run), "accounts": payload["accounts"]}
+
+
+def _selected_confusion_summary(benchmarks: list[dict]) -> dict | None:
+    confusion = [row for row in benchmarks
+                 if row.get("source_member") == "confusion_matrices.csv"
+                 and row.get("source_package_sha256") == FINAL_PACKAGE_SHA256]
+    if len(confusion) != 6:
+        return None
+    true_future = sum(int(row["predicted_future_transaction"]) for row in confusion
+                      if row["actual_class"] == "Future Transaction")
+    missed_future = sum(int(row["predicted_no_future_transaction"]) for row in confusion
+                        if row["actual_class"] == "Future Transaction")
+    true_no_future = sum(int(row["predicted_no_future_transaction"]) for row in confusion
+                         if row["actual_class"] == "No Future Transaction")
+    false_future = sum(int(row["predicted_future_transaction"]) for row in confusion
+                       if row["actual_class"] == "No Future Transaction")
+    return {
+        "source_member": "confusion_matrices.csv", "source_package_sha256": FINAL_PACKAGE_SHA256,
+        "observations": true_future + missed_future + true_no_future + false_future,
+        "errors": missed_future + false_future,
+        "true_future": true_future, "missed_future": missed_future,
+        "true_no_future": true_no_future, "false_future": false_future,
+    }
+
+
+@app.get("/reports/native/validation")
+def native_validation(user: AuthenticatedUser = Depends(require_admin),
+                      db: Session = Depends(get_db)):
+    run = _latest_or_404(db)
+    payload = run_payload(db, run)
+    model = active_model_version(db)
+    evidence_matches_run = bool(
+        model and model.model_version == run.model_version
+        and model.artifact_hash == MODEL_ARTIFACT_SHA256
+    )
+    model_id = model.predictive_model_version_id if evidence_matches_run else None
+    def evidence(model_class):
+        if not model_id:
+            return []
+        return [row.payload for row in db.scalars(select(model_class).where(
+            model_class.predictive_model_version_id == model_id)).all()]
+    horizons = evidence(PredictiveHorizonEvaluation)
+    benchmarks = evidence(PredictiveBenchmarkRecord)
+    later_checks = evidence(PredictiveOOPEvaluation)
+    historical_error_summary = _selected_confusion_summary(benchmarks)
+    study = final_study_prediction_payload(db) if model_id else {"status": "unavailable"}
+    if study.get("source_package_hash") != FINAL_PACKAGE_SHA256:
+        study = {"status": "unavailable"}
+    else:
+        study.pop("predictions", None)
+    supplemental = db.scalars(select(PrescriptiveValidationEvidence).where(
+        PrescriptiveValidationEvidence.evidence_version == EVIDENCE_VERSION)).all()
+    return {
+        "run": serialize_run(run),
+        "study": study,
+        "model_evidence_status": "available" if horizons and benchmarks and later_checks and historical_error_summary else "unavailable",
+        "model_artifact_hash": model.artifact_hash if model_id else None,
+        "historical_error_summary": historical_error_summary,
+        "horizons": horizons,
+        "benchmarks": benchmarks,
+        "later_checks": later_checks,
+        "sensitivity": payload["sensitivity"],
+        "scenario_detail_count": db.scalar(select(func.count()).select_from(
+            SensitivityScenarioRecord).where(
+                SensitivityScenarioRecord.analysis_run_id == run.analysis_run_id)) or 0,
+        "ranked_account_count": len(payload["priorities"]),
+        "critic_influence": payload["critic_influence"],
+        "backtest": payload["backtest"],
+        "critic_weights": run.critic_weights or {},
+        "supplemental": [row.payload for row in supplemental
+                         if model_id and row.source_package_hash == FINAL_PACKAGE_SHA256],
     }
 
 

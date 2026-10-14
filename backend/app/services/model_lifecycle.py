@@ -192,6 +192,21 @@ def seed_locked_predictive_evidence(
     for source in _rows(canonical):
         db.add(PredictiveBenchmarkRecord(predictive_model_version_id=record.predictive_model_version_id, benchmark_scope="canonical_21_classifiers_plus_majority", model_name=str(source["family"]), payload={"source_member": "model_benchmark.csv", **source}))
 
+    confusion = read_package_csv(package_content, "01_DATA/05_PREDICTIVE/05_BENCHMARK/confusion_matrices.csv")
+    selected_confusion = confusion.loc[confusion["family"] == "CatBoost"]
+    if (len(selected_confusion) != 6
+            or set(selected_confusion["outer_year"].astype(int)) != {2020, 2021, 2022}
+            or set(selected_confusion["actual_class"]) != {"Future Transaction", "No Future Transaction"}
+            or selected_confusion.groupby("outer_year").size().ne(2).any()):
+        raise ValueError("Locked CatBoost confusion evidence must contain two classes for each outer year.")
+    for source in _rows(selected_confusion):
+        db.add(PredictiveBenchmarkRecord(
+            predictive_model_version_id=record.predictive_model_version_id,
+            benchmark_scope="selected_confusion_matrix", model_name="CatBoost",
+            payload={"source_member": "confusion_matrices.csv",
+                     "source_package_sha256": FINAL_PACKAGE_SHA256, **source},
+        ))
+
     supplemental = read_package_csv(package_content, "01_DATA/05_PREDICTIVE/08_EXTENDED_AUDIT/supplemental_model_benchmark.csv")
     if len(supplemental) != 9 or "family" not in supplemental or supplemental["family"].nunique() != 9:
         raise ValueError("Supplemental locked benchmark must contain nine unique models.")
@@ -204,7 +219,8 @@ def seed_locked_predictive_evidence(
     for source in _rows(later):
         parsed = pd.to_datetime(source.get("cutoff_date"), errors="coerce")
         db.add(PredictiveOOPEvaluation(predictive_model_version_id=record.predictive_model_version_id, oop_cutoff=None if pd.isna(parsed) else parsed.date(), payload={"source_member": "later_period_summary.csv", **source}))
-    return {"horizons": 3, "canonical_benchmarks": 22, "supplemental_benchmarks": 9, "later_checks": 2}
+    return {"horizons": 3, "canonical_benchmarks": 22, "selected_confusion_rows": 6,
+            "supplemental_benchmarks": 9, "later_checks": 2}
 
 
 def _metadata_date(metadata: dict, *keys: str) -> date | None:
