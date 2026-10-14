@@ -1,5 +1,7 @@
 # Power BI Setup
 
+> Historical specification only. The current approved reporting path is native Web DSS Detailed Analytics. Runtime publication no longer enqueues or supervises Power BI refreshes, and the retry endpoint is retired. Nothing below is a prerequisite for current deployment.
+
 Use the dedicated PostgreSQL login that inherits `peslc_reporting_reader`. It must be SELECT-only, non-superuser, without BYPASSRLS, RAW/private access, correction-review access, or write grants.
 
 Connect Power BI to the certified views through migration 018:

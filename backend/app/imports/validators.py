@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import BinaryIO
+from zipfile import BadZipFile
 
 import pandas as pd
 
@@ -44,6 +45,7 @@ class ParsedWorkbook:
     frames: dict[str, pd.DataFrame]
     issues: list[ValidationIssue]
     file_hash: str
+    rows_discovered: int = 0
 
 
 def canonicalize_column(name: object) -> str:
@@ -95,9 +97,11 @@ def parse_source_file(file_name: str, content: bytes) -> ParsedWorkbook:
     suffix = Path(file_name).suffix.lower()
     issues: list[ValidationIssue] = []
     frames: dict[str, pd.DataFrame] = {}
+    rows_discovered = 0
     try:
         if suffix == ".csv":
             frame = pd.read_csv(BytesIO(content), dtype=str, keep_default_na=False)
+            rows_discovered += len(frame.dropna(how="all"))
             canonical, sheet_issues = _canonicalize_frame(frame, "CSV")
             issues.extend(sheet_issues)
             if canonical is not None:
@@ -105,17 +109,20 @@ def parse_source_file(file_name: str, content: bytes) -> ParsedWorkbook:
         elif suffix == ".xlsx":
             workbook = pd.read_excel(BytesIO(content), sheet_name=None, dtype=str, keep_default_na=False)
             for sheet_name, frame in workbook.items():
+                rows_discovered += len(frame.dropna(how="all"))
                 canonical, sheet_issues = _canonicalize_frame(frame, sheet_name)
                 issues.extend(sheet_issues)
                 if canonical is not None:
                     frames[sheet_name] = canonical
         else:
             issues.append(ValidationIssue(None, None, "error", "Only .csv and .xlsx files are supported.", "file_type"))
-    except (ValueError, UnicodeError, OSError) as exc:
+    except (ValueError, UnicodeError, OSError, pd.errors.ParserError, BadZipFile) as exc:
         issues.append(ValidationIssue(None, None, "error", f"The source file could not be parsed: {exc}", "file_parse"))
     if not frames and not any(issue.severity == "error" for issue in issues):
         issues.append(ValidationIssue(None, None, "error", "No non-empty worksheet or table was found."))
-    return ParsedWorkbook(frames=frames, issues=issues, file_hash=compute_file_hash(content))
+    return ParsedWorkbook(frames=frames, issues=issues,
+                          file_hash=compute_file_hash(content),
+                          rows_discovered=rows_discovered)
 
 
 def parse_decimal(value: object) -> Decimal | None:
@@ -144,7 +151,7 @@ def validate_rows(frame: pd.DataFrame) -> list[ValidationIssue]:
             issues.append(ValidationIssue(row_number, column, severity, message, issue_type, sheet))
 
         if status not in {"Fully Paid", "Cancelled"}:
-            add("PAYMENT STATUS", "warning", "Unsupported payment status requires administrator review and is excluded from analytics.", "unknown_payment_status")
+            add("PAYMENT STATUS", "error", "Unsupported payment status requires administrator review before SI coverage can be certified.", "unknown_payment_status")
         if not is_cancelled and str(row["ACCOUNT NAMES"]).strip() == "":
             add("ACCOUNT NAMES", "error", "Blank or unidentifiable account.", "missing_account")
         if not is_cancelled and str(row["SI NO."]).strip() == "":
@@ -156,11 +163,13 @@ def validate_rows(frame: pd.DataFrame) -> list[ValidationIssue]:
             add("SI AMOUNT", "error", "SI amount must be a valid positive amount.", "invalid_si_amount")
         for column in (() if is_cancelled else ("CR AMOUNT", "EWT")):
             if str(row[column]).strip() and parse_decimal(row[column]) is None:
-                add(column, "error", f"Invalid {column}.", "invalid_money")
+                add(column, "warning", f"Invalid {column}; settlement evidence is unavailable for this invoice.", "invalid_money")
         cr_date = pd.to_datetime(row["CR DATE"], errors="coerce")
         si_date = pd.to_datetime(row["SI DATE"], errors="coerce")
         if not is_cancelled and str(row["CR DATE"]).strip() and pd.isna(cr_date):
-            add("CR DATE", "error", "Invalid CR date.", "invalid_cr_date")
+            add("CR DATE", "warning", "Invalid CR date; settlement evidence is unavailable for this invoice.", "invalid_cr_date")
+        if not is_cancelled and str(row["CR NO."]).strip() and not str(row["EWT"]).strip():
+            add("EWT", "warning", "Missing EWT is not recorded zero; settlement requires independent full reconciliation.", "missing_ewt")
         if not is_cancelled and not pd.isna(cr_date) and not pd.isna(si_date) and cr_date < si_date:
             add("CR DATE", "warning", "Collection date is earlier than SI date.", "negative_chronology")
     return issues

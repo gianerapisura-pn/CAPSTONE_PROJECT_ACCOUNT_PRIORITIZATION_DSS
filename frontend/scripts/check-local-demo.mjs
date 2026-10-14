@@ -32,7 +32,29 @@ try {
     await page.locator(".recharts-line-curve").first().waitFor();
     assert.ok(await page.locator(".recharts-line-curve").first().getAttribute("d"));
     await page.screenshot({ path: `test-results/local-reports-${viewport.width}.png` });
-    console.log(`${viewport.width}px dashboard and native charts: OK`);
+    await page.goto(`${base}/import`);
+    await page.locator('input[type="file"]').setInputFiles("../sample_data/test_fixtures/future_valid.csv");
+    await page.getByRole("button", { name: /Validate and preview/i }).click();
+    await page.getByText("Validation result").waitFor();
+    await page.getByRole("button", { name: "Confirm import" }).click();
+    await page.getByLabel("Analysis reference date").fill("2030-07-10");
+    await page.getByLabel("Evidence reference").waitFor();
+    const dialog = await page.evaluate(() => {
+      const panel = document.querySelector(".dialog");
+      const fields = document.querySelector(".coverage-fields");
+      const rect = panel?.getBoundingClientRect();
+      return { left: rect?.left, right: rect?.right,
+        panelWidth: panel?.clientWidth, panelScrollWidth: panel?.scrollWidth,
+        fieldsWidth: fields?.clientWidth, fieldsScrollWidth: fields?.scrollWidth };
+    });
+    assert.ok(dialog.left !== undefined && dialog.left >= 0);
+    assert.ok(dialog.right !== undefined && dialog.right <= viewport.width);
+    assert.ok(dialog.panelWidth !== undefined && dialog.panelScrollWidth !== undefined
+      && dialog.panelScrollWidth <= dialog.panelWidth + 1);
+    assert.ok(dialog.fieldsWidth !== undefined && dialog.fieldsScrollWidth !== undefined
+      && dialog.fieldsScrollWidth <= dialog.fieldsWidth + 1);
+    await page.screenshot({ path: `test-results/local-import-${viewport.width}.png` });
+    console.log(`${viewport.width}px dashboard, native charts, and import dialog: OK`);
     await page.close();
   }
 } finally {

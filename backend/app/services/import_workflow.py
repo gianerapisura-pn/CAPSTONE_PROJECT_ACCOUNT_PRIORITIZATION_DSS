@@ -38,7 +38,7 @@ from app.etl.status import standardize_payment_status
 from app.imports.validators import REQUIRED_COLUMNS, parse_source_file, validate_rows
 from app.services.analytics_runner import run_account_prioritization, validate_analysis_reference
 from app.services.model_lifecycle import future_transaction_for_current_run
-from app.services.power_bi_refresh import enqueue_refresh
+from app.services.si_coverage import require_si_coverage
 from app.services.storage import SourceStorage, sanitize_filename
 
 logger = logging.getLogger(__name__)
@@ -99,9 +99,18 @@ def _reconstruct_invoice_groups(db: Session, current_batch_id: str | None = None
         .where(condition)
         .order_by(RawSourceRow.created_at, RawSourceRow.raw_source_row_id)
     ).all()
+    critical_rows = {
+        (issue.import_batch_id, issue.source_sheet, issue.row_number)
+        for issue in db.scalars(select(ImportRowIssue).where(
+            ImportRowIssue.severity == "error",
+            ImportRowIssue.row_number.is_not(None),
+        )).all()
+    }
     exact_rows: dict[tuple, tuple[RawSourceRow, SourceRow]] = {}
     duplicate_ids: dict[tuple, list[str]] = {}
     for raw in raw_rows:
+        if (raw.import_batch_id, raw.source_sheet, raw.source_row_number) in critical_rows:
+            continue
         source = _raw_to_source(raw)
         key = _source_business_key(source)
         duplicate_ids.setdefault(key, []).append(raw.raw_source_row_id)
@@ -294,10 +303,9 @@ def preview_source(db: Session, user: AuthenticatedUser, file_name: str, content
     safe_name = sanitize_filename(file_name)
     parsed = parse_source_file(safe_name, content)
     issues = list(parsed.issues)
-    rows_discovered = 0
+    rows_discovered = parsed.rows_discovered
     cancelled = 0
     for frame in parsed.frames.values():
-        rows_discovered += len(frame)
         cancelled += sum(
             standardize_payment_status(value) == "Cancelled"
             for value in frame["PAYMENT STATUS"]
@@ -323,14 +331,16 @@ def preview_source(db: Session, user: AuthenticatedUser, file_name: str, content
         ImportBatch.file_hash == parsed.file_hash,
         ImportBatch.status == "committed",
     ))
+    file_errors = [issue for issue in issues if issue.severity == "error" and issue.row_number is None]
+    flagged_rows = warning_rows - error_rows
     batch = ImportBatch(
         file_name=safe_name,
         file_hash=parsed.file_hash,
         uploaded_by=user.user_id,
         status="previewed",
         rows_discovered=rows_discovered,
-        rows_accepted=max(0, rows_discovered - len(error_rows)),
-        rows_flagged=len(warning_rows),
+        rows_accepted=(0 if file_errors else max(0, rows_discovered - len(error_rows) - len(flagged_rows))),
+        rows_flagged=0 if file_errors else len(flagged_rows),
         rows_excluded=len(error_rows),
         cancelled_count=cancelled,
     )
@@ -386,7 +396,15 @@ def preview_source(db: Session, user: AuthenticatedUser, file_name: str, content
                 if preview_groups else 0.0
             ),
         },
-        "can_commit": not any(issue.severity == "error" for issue in issues) and not duplicate,
+        "rows_accepted": batch.rows_accepted,
+        "rows_flagged": batch.rows_flagged,
+        "rows_quarantined": 0 if file_errors else len(error_rows),
+        "rows_blocked": rows_discovered if file_errors else 0,
+        "publication_blockers": [issue.message for issue in file_errors] + (
+            ["Critical SI rows must be corrected before complete coverage can be certified."]
+            if error_rows else []
+        ),
+        "can_commit": not file_errors and not error_rows and not duplicate and rows_discovered > 0,
         "status": "PREVIEW",
     }
 
@@ -407,7 +425,7 @@ def commit_source(
         ImportRowIssue.severity == "error",
     ))
     if errors:
-        raise HTTPException(422, "Import has validation errors and cannot be committed.")
+        raise HTTPException(422, "Critical source/SI errors require correction before publication.")
     duplicate = db.scalar(select(ImportBatch).where(
         ImportBatch.file_hash == batch.file_hash,
         ImportBatch.status == "committed",
@@ -423,10 +441,18 @@ def commit_source(
         raise HTTPException(409, "Exact duplicate re-upload blocked as an audited no-op.")
     try:
         content = SourceStorage().get(batch.storage_path or "")
+        if sha256(content).hexdigest() != batch.file_hash:
+            raise HTTPException(409, "Previewed source content changed; preview the file again.")
         parsed = parse_source_file(batch.file_name, content)
+        if parsed.issues or not parsed.frames:
+            raise HTTPException(422, "Previewed source schema is no longer valid.")
+        if any(issue.severity == "error" for frame in parsed.frames.values()
+               for issue in validate_rows(frame)):
+            raise HTTPException(422, "Critical SI/source errors require a corrected preview.")
         _persist_raw_rows(db, batch_id, list(parsed.frames.values()))
         cumulative_groups = load_invoice_groups(db)
         validate_analysis_reference(cumulative_groups, pd.Timestamp(analysis_reference_date))
+        require_si_coverage(db, analysis_reference_date, batch_id)
         batch.analysis_reference_date = analysis_reference_date
         batch.status = "committed"
         batch.committed_at = datetime.now(timezone.utc)
@@ -455,7 +481,6 @@ def commit_source(
         db.add(run)
         db.flush()
         persist_run_output(db, run, result)
-        enqueue_refresh(db, run.analysis_run_id)
         batch.analysis_run_id = run.analysis_run_id
         audit(db, user.user_id, "import_committed", "import_batch", batch_id, {
             "analysis_run_id": run.analysis_run_id,
@@ -471,6 +496,7 @@ def commit_source(
             "warnings": result["warnings"],
         }
     except HTTPException:
+        db.rollback()
         raise
     except ValueError as exc:
         db.rollback()

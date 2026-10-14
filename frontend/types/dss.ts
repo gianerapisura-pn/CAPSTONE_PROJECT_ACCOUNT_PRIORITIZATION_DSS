@@ -103,16 +103,23 @@ export interface ImportPreview {
   file_hash: string;
   sheets: string[];
   rows_discovered: number;
+  rows_accepted: number;
+  rows_flagged: number;
+  rows_quarantined: number;
+  rows_blocked: number;
   cancelled_count: number;
   latest_evidence_date: string | null;
   latest_valid_si_date: string | null;
   latest_final_cr_date: string | null;
   analysis_reference_required: boolean;
   can_commit: boolean;
+  publication_blockers: string[];
   duplicate_committed_file: boolean;
   quality_rates: Record<string, number>;
   status: string;
   issues: Array<{
+    source_sheet?: string | null;
+    issue_type?: string;
     row_number: number | null;
     column: string | null;
     severity: string;

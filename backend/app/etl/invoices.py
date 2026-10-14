@@ -30,6 +30,7 @@ class SourceRow:
     source_sheet: str = "CSV"
     source_row_number: int = 0
     raw_source_row_id: str | None = None
+    collection_issue: bool = False
 
 
 @dataclass
@@ -49,6 +50,7 @@ class InvoiceGroup:
     reconciled: bool = False
     review_reason: str | None = None
     conflicting_invoice: bool = False
+    settlement_evidence_complete: bool = True
 
     @property
     def is_cancelled(self) -> bool:
@@ -71,6 +73,7 @@ class InvoiceGroup:
             or self.payment_status != "Fully Paid"
             or self.final_cr_date is None
             or not self.reconciled
+            or not self.settlement_evidence_complete
         ):
             return False
         return (self.final_cr_date - self.si_date).days >= 0
@@ -108,6 +111,11 @@ def dataframe_to_source_rows(frame: pd.DataFrame, import_batch_id: str = "demo")
                 import_batch_id=import_batch_id,
                 source_sheet=str(row.get("source_sheet", "CSV")),
                 source_row_number=int(row.get("source_row_number", 0)),
+                collection_issue=(
+                    bool(str(row["CR DATE"]).strip()) and pd.isna(cr_date_raw)
+                    or bool(str(row["CR AMOUNT"]).strip()) and parse_decimal(row["CR AMOUNT"]) is None
+                    or bool(str(row["EWT"]).strip()) and parse_decimal(row["EWT"]) is None
+                ) if not is_cancelled else False,
             )
         )
     return rows
@@ -138,6 +146,8 @@ def group_invoices(rows: list[SourceRow], precision: Decimal = Decimal("0.01")) 
                 payment_status=row.payment_status,
             )
         grouped[key].rows.append(row)
+        if row.collection_issue:
+            grouped[key].settlement_evidence_complete = False
     conflict_amounts: dict[tuple[str, str, object], set[Decimal]] = {}
     for group in grouped.values():
         identity = (
@@ -180,6 +190,8 @@ def group_invoices(rows: list[SourceRow], precision: Decimal = Decimal("0.01")) 
             group.review_reason = "Unsupported payment status; excluded from analytics pending review."
         elif group.payment_status == "Fully Paid" and not group.reconciled:
             group.review_reason = "Fully Paid invoice does not reconcile to SI amount."
+        elif not group.settlement_evidence_complete:
+            group.review_reason = "Collection evidence is incomplete or invalid; settlement unavailable."
         elif group.final_cr_date is not None and (group.final_cr_date - group.si_date).days < 0:
             group.review_reason = "Collection date is earlier than SI date."
     return list(grouped.values())

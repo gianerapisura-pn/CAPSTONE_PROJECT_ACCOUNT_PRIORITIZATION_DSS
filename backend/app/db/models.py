@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, Uuid
@@ -60,6 +60,24 @@ class ImportRowIssue(Base):
     severity: Mapped[str] = mapped_column(String(16))
     message: Mapped[str] = mapped_column(Text)
     issue_type: Mapped[str] = mapped_column(String(80), default="validation")
+
+
+class SICoverageConfirmation(Base):
+    __tablename__ = "si_coverage_confirmations"
+    confirmation_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True, default=uid)
+    complete_through: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    evidence_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    evidence_reference: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence_basis: Mapped[str] = mapped_column(Text, nullable=False)
+    confirmed_on: Mapped[date | None] = mapped_column(Date)
+    recorded_by: Mapped[str] = mapped_column(UUID_STRING, nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    source_batch_id: Mapped[str | None] = mapped_column(ForeignKey("import_batches.import_batch_id"))
+    source_package_hash: Mapped[str | None] = mapped_column(String(64))
+    supersedes_confirmation_id: Mapped[str | None] = mapped_column(
+        ForeignKey("si_coverage_confirmations.confirmation_id")
+    )
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class RawSourceRow(Base):

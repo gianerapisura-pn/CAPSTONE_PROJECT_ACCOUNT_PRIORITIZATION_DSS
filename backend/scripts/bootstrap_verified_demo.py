@@ -17,6 +17,7 @@ from app.services.locked_packages import FINAL_PACKAGE_SHA256, read_package_memb
 from app.services.model_lifecycle import register_frozen_model
 from app.services.prescriptive_evidence import seed_prescriptive_validation_evidence
 from app.services.study_predictions import seed_final_study_predictions
+from app.services.si_coverage import seed_locked_study_coverage
 from scripts.bootstrap_account_context import bootstrap
 
 
@@ -40,6 +41,7 @@ def main() -> None:
         register_frozen_model(db, package_path=args.package)
         db.commit()
         seed_final_study_predictions(db, args.package)
+        seed_locked_study_coverage(db, args.package, DEMO_ADMIN_USER_ID)
         seed_prescriptive_validation_evidence(db, args.package)
         db.commit()
         workbook = read_package_member(package_content, "01_DATA/00_RAW/PESLC_RAW.xlsx")

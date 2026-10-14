@@ -156,7 +156,7 @@ def test_restart_recovers_pending_but_not_ambiguous_in_flight_request(monkeypatc
     assert dispatched == []
 
 
-def test_import_commit_schedules_after_success_and_retry_requires_admin(monkeypatch):
+def test_import_commit_does_not_schedule_retired_power_bi_refresh(monkeypatch):
     from app.main import CommitRequest
 
     monkeypatch.setattr("app.main.commit_source", lambda *args: {
@@ -168,15 +168,13 @@ def test_import_commit_schedules_after_success_and_retry_requires_admin(monkeypa
         tasks, AuthenticatedUser("admin", "administrator"), None,
     )
     assert result["status"] == "COMMITTED"
-    assert len(tasks.tasks) == 1
-    assert tasks.tasks[0].func is refresh.request_refresh
-    assert tasks.tasks[0].args == (RUN_ID,)
+    assert tasks.tasks == []
     route = next(route for route in app.routes if isinstance(route, APIRoute)
                  and route.path == "/reports/power-bi-refresh/retry")
     assert require_admin in {item.call for item in route.dependant.dependencies}
 
 
-def test_explicit_successful_analytics_run_queues_refresh(monkeypatch):
+def test_explicit_successful_analytics_run_requires_coverage_and_no_refresh(monkeypatch):
     from app.main import RunRequest
     from app import main
 
@@ -184,6 +182,7 @@ def test_explicit_successful_analytics_run_queues_refresh(monkeypatch):
     monkeypatch.setattr(refresh, "get_settings", lambda: settings(demo=True))
     monkeypatch.setattr(main, "load_invoice_groups", lambda db: [object()])
     monkeypatch.setattr(main, "validate_analysis_reference", lambda *args: None)
+    monkeypatch.setattr(main, "require_si_coverage", lambda *args: None)
     monkeypatch.setattr(main, "b2b_analytical_accounts", lambda db: set())
     monkeypatch.setattr(main, "current_actionable_accounts", lambda db: set())
     monkeypatch.setattr(main, "future_transaction_for_current_run", lambda *args: None)
@@ -201,6 +200,5 @@ def test_explicit_successful_analytics_run_queues_refresh(monkeypatch):
             tasks, AuthenticatedUser("admin", "administrator"), db,
         )
         assert result["status"] == "successful"
-        assert db.get(PowerBIRefresh, result["analysis_run_id"]).status == "not_configured"
-    assert len(tasks.tasks) == 1
-    assert tasks.tasks[0].args == (result["analysis_run_id"],)
+        assert db.get(PowerBIRefresh, result["analysis_run_id"]) is None
+    assert tasks.tasks == []

@@ -9,14 +9,14 @@
 5. An administrator verifies taxonomy, B2B eligibility, status, and provenance. B2B accounts enter descriptive/predictive analytics; only Client-Confirmed Active B2B accounts with complete criteria enter current CRITIC/MCS.
 6. Python computes descriptive RFM/Settlement, frozen CatBoost classification, CRITIC/additive MCS, one-stream sensitivity, leave-one-out influence, all-valid versus B2B baselines, and seven closure-aware backtests.
 7. A successful run atomically persists analytical outputs and an immutable account-context snapshot. Failed/in-progress runs cannot replace the latest successful run, and later dimension edits cannot alter an old publication.
-8. The Web DSS reads persisted operational outputs and separately persisted immutable final-study predictions. A successful publication records a separate Power BI refresh request; the backend submits it after commit. Power BI reads certified operational and study views after its own refresh. Microsoft errors never roll back the published run.
+8. The Web DSS native reports read persisted operational outputs from the latest successful run and separately persisted immutable final-study evidence. No Microsoft refresh is needed for publication or rendering.
 
 ## Boundaries
 
 - Next.js: authentication-aware operational review, filtering, detail, approved export, and administration UI.
 - FastAPI: authorization, import orchestration, analytics, frozen artifact verification, persistence, and monitoring.
 - Supabase: Auth, PostgreSQL, RLS, and private source/model buckets.
-- Power BI: downstream visualization/reporting only; no analytical recomputation.
+- Native Detailed Analytics: downstream visualization/reporting only; no analytical recomputation.
 
 The service-role key and private bucket credentials remain backend-only. The peslc_reporting_reader role is NOLOGIN, SELECT-only, cannot bypass RLS, and has no RAW/private-storage access.
 
@@ -24,4 +24,4 @@ Local real-user sign-in uses the production-configured Supabase API. The optiona
 
 ## Locked evidence boundaries
 
-The deployed artifact is the unchanged authorized FrozenCatBoost object containing the fitted median imputer and CatBoost classifier; model metadata and locked evaluation evidence are loaded separately from a hash-verified package. Entropy, Equal Weighting, and CRITIC-weighted TOPSIS exist only as supplementary robustness evidence for Power BI and are never operational ranking methods.
+The deployed artifact is the unchanged authorized FrozenCatBoost object containing the fitted median imputer and CatBoost classifier; model metadata and locked evaluation evidence are loaded separately from a hash-verified package. Entropy, Equal Weighting, and CRITIC-weighted TOPSIS exist only as supplementary historical robustness evidence and are never operational ranking methods.

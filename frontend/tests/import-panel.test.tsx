@@ -47,6 +47,7 @@ test("invalid preview clearly remains uncommittable", async () => {
 test("successful import shows warnings and clear next actions", async () => {
   apiFetchMock
     .mockResolvedValueOnce({ ...basePreview, can_commit: true, issues: [] })
+    .mockResolvedValueOnce([{ complete_through: "2030-06-01", source_batch_id: "b1", source_package_hash: null, superseded_at: null }])
     .mockResolvedValueOnce({
       status: "COMMITTED",
       analysis_run_id: "run-123",
@@ -79,5 +80,5 @@ test("successful import shows warnings and clear next actions", async () => {
   expect(screen.getByText("Predictive context is unavailable for this run.")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "View Updated Priorities" })).toHaveAttribute("href", "/accounts");
   expect(screen.getByRole("link", { name: "Open Detailed Analytics" })).toHaveAttribute("href", "/reports");
-  expect(screen.getByText(/Power BI refresh is requested separately/i)).toBeInTheDocument();
+  expect(screen.getByText(/native Detailed Analytics views now read/i)).toBeInTheDocument();
 });

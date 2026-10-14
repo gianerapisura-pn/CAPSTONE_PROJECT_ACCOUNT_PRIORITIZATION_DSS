@@ -48,6 +48,11 @@ def test_administrator_detail_routes_enforce_admin_dependency():
         "/analytics/sensitivity",
         "/analytics/runs",
         "/analytics/runs/{run_id}",
+        "/analytics/run",
+        "/imports/preview",
+        "/imports/{batch_id}/commit",
+        "/models/monitor",
+        "/si-coverage",
         "/models/current",
         "/reports/native/validation",
     }

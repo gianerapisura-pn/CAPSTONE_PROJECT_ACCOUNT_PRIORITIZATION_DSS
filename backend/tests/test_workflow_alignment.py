@@ -28,10 +28,12 @@ def test_preview_separates_valid_si_and_final_cr_dates(monkeypatch):
     with Session(engine) as db:
         preview = preview_source(db, ADMIN, "source.csv", data)
 
-    assert preview["latest_valid_si_date"] == "2025-07-01"
+    assert preview["latest_valid_si_date"] == "2040-01-01"
     assert preview["latest_final_cr_date"] == "2026-02-01"
-    assert preview["latest_evidence_date"] == "2026-02-01"
+    assert preview["latest_evidence_date"] == "2040-01-01"
     assert preview["analysis_reference_required"] is True
+    assert preview["rows_flagged"] == 1
+    assert preview["rows_quarantined"] == 0
 
 
 def test_collection_correction_queue_returns_admin_candidate_evidence():

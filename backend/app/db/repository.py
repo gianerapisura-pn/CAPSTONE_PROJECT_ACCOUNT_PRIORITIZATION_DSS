@@ -100,6 +100,7 @@ def load_invoice_groups(db):
         reconciliation_difference=Decimal(str(x.reconciliation_difference)),
         reconciled=x.reconciled, review_reason=x.review_reason,
         conflicting_invoice=x.conflicting_invoice, rows=[],
+        settlement_evidence_complete=x.settlement_eligible,
     ) for x in db.scalars(select(InvoiceGroupRecord)).all()]
 
 

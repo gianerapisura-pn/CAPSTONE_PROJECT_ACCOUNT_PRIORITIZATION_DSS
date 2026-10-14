@@ -17,6 +17,10 @@ class ImportPreviewResponse(BaseModel):
     file_hash: str
     sheets: list[str]
     rows_discovered: int
+    rows_accepted: int = 0
+    rows_flagged: int = 0
+    rows_quarantined: int = 0
+    rows_blocked: int = 0
     cancelled_count: int
     latest_evidence_date: str | None = None
     latest_valid_si_date: str | None = None
@@ -26,6 +30,7 @@ class ImportPreviewResponse(BaseModel):
     duplicate_committed_file: bool
     quality_rates: dict[str, float]
     can_commit: bool
+    publication_blockers: list[str] = Field(default_factory=list)
     status: str
 
 

@@ -1,12 +1,12 @@
 # PESLC Account Prioritization DSS
 
-Production-style capstone prototype with a Next.js Web DSS, FastAPI analytics/ETL service, Supabase PostgreSQL contract, and Power BI reporting specification.
+Production-style capstone prototype with a Next.js Web DSS, FastAPI analytics/ETL service, Supabase PostgreSQL contract, and native Detailed Analytics reporting.
 
 ## Final method
 
 - Source rows remain immutable and traceable.
 - Sales Invoices are reconstructed at logical-invoice grain so multiple CR rows do not inflate Frequency or Monetary.
-- An administrator supplies an explicit verified complete-through reference date; latest SI/CR dates remain source metadata and do not automatically set the reference.
+- An administrator supplies an explicit analysis reference backed by a separate, audited Sales Invoice complete-through confirmation. Latest SI/CR dates remain source metadata and do not certify coverage.
 - Historical identities remain preserved. Verified B2B accounts enter descriptive analytics; predictive eligibility also respects closure evidence at each cutoff. Current CRITIC/MCS additionally requires Client-Confirmed Active status and complete criteria.
 - RFM uses q20/q40/q60/q80 empirical quintiles with linear interpolation and tie preservation.
 - The separate predictive branch uses the frozen catboost_stage8 artifact and seven cutoff-safe predictors for a 12-month Future Transaction class.
@@ -26,8 +26,12 @@ Backend defaults to http://127.0.0.1:8000; frontend defaults to http://localhost
 
 The private `PESLC_FINAL_ANALYTICS_FINAL (3).zip` is the single active package for model registration, account-context bootstrap, predictive evidence, final-v2 robustness evidence, and the opt-in regression. Every workflow verifies SHA-256 `6f5d033f23988788fbd5dce91800123308df1251c290bc17f2e35b9d4a429cb9`; the ZIP must never be committed.
 
+## Import and coverage
+
+CSV/XLSX preview reports accepted, flagged, quarantined, and blocked source rows before publication. Invalid SI identity/date/amount and unknown payment status block publication; incomplete collection evidence can leave valid SI available for RFM while settlement remains unavailable. The previewed file hash is checked again at commit. An administrator records independent SI coverage evidence, its source batch, confirmation date, and reference before publication. Both import commit and explicit `/analytics/run` enforce the coverage gate. Historical 2025 coverage can be registered only from the hash-verified locked ZIP with `python -m scripts.bootstrap_study_si_coverage <private-zip> --actor <administrator-uuid>`; its actual confirmation date is not present in the package and is not invented. Future coverage is never automatically seeded.
+
 ## Deployment status
 
-Migrations through 018, application code (including optional post-publication Power BI refresh), and reporting specifications are prepared locally. Applying pending migrations to live Supabase, registering/seeding the private authorized package, connecting/refreshing/reconciling the actual PBIX, production-like later-year import, generation-time measurement, and role-based UAT remain pending until executed with authorized external access. Automatic Power BI refresh is disabled until its backend-only credentials and workspace/model are configured; see `docs/POWER_BI_SETUP.md`.
+Migration 019 adds SI coverage provenance and must be applied after 018 before deploying this backend version. The live Supabase migration state, CatBoost registration, historical coverage seed, and new immutable publication require separate authorized verification; a Git push does not deploy them. A disposable SQLite integration test exercises later-year import behavior, but live authenticated import, generation-time measurement, and role-based UAT remain pending. Native Detailed Analytics reads the latest successful run directly. The legacy Power BI refresh integration is dormant and is not required or started by this code path; `docs/POWER_BI_SETUP.md` is retained as historical specification, not current deployment instructions.
 
-Supplementary Entropy, Equal Weighting, and CRITIC-weighted TOPSIS comparisons are locked methodological robustness evidence for Power BI only. Production FPS, ranks, and groups remain CRITIC plus additive MCS.
+Supplementary Entropy, Equal Weighting, and CRITIC-weighted TOPSIS comparisons are locked historical robustness evidence, not operational scoring methods. Production FPS, ranks, and groups remain CRITIC plus additive MCS.

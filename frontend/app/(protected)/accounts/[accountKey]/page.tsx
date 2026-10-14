@@ -114,7 +114,7 @@ export default function AccountDetailsPage() {
           </div>
         </section>
         <section className="data-section">
-          <div className="section-heading"><div><span className="eyebrow">Source traceability</span><h2><ReceiptText />Invoice history</h2></div><span>{data.transactions.length} logical invoices</span></div>
+          <div className="section-heading"><div><span className="eyebrow">Current cumulative source ledger, not a snapshot of the published run</span><h2><ReceiptText />Invoice history</h2></div><span>{data.transactions.length} logical invoices</span></div>
           <div className="table-wrap"><table><thead><tr><th>SI No.</th><th>SI Date</th><th>SI Amount</th><th>Final CR Date</th><th>Status</th><th>Reconciled</th><th>Import Batch</th></tr></thead>
             <tbody>{data.transactions.map(row => <tr key={String(row.invoice_group_id)}><td>{String(row.si_no)}</td><td>{String(row.si_date)}</td><td>{currency.format(Number(row.si_amount))}</td><td>{String(row.final_cr_date || "Unavailable")}</td><td>{String(row.payment_status)}</td><td>{row.reconciled ? "Yes" : "No"}</td><td className="mono">{String(row.import_batch_id).slice(0, 8)}</td></tr>)}</tbody>
           </table></div>

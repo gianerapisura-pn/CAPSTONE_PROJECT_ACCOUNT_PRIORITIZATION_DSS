@@ -34,7 +34,7 @@ export default function SensitivityPage() {
             <div><span>Total iterations</span><strong>{data.summaries.reduce((sum, row) => sum + row.iterations, 0)}</strong></div>
           </section>
           <section className="data-section">
-            <div className="section-heading"><h2>Rank stability by perturbation range</h2><span>Detailed scenarios in Power BI</span></div>
+            <div className="section-heading"><h2>Rank stability by perturbation range</h2><span>Published run evidence</span></div>
             <div className="table-wrap"><table><thead><tr><th>Relative range</th><th>Iterations</th><th>Mean Spearman</th><th>Minimum</th><th>Maximum</th><th>Average group movement</th><th>Maximum movement</th></tr></thead><tbody>{data.summaries.map((row) => <tr key={row.weight_range}><td><strong>+/-{row.weight_range * 100}%</strong></td><td>{row.iterations}</td><td>{row.mean_spearman.toFixed(4)}</td><td>{row.min_spearman.toFixed(4)}</td><td>{row.max_spearman.toFixed(4)}</td><td>{(row.group_movement_rate * 100).toFixed(2)}%</td><td>{(row.max_group_movement_rate * 100).toFixed(2)}%</td></tr>)}</tbody></table></div>
           </section>
         </>}

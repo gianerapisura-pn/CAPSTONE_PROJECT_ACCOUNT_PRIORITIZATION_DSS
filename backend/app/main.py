@@ -1,6 +1,5 @@
 from __future__ import annotations
-import asyncio
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 from dataclasses import asdict
 from datetime import date, datetime, timezone
 from io import BytesIO
@@ -18,6 +17,7 @@ from app.core.config import get_settings, validate_runtime_configuration
 from app.db.models import (
     AccountAlias, AccountAliasReview, AnalyticsRun, CollectionCorrectionReview, DimAccount, ImportBatch,
     ImportRowIssue, InvoiceGroupRecord, PowerBIRefresh, PredictiveStudyPrediction, RFMResult, RawSourceRow,
+    SICoverageConfirmation,
     SensitivityScenarioRecord, SettlementResult, CriticInfluenceRecord,
     PredictiveBenchmarkRecord, PredictiveHorizonEvaluation, PredictiveOOPEvaluation,
     PrescriptiveValidationEvidence,
@@ -52,12 +52,14 @@ from app.services.model_lifecycle import (
     active_model_version, future_transaction_for_current_run, monitor_registered_predictions,
     unavailable_prediction,
 )
-from app.services.study_predictions import MODEL_ARTIFACT_SHA256, final_study_prediction_payload
+from app.services.study_predictions import MODEL_ARTIFACT_SHA256, MODEL_VERSION, final_study_prediction_payload
 from app.services.prescriptive_evidence import EVIDENCE_VERSION
 from app.services.locked_packages import FINAL_PACKAGE_SHA256
 from app.services.power_bi_refresh import (
-    enqueue_refresh, public_status, request_refresh, supervise_refreshes,
-    retry_refresh, sync_refresh_status,
+    public_status,
+)
+from app.services.si_coverage import (
+    confirm_si_coverage, latest_verified_si_coverage, require_si_coverage,
 )
 
 settings = get_settings()
@@ -67,11 +69,7 @@ settings = get_settings()
 async def lifespan(_: FastAPI):
     validate_runtime_configuration(settings)
     init_database()
-    supervisor = asyncio.create_task(supervise_refreshes())
     yield
-    supervisor.cancel()
-    with suppress(asyncio.CancelledError):
-        await supervisor
 
 
 app = FastAPI(title="PESLC Account Prioritization DSS API", version="2.0.0", lifespan=lifespan)
@@ -85,6 +83,16 @@ class CommitRequest(BaseModel):
 
 class RunRequest(BaseModel):
     analysis_reference_date: date
+
+
+class SICoverageRequest(BaseModel):
+    complete_through: date
+    evidence_type: str
+    evidence_reference: str
+    evidence_basis: str
+    confirmed_on: date
+    source_batch_id: str | None = None
+    supersedes_confirmation_id: str | None = None
 
 
 class MonitorRequest(BaseModel):
@@ -419,9 +427,47 @@ def commit_import(batch_id: str, request: CommitRequest,
                   background_tasks: BackgroundTasks,
                   user: AuthenticatedUser = Depends(require_admin),
                   db: Session = Depends(get_db)):
-    result = commit_source(db, user, batch_id, request.analysis_reference_date)
-    background_tasks.add_task(request_refresh, result["analysis_run_id"])
-    return result
+    return commit_source(db, user, batch_id, request.analysis_reference_date)
+
+
+@app.get("/si-coverage")
+def si_coverage(user: AuthenticatedUser = Depends(require_admin),
+                db: Session = Depends(get_db)):
+    records = db.scalars(select(SICoverageConfirmation).order_by(
+        desc(SICoverageConfirmation.recorded_at))).all()
+    return [{"confirmation_id": row.confirmation_id,
+             "complete_through": row.complete_through.isoformat(),
+             "evidence_type": row.evidence_type,
+             "evidence_reference": row.evidence_reference,
+             "evidence_basis": row.evidence_basis,
+             "confirmed_on": row.confirmed_on.isoformat() if row.confirmed_on else None,
+             "recorded_by": row.recorded_by,
+             "source_batch_id": row.source_batch_id,
+             "source_package_hash": row.source_package_hash,
+             "superseded_at": row.superseded_at.isoformat() if row.superseded_at else None}
+            for row in records]
+
+
+@app.post("/si-coverage")
+def record_si_coverage(request: SICoverageRequest,
+                       user: AuthenticatedUser = Depends(require_admin),
+                       db: Session = Depends(get_db)):
+    try:
+        row = confirm_si_coverage(
+            db, complete_through=request.complete_through,
+            evidence_type=request.evidence_type,
+            evidence_reference=request.evidence_reference,
+            evidence_basis=request.evidence_basis,
+            confirmed_on=request.confirmed_on, recorded_by=user.user_id,
+            source_batch_id=request.source_batch_id,
+            supersedes_confirmation_id=request.supersedes_confirmation_id,
+        )
+        db.commit()
+        return {"confirmation_id": row.confirmation_id,
+                "complete_through": row.complete_through.isoformat()}
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(422, str(exc)) from exc
 
 
 @app.get("/imports", response_model=list[ImportBatchResponse])
@@ -491,6 +537,7 @@ def run_analytics(request: RunRequest, background_tasks: BackgroundTasks,
         raise HTTPException(422, "No committed invoice data is available.")
     try:
         validate_analysis_reference(groups, pd.Timestamp(request.analysis_reference_date))
+        require_si_coverage(db, request.analysis_reference_date)
         b2b_accounts = b2b_analytical_accounts(db)
         actionable_accounts = current_actionable_accounts(db)
         predictive_accounts = predictive_accounts_at(
@@ -509,12 +556,9 @@ def run_analytics(request: RunRequest, background_tasks: BackgroundTasks,
         db.add(run)
         db.flush()
         persist_run_output(db, run, result)
-        enqueue_refresh(db, run.analysis_run_id)
         audit(db, user.user_id, "analytics_run", "analytics_run", run.analysis_run_id,
               {"analysis_reference_date": request.analysis_reference_date.isoformat()})
         db.commit()
-        if background_tasks is not None:
-            background_tasks.add_task(request_refresh, run.analysis_run_id)
         return serialize_run(run)
     except ValueError as exc:
         db.rollback()
@@ -533,7 +577,6 @@ def power_bi_refresh_status(
     if not run:
         return public_status(None, None)
     row = db.get(PowerBIRefresh, run.analysis_run_id)
-    sync_refresh_status(db, row)
     return public_status(row, run.analysis_run_id)
 
 
@@ -543,13 +586,7 @@ def retry_power_bi_refresh(
     user: AuthenticatedUser = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    run = _latest_or_404(db)
-    if not retry_refresh(db, run.analysis_run_id):
-        raise HTTPException(409, "Refresh is unavailable or already requested. Check its status.")
-    audit(db, user.user_id, "power_bi_refresh_retry", "analytics_run", run.analysis_run_id, {})
-    db.commit()
-    background_tasks.add_task(request_refresh, run.analysis_run_id)
-    return public_status(db.get(PowerBIRefresh, run.analysis_run_id), run.analysis_run_id)
+    raise HTTPException(410, "Power BI refresh is retired; native reports read published runs directly.")
 
 
 @app.get("/analytics/latest")
@@ -643,11 +680,9 @@ def native_validation(user: AuthenticatedUser = Depends(require_admin),
     run = _latest_or_404(db)
     payload = run_payload(db, run)
     model = active_model_version(db)
-    evidence_matches_run = bool(
-        model and model.model_version == run.model_version
-        and model.artifact_hash == MODEL_ARTIFACT_SHA256
-    )
-    model_id = model.predictive_model_version_id if evidence_matches_run else None
+    locked_study_model = bool(model and model.model_version == MODEL_VERSION
+                              and model.artifact_hash == MODEL_ARTIFACT_SHA256)
+    model_id = model.predictive_model_version_id if locked_study_model else None
     def evidence(model_class):
         if not model_id:
             return []
@@ -767,6 +802,7 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
                          "group_movement_rate": sum(
                              bool(x.payload["group_changed"]) for x in scenarios) / len(scenarios)}
                         if scenarios else None),
+        "transactions_scope": "current_cumulative_ledger_not_run_snapshot",
         "transactions": [{"invoice_group_id": x.invoice_group_id, "si_no": x.si_no,
                           "si_date": x.si_date.isoformat(), "si_amount": float(x.si_amount),
                           "final_cr_date": x.final_cr_date.isoformat() if x.final_cr_date else None,
@@ -865,10 +901,9 @@ def current_model(user: AuthenticatedUser = Depends(require_admin), db: Session 
 @app.post("/models/monitor")
 def monitor(request: MonitorRequest, user: AuthenticatedUser = Depends(require_admin),
             db: Session = Depends(get_db)):
-    run = latest_successful_run(db)
     result = monitor_registered_predictions(
         db, load_invoice_groups(db), request.as_of_date,
-        run.analysis_reference_date if run else None,
+        latest_verified_si_coverage(db),
     )
     audit(db, user.user_id, "model_monitor", "predictive_model", None,
           {"status": result["status"], "as_of_date": request.as_of_date.isoformat()})
