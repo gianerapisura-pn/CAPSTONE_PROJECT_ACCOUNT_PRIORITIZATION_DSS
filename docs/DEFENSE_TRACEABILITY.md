@@ -8,7 +8,7 @@
 | Robustness | Sensitivity, leave-one-out, and supplementary comparator views | No alternative MCDM method is deployed operationally |
 | Historical usefulness | Seven backtest rows | Exact k/n expected random |
 | Operational workflow | Web DSS | Review, filter, detail, approved export |
-| Detailed reporting | Secure Power BI link and views | No recomputation |
+| Detailed reporting | Three native Web DSS analytics views | Read-only visualization of published and validated evidence; no recomputation |
 | Auditability | Import hash, lineage, immutable runs | Failed runs never publish |
 
 Business category and account status are context/gating fields, not ranking criteria. No output claims project availability, brand preference, quotation status, purchase probability, or permanent account closure.

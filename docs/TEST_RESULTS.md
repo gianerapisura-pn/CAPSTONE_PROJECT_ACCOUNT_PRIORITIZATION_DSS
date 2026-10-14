@@ -1,5 +1,15 @@
 # Test Results
 
+## Revised Later-Period Package Check (2026-10-14)
+
+- Revised private ZIP `PESLC_FINAL_ANALYTICS_FINAL (3)(9).zip`: SHA-256 `6739aad9d809f72cb397c6b226cdcb002e25ee0019e404bb52d7a24e765d125e`. The enclosed frozen CatBoost artifact remains SHA-256 `09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3`; it was loaded for authorized regression only, not retrained or replaced.
+- With `PESLC_FINAL_ANALYTICS_PACKAGE_PATH` set to the revised ZIP, `python -m pytest -q --basetemp=../.pytest-revision-final-20261014`: **119 passed, 0 failed, 0 skipped, 30 warnings**. This includes the original source/prescriptive regression, the revised 2024 historical confirmation, and an isolated existing-database evidence transition with rerun and mismatch rollback checks.
+- Without that environment variable, the private regression file reports **3 skipped**, not passed.
+- Frontend `npm test -- --maxWorkers=1 --no-file-parallelism`: **18 files, 45 tests passed**. `npm run lint`, `npm run typecheck`, and `npm run build` passed; the build generated 16 routes. `npm run test:e2e -- --workers=1`: **1 isolated browser workflow passed**. The first uncapped frontend test attempt ran out of memory; the one-worker rerun passed.
+- Fresh isolated SQLite demo bootstrap from the revised ZIP: 85 historical identities, 84 B2B accounts, 83 ranked accounts, and nine baseline years. The already registered model and genuine predecessor-hash study snapshot were also checked in isolated SQLite; sync did not duplicate the model, predictions, or evidence rows.
+- Main 2024 historical confirmation: 2024-12-31 cutoff, outcome end 2025-12-31, 79 accounts, actual 5/74, predicted 9/70, confusion 4/1/5/69, accuracy 0.9240506329113924, error 0.07594936708860756, Macro F1 0.7648809523809523. The 2023 confirmation and 2025 final forecast (10/73, 2026 outcomes pending) remain separate and unchanged.
+- No live Supabase migration, evidence sync, publication, or login test was performed. The ZIP, private source records, and fitted artifact were not committed.
+
 ## CatBoost Progress Branch Check (2026-10-13)
 
 - Active private package: `PESLC_FINAL_ANALYTICS_FINAL (3).zip`, whole-package SHA-256 `6f5d033f23988788fbd5dce91800123308df1251c290bc17f2e35b9d4a429cb9`.

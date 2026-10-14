@@ -5,6 +5,7 @@ from datetime import date
 from hashlib import sha256
 from io import BytesIO
 import json
+from math import isclose
 from pathlib import Path
 import re
 
@@ -29,6 +30,7 @@ from app.analytics.predictive.future_transaction import (
 from catboost_model import FrozenCatBoost
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG, AnalyticsConfig
 from app.db.models import (
+    AuditLog,
     DimAccount,
     FutureTransactionPrediction,
     PredictiveBenchmarkRecord,
@@ -37,15 +39,25 @@ from app.db.models import (
     PredictiveMonitoringEvaluation,
     PredictiveOOPEvaluation,
 )
+from app.db.repository import audit
 from app.etl.invoices import InvoiceGroup
 from app.services.locked_packages import (
     FINAL_PACKAGE_SHA256,
+    STUDY_PREDECESSOR_PACKAGE_SHA256,
     read_package_csv,
     read_package_json,
     read_package_member,
     verified_package,
 )
 from app.services.storage import ModelStorage
+from app.services.prescriptive_evidence import (
+    seed_prescriptive_validation_evidence, unchanged_prescriptive_evidence,
+)
+from app.services.study_predictions import (
+    MODEL_VERSION, REVISION_AUDIT_ACTION, seed_final_study_predictions,
+    study_snapshot_digest, validate_study_prediction_package,
+)
+from app.db.models import PredictiveStudyPrediction
 
 TARGET_DEFINITION = (
     "Future Transaction means at least one valid logical Sales Invoice after the cutoff "
@@ -75,6 +87,21 @@ LOCKED_DEVELOPMENT_METRICS = {
     "future_transaction_f1": 0.6388888888888888,
     "future_transaction_recall": 0.6722222222222222,
     "mcc": 0.6025330115316253,
+}
+LATER_MEMBER = "01_DATA/05_PREDICTIVE/07_LATER_CHECKS/later_period_summary.csv"
+LATER_EXPECTED = {
+    "2023-12-31": {
+        "future_window_end": "2024-12-31", "observations": 77,
+        "cm_future_future": 6, "cm_future_no_future": 3,
+        "cm_no_future_future": 5, "cm_no_future_no_future": 63,
+        "macro_f1": 0.7701492537313432,
+    },
+    "2024-12-31": {
+        "future_window_end": "2025-12-31", "observations": 79,
+        "cm_future_future": 4, "cm_future_no_future": 1,
+        "cm_no_future_future": 5, "cm_no_future_no_future": 69,
+        "macro_f1": 0.7648809523809523,
+    },
 }
 
 
@@ -171,11 +198,120 @@ def _find_column(frame: pd.DataFrame, candidates: set[str]) -> str | None:
     return None
 
 
+def validated_later_checks(package_content: bytes) -> list[dict]:
+    later = read_package_csv(package_content, LATER_MEMBER)
+    predictions = read_package_csv(
+        package_content, "01_DATA/05_PREDICTIVE/07_LATER_CHECKS/later_period_predictions.csv"
+    )
+    matrices = read_package_csv(
+        package_content, "01_DATA/05_PREDICTIVE/07_LATER_CHECKS/later_period_confusion_matrices.csv"
+    )
+    features = read_package_csv(
+        package_content, "01_DATA/05_PREDICTIVE/07_LATER_CHECKS/later_period_features.csv"
+    )
+    required = {
+        "period", "role", "cutoff_date", "future_window_end", "observations",
+        "eligible_accounts", "actual_future_transaction", "actual_no_future_transaction",
+        "predicted_future_transaction", "predicted_no_future_transaction",
+        "cm_future_future", "cm_future_no_future", "cm_no_future_future",
+        "cm_no_future_no_future", "accuracy", "classification_error", "macro_f1",
+        "balanced_accuracy", "future_precision", "future_recall", "future_f1", "mcc",
+    }
+    if len(later) != 2 or not required.issubset(later.columns):
+        raise ValueError("Locked later-period summary must contain exactly two complete periods.")
+    if not {"period", "cutoff_date", "future_window_end", "account_key", "actual_target", "predicted_target"}.issubset(predictions.columns):
+        raise ValueError("Later-period account predictions are incomplete.")
+    if not {"period", "actual_class", "predicted_future_transaction", "predicted_no_future_transaction"}.issubset(matrices.columns):
+        raise ValueError("Later-period confusion matrices are incomplete.")
+    if not {"period", "account_key", "cutoff_date", *FEATURE_COLUMNS}.issubset(features.columns):
+        raise ValueError("Later-period feature evidence is incomplete.")
+    sources = _rows(later)
+    if {str(row["cutoff_date"]) for row in sources} != set(LATER_EXPECTED):
+        raise ValueError("Later-period main confirmations must use 2023 and December 2024 cutoffs.")
+    if len({str(row["period"]) for row in sources}) != 2:
+        raise ValueError("Later-period confirmations have duplicate period names.")
+    for row in sources:
+        cutoff = str(row["cutoff_date"])
+        expected = LATER_EXPECTED[cutoff]
+        year = cutoff[:4]
+        if (row["period"] != f"{year} confirmation" or
+                row["role"] != "Later-period confirmation" or
+                str(row["future_window_end"]) != expected["future_window_end"]):
+            raise ValueError("Later-period confirmation identity or outcome window is invalid.")
+        counts = {key: int(row[key]) for key in (
+            "observations", "eligible_accounts", "actual_future_transaction",
+            "actual_no_future_transaction", "predicted_future_transaction",
+            "predicted_no_future_transaction", "cm_future_future",
+            "cm_future_no_future", "cm_no_future_future", "cm_no_future_no_future",
+        )}
+        if any(counts[key] != value for key, value in expected.items() if key in counts):
+            raise ValueError("Later-period confusion counts differ from approved evidence.")
+        n = counts["observations"]
+        ff, fn = counts["cm_future_future"], counts["cm_future_no_future"]
+        nf, nn = counts["cm_no_future_future"], counts["cm_no_future_no_future"]
+        if (counts["eligible_accounts"] != n or ff + fn + nf + nn != n or
+                counts["actual_future_transaction"] != ff + fn or
+                counts["actual_no_future_transaction"] != nf + nn or
+                counts["predicted_future_transaction"] != ff + nf or
+                counts["predicted_no_future_transaction"] != fn + nn):
+            raise ValueError("Later-period class totals do not reconcile.")
+        metrics = {
+            "accuracy": (ff + nn) / n,
+            "classification_error": (fn + nf) / n,
+            "macro_f1": expected["macro_f1"],
+            "balanced_accuracy": (ff / (ff + fn) + nn / (nf + nn)) / 2,
+            "future_precision": ff / (ff + nf),
+            "future_recall": ff / (ff + fn),
+            "future_f1": 2 * ff / (2 * ff + fn + nf),
+            "mcc": (ff * nn - fn * nf) / (((ff + nf) * (ff + fn) * (nn + nf) * (nn + fn)) ** 0.5),
+        }
+        if any(not isclose(float(row[key]), value, rel_tol=0, abs_tol=1e-12)
+               for key, value in metrics.items()):
+            raise ValueError("Later-period classification metrics do not reconcile.")
+        period_rows = predictions.loc[predictions["period"] == row["period"]]
+        feature_rows = features.loc[features["period"] == row["period"]]
+        if (len(period_rows) != n or period_rows["account_key"].nunique() != n or
+                set(period_rows["cutoff_date"]) != {cutoff} or
+                set(period_rows["future_window_end"]) != {expected["future_window_end"]}):
+            raise ValueError("Later-period account prediction window or population is invalid.")
+        if (len(feature_rows) != n or set(feature_rows["account_key"]) != set(period_rows["account_key"]) or
+                set(feature_rows["cutoff_date"]) != {cutoff}):
+            raise ValueError("Later-period feature evidence disagrees with the predictions.")
+        for actual, predicted, count in (
+            ("Future Transaction", "Future Transaction", ff),
+            ("Future Transaction", "No Future Transaction", fn),
+            ("No Future Transaction", "Future Transaction", nf),
+            ("No Future Transaction", "No Future Transaction", nn),
+        ):
+            if len(period_rows.loc[
+                (period_rows["actual_target"] == actual) &
+                (period_rows["predicted_target"] == predicted)
+            ]) != count:
+                raise ValueError("Later-period account predictions disagree with the summary.")
+        matrix = matrices.loc[matrices["period"] == row["period"]]
+        if len(matrix) != 2 or set(matrix["actual_class"]) != {
+            "Future Transaction", "No Future Transaction"
+        }:
+            raise ValueError("Later-period confusion matrix is incomplete.")
+        for actual, future, no_future in (
+            ("Future Transaction", ff, fn), ("No Future Transaction", nf, nn)
+        ):
+            item = matrix.loc[matrix["actual_class"] == actual].iloc[0]
+            if (int(item["predicted_future_transaction"]) != future or
+                    int(item["predicted_no_future_transaction"]) != no_future):
+                raise ValueError("Later-period confusion matrix disagrees with the summary.")
+    if (len(predictions) != sum(item["observations"] for item in sources) or
+            len(features) != len(predictions) or len(matrices) != 4):
+        raise ValueError("Later-period evidence includes unexpected extra observations.")
+    return sources
+
+
 def seed_locked_predictive_evidence(
     db: Session,
     record: PredictiveModelVersion,
     package_content: bytes,
 ) -> dict:
+    later = validated_later_checks(package_content)
     db.execute(delete(PredictiveHorizonEvaluation).where(PredictiveHorizonEvaluation.predictive_model_version_id == record.predictive_model_version_id))
     db.execute(delete(PredictiveBenchmarkRecord).where(PredictiveBenchmarkRecord.predictive_model_version_id == record.predictive_model_version_id))
     db.execute(delete(PredictiveOOPEvaluation).where(PredictiveOOPEvaluation.predictive_model_version_id == record.predictive_model_version_id))
@@ -213,12 +349,13 @@ def seed_locked_predictive_evidence(
     for source in _rows(supplemental):
         db.add(PredictiveBenchmarkRecord(predictive_model_version_id=record.predictive_model_version_id, benchmark_scope="supplemental_nine_classifier_audit", model_name=str(source["family"]), payload={"source_member": "supplemental_model_benchmark.csv", **source}))
 
-    later = read_package_csv(package_content, "01_DATA/05_PREDICTIVE/07_LATER_CHECKS/later_period_summary.csv")
-    if len(later) != 2:
-        raise ValueError("Locked later-period summary must contain exactly two periods.")
-    for source in _rows(later):
-        parsed = pd.to_datetime(source.get("cutoff_date"), errors="coerce")
-        db.add(PredictiveOOPEvaluation(predictive_model_version_id=record.predictive_model_version_id, oop_cutoff=None if pd.isna(parsed) else parsed.date(), payload={"source_member": "later_period_summary.csv", **source}))
+    for source in later:
+        db.add(PredictiveOOPEvaluation(
+            predictive_model_version_id=record.predictive_model_version_id,
+            oop_cutoff=date.fromisoformat(source["cutoff_date"]),
+            payload={"source_member": LATER_MEMBER,
+                     "source_package_sha256": FINAL_PACKAGE_SHA256, **source},
+        ))
     return {"horizons": 3, "canonical_benchmarks": 22, "selected_confusion_rows": 6,
             "supplemental_benchmarks": 9, "later_checks": 2}
 
@@ -260,6 +397,8 @@ def register_frozen_model(
             f"Artifact SHA-256 mismatch: expected {config.model_sha256}, received {digest}."
         )
     artifact = _validate_artifact(joblib.load(BytesIO(content)), config)
+    if package_content is not None:
+        validated_later_checks(package_content)
     existing = db.scalar(select(PredictiveModelVersion).where(
         PredictiveModelVersion.model_version == config.model_version
     ))
@@ -319,6 +458,124 @@ def register_frozen_model(
     if package_content is not None:
         seed_locked_predictive_evidence(db, record, package_content)
     return record
+
+
+def _unchanged_development_evidence(db: Session, record: PredictiveModelVersion,
+                                    content: bytes) -> bool:
+    horizons = db.scalars(select(PredictiveHorizonEvaluation).where(
+        PredictiveHorizonEvaluation.predictive_model_version_id == record.predictive_model_version_id
+    )).all()
+    benchmarks = db.scalars(select(PredictiveBenchmarkRecord).where(
+        PredictiveBenchmarkRecord.predictive_model_version_id == record.predictive_model_version_id
+    )).all()
+    if not horizons and not benchmarks:
+        return False
+    expected_horizons = [
+        {"source_member": "horizon_summary.csv", **row}
+        for row in _rows(read_package_csv(content, "01_DATA/05_PREDICTIVE/02_HORIZON/horizon_summary.csv"))
+    ]
+    benchmark_sources = (
+        ("model_benchmark.csv", "01_DATA/05_PREDICTIVE/05_BENCHMARK/model_benchmark.csv", None),
+        ("confusion_matrices.csv", "01_DATA/05_PREDICTIVE/05_BENCHMARK/confusion_matrices.csv", "CatBoost"),
+        ("supplemental_model_benchmark.csv", "01_DATA/05_PREDICTIVE/08_EXTENDED_AUDIT/supplemental_model_benchmark.csv", None),
+    )
+    expected_benchmarks = []
+    for label, member, family in benchmark_sources:
+        frame = read_package_csv(content, member)
+        if family:
+            frame = frame.loc[frame["family"] == family]
+        expected_benchmarks.extend({"source_member": label, **row} for row in _rows(frame))
+    actual_benchmarks = [
+        {key: value for key, value in row.payload.items() if key != "source_package_sha256"}
+        for row in benchmarks
+    ]
+    if (len(horizons) != 3 or len(benchmarks) != 37 or
+            sorted([row.payload for row in horizons], key=str) != sorted(expected_horizons, key=str) or
+            sorted(actual_benchmarks, key=str) != sorted(expected_benchmarks, key=str) or
+            any(row.payload.get("source_package_sha256") not in (
+                FINAL_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256
+            ) for row in benchmarks if row.payload.get("source_member") == "confusion_matrices.csv")):
+        raise ValueError("Existing development evidence differs from the revised package.")
+    return True
+
+
+def sync_revised_package_evidence(db: Session, package_path: str | Path,
+                                  actor: str | None = None) -> dict:
+    _, content = verified_package(package_path, FINAL_PACKAGE_SHA256)
+    if sha256(read_package_member(content, "03_MODEL/catboost.joblib")).hexdigest() != DEFAULT_ANALYTICS_CONFIG.model_sha256:
+        raise ValueError("Revised package contains a different frozen model artifact.")
+    record = db.scalar(select(PredictiveModelVersion).where(
+        PredictiveModelVersion.model_version == MODEL_VERSION
+    ))
+    if (record is None or record.status != "active" or
+            record.artifact_hash != DEFAULT_ANALYTICS_CONFIG.model_sha256):
+        raise ValueError("The approved active CatBoost model must already be registered.")
+    _load_artifact(record)
+    validate_study_prediction_package(content)
+    later = validated_later_checks(content)
+    development_exists = _unchanged_development_evidence(db, record, content)
+    prescriptive_exists = unchanged_prescriptive_evidence(db, content)
+    study = seed_final_study_predictions(db, package_path)
+    old_rows = db.scalars(select(PredictiveOOPEvaluation).where(
+        PredictiveOOPEvaluation.predictive_model_version_id == record.predictive_model_version_id
+    )).all()
+    current = len(old_rows) == 2 and {
+        (row.payload.get("cutoff_date"), row.payload.get("source_package_sha256"))
+        for row in old_rows
+    } == {(source["cutoff_date"], FINAL_PACKAGE_SHA256) for source in later}
+    if current and any(
+        row.payload != {"source_member": LATER_MEMBER,
+                        "source_package_sha256": FINAL_PACKAGE_SHA256,
+                        **next(source for source in later if source["cutoff_date"] == row.payload["cutoff_date"])}
+        for row in old_rows
+    ):
+        raise ValueError("Persisted current later-period evidence differs from the verified package.")
+    if old_rows and not current:
+        by_cutoff = {row.payload.get("cutoff_date"): row.payload for row in old_rows}
+        if (len(old_rows) != 2 or set(by_cutoff) != {"2023-12-31", "2024-08-13"} or
+                by_cutoff["2023-12-31"].get("macro_f1") != LATER_EXPECTED["2023-12-31"]["macro_f1"] or
+                by_cutoff["2024-08-13"].get("period") != "2024-08-13 confirmation" or
+                by_cutoff["2024-08-13"].get("observations") != 79 or
+                not isclose(float(by_cutoff["2024-08-13"].get("macro_f1", -1)),
+                            0.7710144927536231, rel_tol=0, abs_tol=1e-12)):
+            raise ValueError("Existing later-period evidence is not the recognized predecessor.")
+    if not development_exists:
+        seed_locked_predictive_evidence(db, record, content)
+    elif not current:
+        db.execute(delete(PredictiveOOPEvaluation).where(
+            PredictiveOOPEvaluation.predictive_model_version_id == record.predictive_model_version_id
+        ))
+        for source in later:
+            db.add(PredictiveOOPEvaluation(
+                predictive_model_version_id=record.predictive_model_version_id,
+                oop_cutoff=date.fromisoformat(source["cutoff_date"]),
+                payload={"source_member": LATER_MEMBER,
+                         "source_package_sha256": FINAL_PACKAGE_SHA256, **source},
+            ))
+    if not prescriptive_exists:
+        seed_prescriptive_validation_evidence(db, package_path)
+    study_rows = db.scalars(select(PredictiveStudyPrediction).where(
+        PredictiveStudyPrediction.model_version == MODEL_VERSION,
+        PredictiveStudyPrediction.forecast_origin == date(2025, 12, 31),
+    )).all()
+    proofs = db.scalars(select(AuditLog).where(
+        AuditLog.action == REVISION_AUDIT_ACTION,
+        AuditLog.entity_type == "predictive_model",
+        AuditLog.entity_id == MODEL_VERSION,
+    )).all()
+    digest = study_snapshot_digest(study_rows)
+    if not any(item.details.get("package_sha256") == FINAL_PACKAGE_SHA256 and
+               item.details.get("study_snapshot_sha256") == digest for item in proofs):
+        audit(db, actor, REVISION_AUDIT_ACTION, "predictive_model", MODEL_VERSION, {
+            "package_sha256": FINAL_PACKAGE_SHA256,
+            "study_predecessor_sha256": STUDY_PREDECESSOR_PACKAGE_SHA256,
+            "study_snapshot_sha256": digest,
+            "later_member": LATER_MEMBER,
+            "supplementary_member": "05_QA/final_design_tests/later_period_design_check.csv",
+            "prescriptive_evidence_unchanged": prescriptive_exists,
+        })
+    return {"model_version": MODEL_VERSION, "study": study,
+            "later_checks": 2, "prescriptive_evidence_unchanged": prescriptive_exists}
 
 
 def unavailable_prediction(config: AnalyticsConfig = DEFAULT_ANALYTICS_CONFIG) -> FutureTransactionResult:

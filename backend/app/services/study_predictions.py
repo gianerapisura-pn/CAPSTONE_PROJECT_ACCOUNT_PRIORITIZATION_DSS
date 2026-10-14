@@ -2,14 +2,17 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import date
+from hashlib import sha256
+import json
 from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import DimAccount, PredictiveModelVersion, PredictiveStudyPrediction
+from app.db.models import AuditLog, DimAccount, PredictiveModelVersion, PredictiveStudyPrediction
 from app.services.locked_packages import (
     FINAL_PACKAGE_SHA256,
+    STUDY_PREDECESSOR_PACKAGE_SHA256,
     read_package_csv,
     read_package_json,
     verified_package,
@@ -32,6 +35,7 @@ FORECAST_ORIGIN = date(2025, 12, 31)
 FUTURE_WINDOW_START = date(2026, 1, 1)
 FUTURE_WINDOW_END = date(2026, 12, 31)
 VALID_LABELS = {"Future Transaction", "No Future Transaction"}
+REVISION_AUDIT_ACTION = "revised_package_evidence_verified"
 REQUIRED_COLUMNS = {
     "account_key", "account_name", "scoring_role", "cutoff_date",
     "future_window_start", "future_window_end", "predicted_target",
@@ -186,14 +190,26 @@ def seed_final_study_predictions(db: Session, package_path: str | Path) -> dict:
     if existing:
         expected = {
             accounts[str(row["account_name"]).strip()].account_key:
-                str(row["predicted_target"]).strip()
+                (
+                    str(row["predicted_target"]).strip(),
+                    _as_date(row["cutoff_date"], "cutoff_date"),
+                    _as_date(row["future_window_start"], "future_window_start"),
+                    _as_date(row["future_window_end"], "future_window_end"),
+                )
             for row in records
         }
-        actual = {row.account_key: row.predicted_class for row in existing}
-        if actual != expected or any(
-            row.source_package_hash != FINAL_PACKAGE_SHA256
-            for row in existing
-        ):
+        actual = {
+            row.account_key: (
+                row.predicted_class, row.forecast_origin,
+                row.future_window_start, row.future_window_end,
+            ) for row in existing
+        }
+        hashes = {row.source_package_hash for row in existing}
+        if (len(existing) != 83 or actual != expected or
+                hashes not in ({FINAL_PACKAGE_SHA256}, {STUDY_PREDECESSOR_PACKAGE_SHA256}) or
+                any(row.model_version != MODEL_VERSION or
+                    not row.source_package_member.endswith(STUDY_PREDICTION_MEMBER)
+                    for row in existing)):
             raise ValueError("An incompatible immutable final study snapshot already exists.")
         return {"study_predictions": len(existing), "already_seeded": True}
 
@@ -210,6 +226,33 @@ def seed_final_study_predictions(db: Session, package_path: str | Path) -> dict:
             source_package_member=STUDY_PREDICTION_MEMBER,
         ))
     return {"study_predictions": len(records), "already_seeded": False}
+
+
+def study_snapshot_digest(rows: list[PredictiveStudyPrediction]) -> str:
+    snapshot = sorted((
+        row.account_key, row.predicted_class, row.forecast_origin.isoformat(),
+        row.future_window_start.isoformat(), row.future_window_end.isoformat(),
+    ) for row in rows)
+    return sha256(json.dumps(snapshot, separators=(",", ":")).encode()).hexdigest()
+
+
+def revision_verified(db: Session, rows: list[PredictiveStudyPrediction]) -> bool:
+    if not rows or {row.source_package_hash for row in rows} != {
+        STUDY_PREDECESSOR_PACKAGE_SHA256
+    }:
+        return False
+    digest = study_snapshot_digest(rows)
+    proofs = db.scalars(select(AuditLog).where(
+        AuditLog.action == REVISION_AUDIT_ACTION,
+        AuditLog.entity_type == "predictive_model",
+        AuditLog.entity_id == MODEL_VERSION,
+    )).all()
+    return any(
+        proof.details.get("package_sha256") == FINAL_PACKAGE_SHA256
+        and proof.details.get("study_predecessor_sha256") == STUDY_PREDECESSOR_PACKAGE_SHA256
+        and proof.details.get("study_snapshot_sha256") == digest
+        for proof in proofs
+    )
 
 
 def final_study_prediction_payload(db: Session) -> dict:
@@ -238,6 +281,8 @@ def final_study_prediction_payload(db: Session) -> dict:
     hashes = {row.source_package_hash for row in rows}
     if len(origins) != 1 or len(starts) != 1 or len(ends) != 1 or len(hashes) != 1:
         raise ValueError("Persisted final study prediction evidence is inconsistent.")
+    if next(iter(hashes)) != FINAL_PACKAGE_SHA256 and not revision_verified(db, rows):
+        return {"status": "unavailable"}
     accounts = {
         row.account_key: row.standardized_account_name
         for row in db.scalars(select(DimAccount).where(

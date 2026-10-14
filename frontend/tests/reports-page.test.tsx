@@ -32,9 +32,20 @@ vi.mock("@/lib/use-api", () => ({
       ranked_accounts: 1, business_baselines: [{ year: 2029, period_status: "Complete year", all_recorded_sales: 1000 }],
       accounts,
     } : path.endsWith("/insights") ? { run, accounts } : {
-      run, study: { status: "Validated", class_counts: { "Future Transaction": 1, "No Future Transaction": 1 } },
+      run, study: { status: "Validated", forecast_origin: "2025-12-31", future_window_start: "2026-01-01", future_window_end: "2026-12-31", target_horizon_months: 12, class_counts: { "Future Transaction": 10, "No Future Transaction": 73 } },
       model_evidence_status: "available", model_artifact_hash: "verified-hash", historical_error_summary: null,
-      horizons: [], benchmarks: [], later_checks: [], sensitivity: [], critic_influence: [],
+      horizons: [], benchmarks: [], later_checks: [
+        { period: "2023 confirmation", cutoff_date: "2023-12-31", future_window_end: "2024-12-31",
+          observations: 77, actual_future_transaction: 9, actual_no_future_transaction: 68,
+          predicted_future_transaction: 11, predicted_no_future_transaction: 66,
+          classification_error: .10389610389610393, macro_f1: .7701492537313432,
+          accuracy: .8961038961038961 },
+        { period: "2024 confirmation", cutoff_date: "2024-12-31", future_window_end: "2025-12-31",
+          observations: 79, actual_future_transaction: 5, actual_no_future_transaction: 74,
+          predicted_future_transaction: 9, predicted_no_future_transaction: 70,
+          classification_error: .07594936708860756, macro_f1: .7648809523809523,
+          accuracy: .9240506329113924 },
+      ], sensitivity: [], critic_influence: [],
       backtest: { cutoffs: [] }, critic_weights: {}, supplemental: [],
     },
   }),
@@ -82,6 +93,16 @@ test("administrator can open validation evidence; management cannot", async () =
   expect(screen.getByRole("heading", { name: "Model Benchmark: Mean Macro F1" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Sensitivity: Mean Spearman Rank Correlation" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Historical Backtests 2018-2024: Lift vs Random" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Historical later-period confirmations" })).toBeInTheDocument();
+  expect(screen.getAllByText("2024-12-31")).toHaveLength(2);
+  expect(screen.getAllByText("2025-12-31").length).toBeGreaterThan(0);
+  expect(screen.getByText("5 / 74")).toBeInTheDocument();
+  expect(screen.getByText("9 / 70")).toBeInTheDocument();
+  expect(screen.getByText("0.7649")).toBeInTheDocument();
+  expect(screen.getByText("92.41%")).toBeInTheDocument();
+  expect(screen.getByText("83")).toBeInTheDocument();
+  expect(screen.getByText("Pending")).toBeInTheDocument();
+  expect(screen.getByText(/not accuracy claims for the pending 2026 forecast/)).toBeInTheDocument();
 });
 
 test("legacy Power BI URL guard still rejects public and foreign links", () => {

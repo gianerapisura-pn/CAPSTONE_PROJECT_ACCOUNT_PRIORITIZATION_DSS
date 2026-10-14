@@ -11,6 +11,7 @@
 - Immutable migrations 001-017 plus forward-only migration 018 for CatBoost, closure provenance, and active-model reporting.
 - Environment-gated private regression.
 - Native three-view Detailed Analytics backed by the latest successful publication; Power BI refresh calls are dormant.
+- Revised 2024 historical confirmation is sourced from the verified `(3)(9).zip`; a transactional, idempotent local evidence-sync path preserves the registered model and immutable 2025 study rows.
 - Source preview dispositions, explicit SI coverage provenance and publication gate, plus isolated future-data integration coverage.
 
 ## External evidence pending
@@ -20,6 +21,6 @@
 3. Measure prioritized-list generation time in the target environment.
 4. Execute 6 User UAT and 8 System Validation cases with named testers/evidence.
 
-The latest CatBoost package still requires authorized live deployment verification, migration 018/019 status checks, closure-provenance bootstrap, model registration, study-evidence and 2025 SI-coverage seed, and a new immutable publication where not already done. The historical ZIP's 2025 client confirmation contains no actual confirmation date; the bootstrap records it as unknown. No Power BI report is required by the current native-reporting direction.
+The revised CatBoost package still requires authorized live deployment verification, migration 018/019 status checks, closure-provenance bootstrap, model registration or guarded evidence sync as appropriate, study-evidence and 2025 SI-coverage seed, and a new immutable publication where not already done. The historical ZIP's 2025 client confirmation contains no actual confirmation date; the bootstrap records it as unknown. No Power BI report is required by the current native-reporting direction. Do not run the evidence sync on live Supabase without separate authorization.
 
 Local code also provides the pending account-context queue, audited CR correction resolution, all-valid/B2B baseline split, package-based predictive evidence seeding, and supplementary prescriptive-evidence seeding. The supplementary comparators do not change the official CRITIC plus additive MCS method.

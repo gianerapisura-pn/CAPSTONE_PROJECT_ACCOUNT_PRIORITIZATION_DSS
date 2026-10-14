@@ -1,6 +1,6 @@
 # Current Data Validation Report
 
-Status: the latest ZIP hash was verified. Strict parsing, the pinned scikit-learn 1.8.0 frozen-model regression, and a guarded live Supabase account-provenance bootstrap passed. A new immutable 2025-12-31 run published the updated context; the prior run remains unchanged. All 83 latest priorities match the package by account, reference, recency, rank, group, and score. Power BI semantic-model publication and automatic refresh remain unconfigured.
+Status: the revised ZIP SHA-256 `6739aad9d809f72cb397c6b226cdcb002e25ee0019e404bb52d7a24e765d125e` and frozen CatBoost artifact SHA-256 `09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3` were verified locally. The existing live Supabase publication described below is a historical checkpoint from the predecessor package; this revision has not been deployed there. A local isolated database transition preserves the existing study snapshot and published-run provenance. Power BI semantic-model publication and automatic refresh remain unconfigured.
 
 | Anchor | Locked value |
 |---|---:|
@@ -14,6 +14,7 @@ Status: the latest ZIP hash was verified. Strict parsing, the pinned scikit-lear
 | B2B descriptive / 2025 study predictive | 84 / 83 |
 | Current actionable / MCS / ranked | 83 / 83 / 83 |
 | Final study prediction | 10 Future / 73 No Future Transaction |
+| Revised 2024 historical confirmation | 2024-12-31 cutoff; 2025-12-31 outcome end; 79 accounts; actual 5/74; predicted 9/70; Macro F1 0.7648809523809523 |
 | Priority groups | 28 / 27 / 28 |
 | Sensitivity | 400 scenarios / 33,200 detail rows |
 | Backtests | 7 annual cutoffs |

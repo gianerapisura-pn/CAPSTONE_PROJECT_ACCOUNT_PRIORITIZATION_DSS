@@ -7,6 +7,7 @@
 5. Create a separate Power BI login and grant only peslc_reporting_reader membership.
 6. Verify the login has SELECT-only access to certified views and prescriptive validation evidence, cannot bypass RLS, and cannot select RAW/import/audit/correction-review tables.
 7. Register the hash-verified `catboost_stage8` artifact from the authorized latest package, then seed its separate immutable study/robustness evidence. Never retrain or alter the artifact during registration.
+   If the same artifact is already registered, do not register it again. After backup and explicit authorization, use `python -m scripts.sync_revised_evidence <private-revised-zip> --actor <administrator-uuid>` to verify and synchronize only the revised evidence. Test this against isolated SQLite first; this document does not authorize a live run.
 8. Run read-only checks before any live mutation and never print secrets.
 
 Migration 009 adds account context, operational prediction registry, benchmark and CRITIC influence tables. Migrations 010-011 add correction review, current actionability/provenance, immutable run context, and reporting controls. Migration 012 adds the separate immutable final-study prediction and certified reporting view.

@@ -3,11 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.db.models import PrescriptiveValidationEvidence
-from app.services.locked_packages import FINAL_PACKAGE_SHA256, read_package_csv, verified_package
+from app.services.locked_packages import (
+    FINAL_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256,
+    read_package_csv, verified_package,
+)
 
 EVIDENCE_VERSION = "prescriptive-robustness-final-v2"
 PURPOSEFUL_SUMMARIES = {
@@ -30,6 +33,30 @@ def _json_value(value):
     if value is None or (not isinstance(value, (list, dict)) and pd.isna(value)):
         return None
     return value.item() if hasattr(value, "item") else value
+
+
+def unchanged_prescriptive_evidence(db: Session, content: bytes) -> bool:
+    rows = db.scalars(select(PrescriptiveValidationEvidence).where(
+        PrescriptiveValidationEvidence.evidence_version == EVIDENCE_VERSION
+    )).all()
+    if not rows:
+        return False
+    if {row.source_package_hash for row in rows} not in (
+        {FINAL_PACKAGE_SHA256}, {STUDY_PREDECESSOR_PACKAGE_SHA256}
+    ):
+        raise ValueError("Existing prescriptive evidence has unrecognized package provenance.")
+    expected = []
+    for scope, members in PURPOSEFUL_SUMMARIES.items():
+        for member in members:
+            for index, source in enumerate(read_package_csv(content, member).to_dict("records"), 1):
+                expected.append((scope, {
+                    "source_member": member, "row": index,
+                    **{str(key): _json_value(value) for key, value in source.items()},
+                }))
+    actual = [(row.evidence_scope, row.payload) for row in rows]
+    if sorted(actual, key=str) != sorted(expected, key=str):
+        raise ValueError("Existing prescriptive evidence differs from the revised package.")
+    return True
 
 
 def seed_prescriptive_validation_evidence(db: Session, package_path: str | Path) -> dict:

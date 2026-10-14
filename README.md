@@ -24,7 +24,9 @@ Backend defaults to http://127.0.0.1:8000; frontend defaults to http://localhost
 
 ## Private artifact and data
 
-The private `PESLC_FINAL_ANALYTICS_FINAL (3).zip` is the single active package for model registration, account-context bootstrap, predictive evidence, final-v2 robustness evidence, and the opt-in regression. Every workflow verifies SHA-256 `6f5d033f23988788fbd5dce91800123308df1251c290bc17f2e35b9d4a429cb9`; the ZIP must never be committed.
+The revised private `PESLC_FINAL_ANALYTICS_FINAL (3)(9).zip` is the single active package for model registration, account-context bootstrap, predictive evidence, final-v2 robustness evidence, and the opt-in regression. Every workflow verifies SHA-256 `6739aad9d809f72cb397c6b226cdcb002e25ee0019e404bb52d7a24e765d125e`; the ZIP must never be committed. The prior `(3).zip` hash is retained only to verify unchanged immutable study snapshots during an audited transition.
+
+The main 2024 historical predictive confirmation now uses cutoff 2024-12-31 and outcomes through 2025-12-31. The older 2024-08-13 rolling comparison remains supplementary package evidence, not model-selection evidence. The 2025-12-31 study forecast and seven separate prescriptive backtests are unchanged.
 
 ## Import and coverage
 
@@ -35,3 +37,5 @@ CSV/XLSX preview reports accepted, flagged, quarantined, and blocked source rows
 Migration 019 adds SI coverage provenance and must be applied after 018 before deploying this backend version. The live Supabase migration state, CatBoost registration, historical coverage seed, and new immutable publication require separate authorized verification; a Git push does not deploy them. A disposable SQLite integration test exercises later-year import behavior, but live authenticated import, generation-time measurement, and role-based UAT remain pending. Native Detailed Analytics reads the latest successful run directly. The legacy Power BI refresh integration is dormant and is not required or started by this code path; `docs/POWER_BI_SETUP.md` is retained as historical specification, not current deployment instructions.
 
 Supplementary Entropy, Equal Weighting, and CRITIC-weighted TOPSIS comparisons are locked historical robustness evidence, not operational scoring methods. Production FPS, ranks, and groups remain CRITIC plus additive MCS.
+
+For an already registered `catboost_stage8` model, run `python -m scripts.sync_revised_evidence <private-revised-zip> --actor <administrator-uuid>` from `backend` only against an authorized target database after taking a backup and reviewing its state. The command verifies the registered model and package, compares immutable study rows, then synchronizes evidence transactionally; it never retrains or republishes historical runs. Do not run it on live Supabase without separate authorization.

@@ -5,10 +5,13 @@ from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
 import os
+from types import SimpleNamespace
 
 import joblib
 import pandas as pd
 import pytest
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import Session
 
 from app.analytics.predictive.future_transaction import score_frozen_artifact
 from app.analytics.validation.baselines import annual_business_baselines
@@ -24,6 +27,18 @@ from app.services.locked_packages import (
     verified_package,
 )
 from app.services.model_lifecycle import _validate_artifact
+from app.db.models import (
+    Base, AnalyticsRun, AuditLog, DimAccount, PredictiveModelVersion,
+    PredictiveOOPEvaluation, PredictiveStudyPrediction, PrescriptiveValidationEvidence,
+)
+from app.services.locked_packages import STUDY_PREDECESSOR_PACKAGE_SHA256
+from app.services.model_lifecycle import register_frozen_model, sync_revised_package_evidence
+from app.services.prescriptive_evidence import seed_prescriptive_validation_evidence
+from app.services.study_predictions import (
+    final_study_prediction_payload, seed_final_study_predictions,
+)
+from app.main import native_validation
+from app.auth.dependencies import AuthenticatedUser
 
 PACKAGE = os.getenv("PESLC_FINAL_ANALYTICS_PACKAGE_PATH")
 AVAILABLE = bool(PACKAGE)
@@ -239,3 +254,104 @@ def test_private_current_prescriptive_regression():
         )
         assert item["lift_over_expected_random"] == pytest.approx(expected, abs=1e-6)
     assert sum(item["lift_over_expected_random"] > 1 for item in cutoffs) == 6
+
+
+def test_private_revised_later_confirmation_and_existing_database_sync(monkeypatch):
+    import app.services.model_lifecycle as lifecycle
+
+    _, content = verified_package(PACKAGE, FINAL_PACKAGE_SHA256)
+    model_bytes = read_package_member(content, "03_MODEL/catboost.joblib")
+    assert sha256(model_bytes).hexdigest() == DEFAULT_ANALYTICS_CONFIG.model_sha256
+    monkeypatch.setattr(lifecycle, "ModelStorage", lambda: SimpleNamespace(
+        put=lambda _version, _content: "private-test-model",
+        get=lambda _path: model_bytes,
+    ))
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        predictions = read_package_csv(content, "01_DATA/05_PREDICTIVE/09_CURRENT/current_predictions.csv")
+        for name in predictions["account_name"]:
+            db.add(DimAccount(standardized_account_name=name, display_name=name))
+        db.add(AnalyticsRun(status="successful", analysis_reference_date=pd.Timestamp("2025-12-31").date()))
+        db.flush()
+        model = register_frozen_model(db, package_path=PACKAGE)
+        seed_final_study_predictions(db, PACKAGE)
+        seed_prescriptive_validation_evidence(db, PACKAGE)
+        db.flush()
+        for row in db.scalars(select(PredictiveStudyPrediction)).all():
+            row.source_package_hash = STUDY_PREDECESSOR_PACKAGE_SHA256
+        for row in db.scalars(select(PrescriptiveValidationEvidence)).all():
+            row.source_package_hash = STUDY_PREDECESSOR_PACKAGE_SHA256
+        for row in db.scalars(select(lifecycle.PredictiveBenchmarkRecord).where(
+            lifecycle.PredictiveBenchmarkRecord.benchmark_scope == "selected_confusion_matrix"
+        )).all():
+            row.payload = {**row.payload, "source_package_sha256": STUDY_PREDECESSOR_PACKAGE_SHA256}
+        old_2024 = db.scalar(select(PredictiveOOPEvaluation).where(
+            PredictiveOOPEvaluation.oop_cutoff == pd.Timestamp("2024-12-31").date()
+        ))
+        old_2024.oop_cutoff = pd.Timestamp("2024-08-13").date()
+        old_2024.payload = {
+            "source_member": "later_period_summary.csv",
+            "period": "2024-08-13 confirmation", "cutoff_date": "2024-08-13",
+            "future_window_end": "2025-08-13", "observations": 79,
+            "macro_f1": 0.7710144927536231,
+        }
+        old_2023 = db.scalar(select(PredictiveOOPEvaluation).where(
+            PredictiveOOPEvaluation.oop_cutoff == pd.Timestamp("2023-12-31").date()
+        ))
+        old_2023.payload = {
+            key: value for key, value in old_2023.payload.items()
+            if key != "source_package_sha256"
+        }
+        db.commit()
+
+        study_ids = {row.predictive_study_prediction_id for row in db.scalars(select(PredictiveStudyPrediction))}
+        model_id = model.predictive_model_version_id
+        assert final_study_prediction_payload(db)["status"] == "unavailable"
+
+        with db.begin_nested() as nested:
+            changed = db.scalar(select(PredictiveStudyPrediction))
+            changed.predicted_class = (
+                "No Future Transaction" if changed.predicted_class == "Future Transaction"
+                else "Future Transaction"
+            )
+            db.flush()
+            with pytest.raises(ValueError, match="incompatible immutable"):
+                sync_revised_package_evidence(db, PACKAGE)
+            nested.rollback()
+        assert {row.payload["cutoff_date"] for row in db.scalars(select(PredictiveOOPEvaluation))} == {
+            "2023-12-31", "2024-08-13"
+        }
+
+        first = sync_revised_package_evidence(db, PACKAGE)
+        db.commit()
+        later_ids = {row.id for row in db.scalars(select(PredictiveOOPEvaluation))}
+        second = sync_revised_package_evidence(db, PACKAGE)
+        db.commit()
+        assert first["study"]["already_seeded"] and second["study"]["already_seeded"]
+        assert db.scalar(select(func.count()).select_from(PredictiveModelVersion)) == 1
+        assert model_id == db.scalar(select(PredictiveModelVersion)).predictive_model_version_id
+        assert {row.predictive_study_prediction_id for row in db.scalars(select(PredictiveStudyPrediction))} == study_ids
+        assert {row.source_package_hash for row in db.scalars(select(PredictiveStudyPrediction))} == {
+            STUDY_PREDECESSOR_PACKAGE_SHA256
+        }
+        assert {row.id for row in db.scalars(select(PredictiveOOPEvaluation))} == later_ids
+        assert db.scalar(select(func.count()).select_from(AuditLog)) == 1
+        assert final_study_prediction_payload(db)["class_counts"] == {
+            "Future Transaction": 10, "No Future Transaction": 73,
+        }
+        response = native_validation(AuthenticatedUser("test-user", "administrator"), db)
+        assert response["model_evidence_status"] == "available"
+        assert response["study"]["status"] == "Validated"
+        assert len(response["supplemental"]) > 0
+        assert [(row["cutoff_date"], row["future_window_end"]) for row in response["later_checks"]] == [
+            ("2023-12-31", "2024-12-31"), ("2024-12-31", "2025-12-31"),
+        ]
+        revised = response["later_checks"][1]
+        assert (revised["observations"], revised["actual_future_transaction"],
+                revised["actual_no_future_transaction"], revised["predicted_future_transaction"],
+                revised["predicted_no_future_transaction"]) == (79, 5, 74, 9, 70)
+        assert (revised["cm_future_future"], revised["cm_future_no_future"],
+                revised["cm_no_future_future"], revised["cm_no_future_no_future"]) == (4, 1, 5, 69)
+        assert revised["accuracy"] == pytest.approx(0.9240506329113924)
+        assert revised["macro_f1"] == pytest.approx(0.7648809523809523)

@@ -54,7 +54,7 @@ from app.services.model_lifecycle import (
 )
 from app.services.study_predictions import MODEL_ARTIFACT_SHA256, MODEL_VERSION, final_study_prediction_payload
 from app.services.prescriptive_evidence import EVIDENCE_VERSION
-from app.services.locked_packages import FINAL_PACKAGE_SHA256
+from app.services.locked_packages import FINAL_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256
 from app.services.power_bi_refresh import (
     public_status,
 )
@@ -651,11 +651,13 @@ def native_insights(user: AuthenticatedUser = Depends(require_user),
     return {"run": serialize_run(run), "accounts": payload["accounts"]}
 
 
-def _selected_confusion_summary(benchmarks: list[dict]) -> dict | None:
+def _selected_confusion_summary(benchmarks: list[dict],
+                                allowed_hashes: set[str] | None = None) -> dict | None:
+    accepted = allowed_hashes or {FINAL_PACKAGE_SHA256}
     confusion = [row for row in benchmarks
                  if row.get("source_member") == "confusion_matrices.csv"
-                 and row.get("source_package_sha256") == FINAL_PACKAGE_SHA256]
-    if len(confusion) != 6:
+                 and row.get("source_package_sha256") in accepted]
+    if len(confusion) != 6 or len({row["source_package_sha256"] for row in confusion}) != 1:
         return None
     true_future = sum(int(row["predicted_future_transaction"]) for row in confusion
                       if row["actual_class"] == "Future Transaction")
@@ -666,7 +668,8 @@ def _selected_confusion_summary(benchmarks: list[dict]) -> dict | None:
     false_future = sum(int(row["predicted_future_transaction"]) for row in confusion
                        if row["actual_class"] == "No Future Transaction")
     return {
-        "source_member": "confusion_matrices.csv", "source_package_sha256": FINAL_PACKAGE_SHA256,
+        "source_member": "confusion_matrices.csv",
+        "source_package_sha256": confusion[0]["source_package_sha256"],
         "observations": true_future + missed_future + true_no_future + false_future,
         "errors": missed_future + false_future,
         "true_future": true_future, "missed_future": missed_future,
@@ -690,19 +693,25 @@ def native_validation(user: AuthenticatedUser = Depends(require_admin),
             model_class.predictive_model_version_id == model_id)).all()]
     horizons = evidence(PredictiveHorizonEvaluation)
     benchmarks = evidence(PredictiveBenchmarkRecord)
-    later_checks = evidence(PredictiveOOPEvaluation)
-    historical_error_summary = _selected_confusion_summary(benchmarks)
+    later_checks = [row for row in evidence(PredictiveOOPEvaluation)
+                    if row.get("source_package_sha256") == FINAL_PACKAGE_SHA256]
     study = final_study_prediction_payload(db) if model_id else {"status": "unavailable"}
-    if study.get("source_package_hash") != FINAL_PACKAGE_SHA256:
-        study = {"status": "unavailable"}
-    else:
+    predecessor_verified = (
+        study.get("status") == "Validated" and
+        study.get("source_package_hash") == STUDY_PREDECESSOR_PACKAGE_SHA256
+    )
+    accepted_hashes = {FINAL_PACKAGE_SHA256}
+    if predecessor_verified:
+        accepted_hashes.add(STUDY_PREDECESSOR_PACKAGE_SHA256)
+    historical_error_summary = _selected_confusion_summary(benchmarks, accepted_hashes)
+    if study.get("status") == "Validated":
         study.pop("predictions", None)
     supplemental = db.scalars(select(PrescriptiveValidationEvidence).where(
         PrescriptiveValidationEvidence.evidence_version == EVIDENCE_VERSION)).all()
     return {
         "run": serialize_run(run),
         "study": study,
-        "model_evidence_status": "available" if horizons and benchmarks and later_checks and historical_error_summary else "unavailable",
+        "model_evidence_status": "available" if horizons and benchmarks and len(later_checks) == 2 and historical_error_summary else "unavailable",
         "model_artifact_hash": model.artifact_hash if model_id else None,
         "historical_error_summary": historical_error_summary,
         "horizons": horizons,
@@ -717,7 +726,7 @@ def native_validation(user: AuthenticatedUser = Depends(require_admin),
         "backtest": payload["backtest"],
         "critic_weights": run.critic_weights or {},
         "supplemental": [row.payload for row in supplemental
-                         if model_id and row.source_package_hash == FINAL_PACKAGE_SHA256],
+                         if model_id and row.source_package_hash in accepted_hashes],
     }
 
 

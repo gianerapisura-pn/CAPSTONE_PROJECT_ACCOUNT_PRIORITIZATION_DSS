@@ -18,6 +18,8 @@ The official study forecast origin is 2025-12-31 and its 12-month window is 2026
 
 The target is at least one valid logical SI in (T, T+12 months], labelled Future Transaction; otherwise No Future Transaction. Seven predictors are Recency Days, Frequency 24m, Monetary 24m, Average Settlement Days, Account Activity Gap, Recent Transaction Count 12m, and Recent Monetary Value 12m. All evidence is cutoff-safe; first-transaction activity-gap missingness is structural.
 
+The main later-period historical confirmations use 2023-12-31 with outcomes through 2024-12-31 and 2024-12-31 with outcomes through 2025-12-31. The revised second confirmation evaluates 79 accounts (actual Future/No Future 5/74; predicted 9/70), with accuracy 0.9240506329113924 and Macro F1 0.7648809523809523. The older August 2024 rolling comparison is supplementary. Neither confirmation is a test of the pending 2026 forecast or one of the seven prescriptive ranking backtests.
+
 Routine scoring uses only the private frozen CatBoost artifact catboost_stage8, expected SHA-256 09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3, with CatBoost 1.2.8 and scikit-learn 1.8.0. The artifact is the unchanged authorized FrozenCatBoost object with its fitted median imputer and CatBoost classifier; metadata is loaded separately. Model code 0 maps to Future Transaction and code 1 maps to No Future Transaction. No endpoint retrains it. Output is categorical only and never enters ranking. Monitoring stays Pending until both the 12-month outcome window has ended and a successful run verifies complete SI coverage through its end. Calendar passage or a later CR alone cannot establish No Future Transaction; single-class periods suppress class-balanced metrics.
 
 ## Prescriptive branch
