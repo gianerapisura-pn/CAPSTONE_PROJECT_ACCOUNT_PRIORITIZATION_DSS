@@ -1,9 +1,14 @@
 import { chromium } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 
 const base = process.env.PESLC_CAPTURE_URL ?? "http://127.0.0.1:3000";
-const output = path.resolve("test-results", "peslc-paper-screenshots-2026-10-22");
+const capturedAtUtc = new Date().toISOString();
+const output = path.resolve("test-results", `peslc-paper-screenshots-${capturedAtUtc.replace(/[:.]/g, "-")}`);
+let gitCommit = null;
+try { gitCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: path.resolve(".."), encoding: "utf8" }).trim() || null; }
+catch { /* A capture outside a Git checkout has no verifiable commit. */ }
 const routes = [
   ["01-overview", "/dashboard"],
   ["02-account-prioritization", "/accounts"],
@@ -24,6 +29,17 @@ await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 const manifest = [];
+const metadata = { capturedAtUtc, gitCommit, analysisRunId: null, analysisReferenceDate: null, environment: "unverified" };
+page.on("response", async response => {
+  if (!response.ok() || !/\/reports\/native\/(overview|insights|validation)$/.test(new URL(response.url()).pathname)) return;
+  try {
+    const run = (await response.json()).run;
+    if (run?.analysis_run_id && run?.analysis_reference_date) {
+      metadata.analysisRunId = run.analysis_run_id;
+      metadata.analysisReferenceDate = run.analysis_reference_date;
+    }
+  } catch { /* Keep unavailable run metadata null. */ }
+});
 
 async function capture(name, route, tab) {
   await page.goto(`${base}${route}`, { waitUntil: "domcontentloaded", timeout: 60000 });
@@ -59,6 +75,7 @@ try {
   await capture("00-sign-in", "/login");
   await page.getByRole("button", { name: /Enter isolated demo workspace/i }).click();
   await page.waitForURL(/\/dashboard/, { timeout: 30000 });
+  if (await page.getByText(/DEMO ENVIRONMENT/i).count()) metadata.environment = "isolated demo";
   for (const [name, route, tab] of routes) await capture(name, route, tab);
 
   await page.goto(`${base}/accounts`);
@@ -111,14 +128,13 @@ try {
   manifest.push({ name: "18-validation-expanded-evidence", route: "/reports", tab: "Analytics Validation", sections: expandedFiles, files: expandedFiles.map(item => item.file) });
   console.log(`18-validation-expanded-evidence: ${expandedFiles.length} screenshots`);
 
-  await writeFile(path.join(output, "MANIFEST.json"), JSON.stringify(manifest, null, 2));
+  await writeFile(path.join(output, "MANIFEST.json"), JSON.stringify({ metadata, screenshots: manifest }, null, 2));
   await writeFile(path.join(output, "README.txt"),
-    "PESLC DSS screenshots - 2026-10-22\n" +
-    "Source: local isolated demo at " + base + ".\n" +
-    "These are prototype screenshots, not a live Supabase or Vercel deployment.\n" +
-    "The demo is backed by the locally loaded verified historical package.\n" +
+    `PESLC DSS screenshots captured ${capturedAtUtc}.\n` +
+    `Source URL: ${base}. Environment: ${metadata.environment}.\n` +
+    "The capture does not establish live Supabase deployment or source-package verification.\n" +
     "Numbered PNGs follow page scroll order; later files show focused charts, table pagination, and expanded evidence.\n" +
-    "See MANIFEST.json for routes, tabs, screenshot lists, and capture errors.\n");
+    "See MANIFEST.json for observed run metadata, routes, tabs, screenshot lists, and capture errors.\n");
 } finally {
   await browser.close();
 }

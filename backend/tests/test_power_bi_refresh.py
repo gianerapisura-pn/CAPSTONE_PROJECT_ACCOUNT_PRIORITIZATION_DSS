@@ -176,26 +176,27 @@ def test_import_commit_does_not_schedule_retired_power_bi_refresh(monkeypatch):
 
 def test_explicit_successful_analytics_run_requires_coverage_and_no_refresh(monkeypatch):
     from app.main import RunRequest
-    from app import main
+    from app.services import publication_workflow as publication
 
     factory = database(monkeypatch)
     monkeypatch.setattr(refresh, "get_settings", lambda: settings(demo=True))
-    monkeypatch.setattr(main, "load_invoice_groups", lambda db: [object()])
-    monkeypatch.setattr(main, "validate_analysis_reference", lambda *args: None)
-    monkeypatch.setattr(main, "require_si_coverage", lambda *args: None)
-    monkeypatch.setattr(main, "b2b_analytical_accounts", lambda db: set())
-    monkeypatch.setattr(main, "current_actionable_accounts", lambda db: set())
-    monkeypatch.setattr(main, "future_transaction_for_current_run", lambda *args: None)
-    monkeypatch.setattr(main, "run_account_prioritization", lambda *args, **kwargs: object())
-    monkeypatch.setattr(main, "asdict", lambda result: {"status": "successful"})
-    monkeypatch.setattr(main, "persist_run_output", lambda db, run, result: setattr(
+    coverage = []
+    monkeypatch.setattr(publication, "load_invoice_groups", lambda db: [object()])
+    monkeypatch.setattr(publication, "validate_analysis_reference", lambda *args: None)
+    monkeypatch.setattr(publication, "require_si_coverage", lambda db, reference: coverage.append(reference))
+    monkeypatch.setattr(publication, "b2b_analytical_accounts", lambda db: set())
+    monkeypatch.setattr(publication, "current_actionable_accounts", lambda db: set())
+    monkeypatch.setattr(publication, "future_transaction_for_current_run", lambda *args: None)
+    monkeypatch.setattr(publication, "run_account_prioritization", lambda *args, **kwargs: object())
+    monkeypatch.setattr(publication, "asdict", lambda result: {"status": "successful"})
+    monkeypatch.setattr(publication, "persist_run_output", lambda db, run, result: setattr(
         run, "status", "successful"
     ))
-    monkeypatch.setattr(main, "monitor_registered_predictions", lambda *args: {
+    monkeypatch.setattr(publication, "monitor_registered_predictions", lambda *args: {
         "matured": 0, "pending": 0, "study_outcome_status": "unavailable",
         "review_recommended": False,
     })
-    monkeypatch.setattr(main, "audit", lambda *args: None)
+    monkeypatch.setattr(publication, "audit", lambda *args: None)
     tasks = BackgroundTasks()
 
     with factory() as db:
@@ -205,4 +206,5 @@ def test_explicit_successful_analytics_run_requires_coverage_and_no_refresh(monk
         )
         assert result["status"] == "successful"
         assert db.get(PowerBIRefresh, result["analysis_run_id"]) is None
+    assert coverage == [date(2030, 6, 1)]
     assert tasks.tasks == []

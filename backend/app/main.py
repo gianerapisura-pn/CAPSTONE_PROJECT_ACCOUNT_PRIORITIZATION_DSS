@@ -27,16 +27,10 @@ from app.db.repository import (
     CLIENT_CONFIRMED_ACTIVE,
     CLIENT_CONFIRMED_CLOSED,
     audit,
-    b2b_analytical_accounts,
     current_account_rows,
-    current_actionable_accounts,
     filter_current_account_rows,
-    historical_named_identities,
     latest_successful_run,
     load_invoice_groups,
-    predictive_accounts_at,
-    predictive_closure_years,
-    persist_run_output,
     run_payload,
     serialize_run,
 )
@@ -46,12 +40,11 @@ from app.schemas.api import (
     AccountListResponse, AccountPriorityResponse, AnalyticsRunResponse, ImportBatchResponse,
     ImportCommitResponse, ImportDetailResponse, ImportPreviewResponse, ModelSummaryResponse,
 )
-from app.services.analytics_runner import run_account_prioritization, validate_analysis_reference
 from app.services.import_workflow import (
     commit_source, preview_source, resolve_collection_correction,
 )
 from app.services.model_lifecycle import (
-    active_model_version, future_transaction_for_current_run, monitor_registered_predictions,
+    active_model_version, monitor_registered_predictions,
     operational_performance_summary,
     unavailable_prediction,
 )
@@ -62,8 +55,9 @@ from app.services.power_bi_refresh import (
     public_status,
 )
 from app.services.si_coverage import (
-    confirm_si_coverage, latest_verified_si_coverage, require_si_coverage,
+    confirm_si_coverage, latest_verified_si_coverage,
 )
+from app.services.publication_workflow import publish_existing_source
 
 settings = get_settings()
 
@@ -535,41 +529,11 @@ def import_detail(batch_id: str, user: AuthenticatedUser = Depends(require_admin
 def run_analytics(request: RunRequest, background_tasks: BackgroundTasks,
                   user: AuthenticatedUser = Depends(require_admin),
                   db: Session = Depends(get_db)):
-    groups = load_invoice_groups(db)
-    if not groups:
-        raise HTTPException(422, "No committed invoice data is available.")
     try:
-        validate_analysis_reference(groups, pd.Timestamp(request.analysis_reference_date))
-        require_si_coverage(db, request.analysis_reference_date)
-        b2b_accounts = b2b_analytical_accounts(db)
-        actionable_accounts = current_actionable_accounts(db)
-        predictive_accounts = predictive_accounts_at(
-            db, request.analysis_reference_date
+        run = publish_existing_source(
+            db, request.analysis_reference_date, user.user_id,
+            source="administrator_rerun",
         )
-        predictive = future_transaction_for_current_run(
-            db, groups, pd.Timestamp(request.analysis_reference_date), predictive_accounts)
-        result = asdict(run_account_prioritization(
-            groups, pd.Timestamp(request.analysis_reference_date), b2b_accounts,
-            actionable_accounts, predictive_result=predictive,
-            predictive_closure_years=predictive_closure_years(db),
-            historical_identity_names=historical_named_identities(db)))
-        run = AnalyticsRun(status="running",
-                           analysis_reference_date=request.analysis_reference_date,
-                           methodology_version=DEFAULT_ANALYTICS_CONFIG.version,
-                           code_version=DEFAULT_ANALYTICS_CONFIG.version)
-        db.add(run)
-        db.flush()
-        persist_run_output(db, run, result)
-        monitoring = monitor_registered_predictions(
-            db, groups, date.today(), request.analysis_reference_date,
-            run.analysis_run_id,
-        )
-        audit(db, user.user_id, "analytics_run", "analytics_run", run.analysis_run_id,
-              {"analysis_reference_date": request.analysis_reference_date.isoformat(),
-               "monitoring_matured": monitoring["matured"],
-               "monitoring_pending": monitoring["pending"],
-               "study_outcome_status": monitoring["study_outcome_status"],
-               "model_review_recommended": monitoring["review_recommended"]})
         db.commit()
         return serialize_run(run)
     except ValueError as exc:

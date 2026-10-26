@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, vi } from "vitest";
 
@@ -18,17 +18,17 @@ const accounts = [
   { account: "ALPHA", account_key: "a", business_category: "Corporate", primary_business_type: "Industrial",
     account_status: "Client-Confirmed Active", is_ranked: true, current_actionable: true, priority_rank: 1,
     priority_group: "High", final_priority_score: .8123, predicted_future_transaction_class: "With Future Sales",
-    r_score: 5, f_score: 4, m_score: 3, average_settlement_days: 25 },
+    r_score: 5, f_score: 4, m_score: 3, average_settlement_days: 25, frequency_count: 0 },
   { account: "BETA", account_key: "b", business_category: "Retail", primary_business_type: "Commercial",
     account_status: "Client-Confirmed Closed", is_ranked: false, current_actionable: false, priority_rank: null,
     priority_group: null, final_priority_score: null, predicted_future_transaction_class: null,
-    r_score: 2, f_score: 2, m_score: 2, average_settlement_days: null },
+    r_score: 2, f_score: 2, m_score: 2, average_settlement_days: null, frequency_count: null },
   { account: "GAMMA", account_key: "c", business_category: "Retail", primary_business_type: "Commercial",
     account_status: "Client-Confirmed Active", is_ranked: true, current_actionable: true, priority_rank: 2,
     priority_group: "Medium", final_priority_score: .5, predicted_future_transaction_class: "With No Future Sales",
-    r_score: 2, f_score: 5, m_score: 2, average_settlement_days: 40 },
+    r_score: 2, f_score: 5, m_score: 2, average_settlement_days: 40, frequency_count: 2 },
 ];
-let insightsAccounts = accounts;
+let insightsAccounts: Array<Record<string, unknown>> = accounts;
 vi.mock("@/lib/use-api", () => ({
   useApi: (path: string) => ({
     loading: false, error: "", reload: vi.fn(),
@@ -95,6 +95,35 @@ test("filters retain published score and the account drilldown", async () => {
   expect(screen.queryByText("BETA")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "ALPHA" }));
   expect(screen.getAllByText("0.8123").length).toBeGreaterThan(0);
+});
+
+test("recent purchase table uses published 24-month counts and current filters", async () => {
+  const user = userEvent.setup();
+  insightsAccounts = [
+    ...accounts,
+    { ...accounts[0], account: "DELTA", account_key: "d", priority_rank: 3, frequency_count: 4 },
+    { ...accounts[0], account: "EPSILON", account_key: "e", priority_group: "Low", priority_rank: 4, frequency_count: null },
+  ];
+  render(<ReportsPage />);
+  await user.click(screen.getByRole("tab", { name: "Account & Prioritization Insights" }));
+  const table = screen.getByRole("region", { name: "Recent Purchase Activity by Priority Group" });
+  const high = within(table).getByRole("row", { name: /^High / });
+  expect(within(high).getAllByRole("cell").map(cell => cell.textContent)).toEqual(["2", "1", "1", "0", "50.00%"]);
+  const medium = within(table).getByRole("row", { name: /^Medium / });
+  expect(within(medium).getAllByRole("cell").map(cell => cell.textContent)).toEqual(["1", "0", "1", "0", "0.00%"]);
+  const low = within(table).getByRole("row", { name: /^Low / });
+  expect(within(low).getAllByRole("cell").map(cell => cell.textContent)).toEqual(["1", "0", "0", "1", "0.00%"]);
+  expect(within(table).getByText(/does not confirm inactivity/)).toBeInTheDocument();
+  fireEvent.pointerEnter(within(high).getAllByRole("cell")[4].firstElementChild!);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("1 account with zero purchases / 2 ranked accounts x 100 = 50.00%");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("2030-06-01");
+  fireEvent.pointerEnter(within(low).getAllByRole("cell")[3].firstElementChild!);
+  expect(screen.getAllByRole("tooltip").at(-1)).toHaveTextContent("An unavailable count is not treated as zero.");
+  await user.selectOptions(screen.getByLabelText("Priority group"), "High");
+  expect(within(table).getByRole("row", { name: /^High / })).toHaveTextContent("50.00%");
+  expect(within(table).getByRole("row", { name: /^Medium / })).toHaveTextContent("Not applicable");
+  await user.type(screen.getByPlaceholderText("Search account"), "ALPHA");
+  expect(within(table).getByRole("row", { name: /^High / })).toHaveTextContent("100.00%");
 });
 
 test("current overview counts exclude historical-only identities from the ranking scope", () => {

@@ -63,7 +63,7 @@ def test_future_source_publications_are_isolated_and_idempotent(monkeypatch):
         monitored_references.append(complete_through)
         return monitor_registered_predictions(db, groups, as_of, complete_through, source_run_id)
     monkeypatch.setattr("app.services.import_workflow.monitor_registered_predictions", record_monitoring)
-    monkeypatch.setattr("app.main.monitor_registered_predictions", record_monitoring)
+    monkeypatch.setattr("app.services.publication_workflow.monitor_registered_predictions", record_monitoring)
     monkeypatch.setattr(SourceStorage, "put", lambda self, batch_id, name, content: stored.setdefault(batch_id, content) and batch_id)
     monkeypatch.setattr(SourceStorage, "get", lambda self, path: stored[path])
 
