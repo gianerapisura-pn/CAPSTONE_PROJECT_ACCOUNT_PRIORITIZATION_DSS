@@ -9,9 +9,13 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import AuditLog, DimAccount, PredictiveModelVersion, PredictiveStudyPrediction
+from app.db.models import (
+    AuditLog, DimAccount, PredictiveModelVersion, PredictiveMonitoringEvaluation,
+    PredictiveStudyPrediction,
+)
 from app.services.locked_packages import (
     FINAL_PACKAGE_SHA256,
+    PRIOR_ACTIVE_PACKAGE_SHA256,
     STUDY_PREDECESSOR_PACKAGE_SHA256,
     read_package_csv,
     read_package_json,
@@ -34,7 +38,7 @@ MODEL_FAMILY = "CatBoost Classifier"
 FORECAST_ORIGIN = date(2025, 12, 31)
 FUTURE_WINDOW_START = date(2026, 1, 1)
 FUTURE_WINDOW_END = date(2026, 12, 31)
-VALID_LABELS = {"Future Transaction", "No Future Transaction"}
+VALID_LABELS = {"With Future Sales", "With No Future Sales"}
 REVISION_AUDIT_ACTION = "revised_package_evidence_verified"
 REQUIRED_COLUMNS = {
     "account_key", "account_name", "scoring_role", "cutoff_date",
@@ -99,7 +103,7 @@ def validate_study_prediction_package(content: bytes) -> list[dict]:
     protocol = metadata.get("final_study_scoring_protocol") or {}
     if protocol.get("forecast_origin") != FORECAST_ORIGIN.isoformat():
         raise ValueError("Model metadata has the wrong final study forecast origin.")
-    if "cr does not define a future transaction" not in str(
+    if "cr alone does not establish a new valid sales invoice" not in str(
         protocol.get("cr_role", "")
     ).casefold():
         raise ValueError("Model metadata does not preserve the SI-only target contract.")
@@ -143,7 +147,7 @@ def validate_study_prediction_package(content: bytes) -> list[dict]:
     if set(labels) - VALID_LABELS:
         raise ValueError("Final study prediction evidence contains an invalid class.")
     if Counter(labels) != Counter(
-        {"Future Transaction": 10, "No Future Transaction": 73}
+        {"With Future Sales": 10, "With No Future Sales": 73}
     ):
         raise ValueError("Final study prediction evidence must preserve the official 10/73 result.")
     if "A064" in set(account_keys):
@@ -206,7 +210,7 @@ def seed_final_study_predictions(db: Session, package_path: str | Path) -> dict:
         }
         hashes = {row.source_package_hash for row in existing}
         if (len(existing) != 83 or actual != expected or
-                hashes not in ({FINAL_PACKAGE_SHA256}, {STUDY_PREDECESSOR_PACKAGE_SHA256}) or
+                hashes not in ({FINAL_PACKAGE_SHA256}, {PRIOR_ACTIVE_PACKAGE_SHA256}, {STUDY_PREDECESSOR_PACKAGE_SHA256}) or
                 any(row.model_version != MODEL_VERSION or
                     not row.source_package_member.endswith(STUDY_PREDICTION_MEMBER)
                     for row in existing)):
@@ -248,7 +252,7 @@ def revision_verified(db: Session, rows: list[PredictiveStudyPrediction]) -> boo
         AuditLog.entity_id == MODEL_VERSION,
     )).all()
     return any(
-        proof.details.get("package_sha256") == FINAL_PACKAGE_SHA256
+        proof.details.get("package_sha256") in {FINAL_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256}
         and proof.details.get("study_predecessor_sha256") == STUDY_PREDECESSOR_PACKAGE_SHA256
         and proof.details.get("study_snapshot_sha256") == digest
         for proof in proofs
@@ -260,7 +264,7 @@ def final_study_prediction_payload(db: Session) -> dict:
         PredictiveStudyPrediction.model_version == MODEL_VERSION,
         PredictiveStudyPrediction.forecast_origin == FORECAST_ORIGIN,
     ).order_by(PredictiveStudyPrediction.account_key)).all()
-    if not rows:
+    def unavailable_payload() -> dict:
         return {
             "status": "unavailable",
             "forecast_origin": None,
@@ -274,15 +278,18 @@ def final_study_prediction_payload(db: Session) -> dict:
             "source_package_hash": None,
             "class_counts": {},
             "predictions": {},
+            "monitoring_status": "Unavailable",
         }
+    if not rows:
+        return unavailable_payload()
     origins = {row.forecast_origin for row in rows}
     starts = {row.future_window_start for row in rows}
     ends = {row.future_window_end for row in rows}
     hashes = {row.source_package_hash for row in rows}
     if len(origins) != 1 or len(starts) != 1 or len(ends) != 1 or len(hashes) != 1:
         raise ValueError("Persisted final study prediction evidence is inconsistent.")
-    if next(iter(hashes)) != FINAL_PACKAGE_SHA256 and not revision_verified(db, rows):
-        return {"status": "unavailable"}
+    if next(iter(hashes)) not in {FINAL_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256} and not revision_verified(db, rows):
+        return unavailable_payload()
     accounts = {
         row.account_key: row.standardized_account_name
         for row in db.scalars(select(DimAccount).where(
@@ -294,8 +301,18 @@ def final_study_prediction_payload(db: Session) -> dict:
         for row in rows if row.account_key in accounts
     }
     counts = Counter(predictions.values())
+    model = db.scalar(select(PredictiveModelVersion).where(
+        PredictiveModelVersion.model_version == MODEL_VERSION,
+        PredictiveModelVersion.artifact_hash == MODEL_ARTIFACT_SHA256,
+    ))
+    evaluations = db.scalars(select(PredictiveMonitoringEvaluation).where(
+        PredictiveMonitoringEvaluation.predictive_model_version_id == model.predictive_model_version_id,
+        PredictiveMonitoringEvaluation.cutoff_date == FORECAST_ORIGIN,
+    )).all() if model else []
+    evaluated = any(row.payload.get("scope") == "final_study_forecast" for row in evaluations)
     return {
         "status": "Validated",
+        "monitoring_status": "Evaluated" if evaluated else "Pending",
         "forecast_origin": next(iter(origins)).isoformat(),
         "future_window_start": next(iter(starts)).isoformat(),
         "future_window_end": next(iter(ends)).isoformat(),

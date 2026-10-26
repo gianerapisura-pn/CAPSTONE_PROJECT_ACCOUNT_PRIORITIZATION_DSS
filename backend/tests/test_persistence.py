@@ -44,7 +44,7 @@ def test_final_run_persistence_and_public_contract():
                 identity_source_type="Official company/organization",
                 identity_source_reference="Verified account registry"))
         db.flush()
-        predictions = {item.standardized_account_name: "No Future Transaction"
+        predictions = {item.standardized_account_name: "With No Future Sales"
                        for item in groups}
         predictive = FutureTransactionResult(
             status="Validated", target_horizon_months=12, feature_columns=[],
@@ -76,7 +76,7 @@ def test_final_run_persistence_and_public_contract():
         assert all(x["identity_source_reference"] == "Verified account registry" for x in rows)
         assert all(x["b2b_priority_eligible"] for x in rows)
         assert {x["predicted_future_transaction_class"] for x in rows} == {
-            "No Future Transaction"}
+            "With No Future Sales"}
         assert all("predicted_inactivity_risk" not in x for x in rows)
         assert db.scalar(select(FutureTransactionPrediction)) is not None
         assert serialize_run(latest)["analysis_reference_date"] == "2026-09-21"
@@ -94,13 +94,13 @@ def test_filters_do_not_rerank_or_mutate_scores():
     rows = [
         {"account": "A", "priority_group": "High", "priority_rank": 1,
          "final_priority_score": .9, "mcs_eligible": True, "is_ranked": True,
-         "predicted_future_transaction_class": "Future Transaction"},
+         "predicted_future_transaction_class": "With Future Sales"},
         {"account": "B", "priority_group": "Low", "priority_rank": 2,
          "final_priority_score": .4, "mcs_eligible": True, "is_ranked": True,
-         "predicted_future_transaction_class": "No Future Transaction"},
+         "predicted_future_transaction_class": "With No Future Sales"},
     ]
     filtered = filter_current_account_rows(
-        rows, predicted_future_transaction_class="No Future Transaction")
+        rows, predicted_future_transaction_class="With No Future Sales")
     assert filtered == [rows[1]]
     assert rows[1]["priority_rank"] == 2
 

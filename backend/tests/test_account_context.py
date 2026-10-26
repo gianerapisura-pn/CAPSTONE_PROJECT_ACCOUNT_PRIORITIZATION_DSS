@@ -12,18 +12,16 @@ from scripts import bootstrap_account_context
 
 
 def test_locked_account_master_status_provenance_and_population_contract(monkeypatch):
-    keys = [f"A{index:03d}" for index in range(1, 86)]
-    names = [f"BUSINESS {index}" for index in range(1, 86)]
-    names[62] = "ROD DE GUIA"
-    names[63] = "ROSTRAM PROTECTIVE SYSTEM METIER COMPANY"
+    keys = [f"A{index:03d}" for index in range(1, 86) if index != 63]
+    names = ["ROSTRAM PROTECTIVE SYSTEM METIER COMPANY" if key == "A064" else f"BUSINESS {key}" for key in keys]
     master = pd.DataFrame({
         "account_key": keys,
         "account_name": names,
-        "entity_type": ["Individual/Personal" if key == "A063" else "Company" for key in keys],
-        "business_category": ["Personal" if key == "A063" else "Corporate" for key in keys],
-        "primary_business_type": ["Personal" if key == "A063" else "Construction" for key in keys],
+        "entity_type": ["Company"] * 84,
+        "business_category": ["Corporate"] * 84,
+        "primary_business_type": ["Construction"] * 84,
     })
-    b2b_keys = [key for key in keys if key != "A063"]
+    b2b_keys = keys
     status = pd.DataFrame({
         "account_key": b2b_keys,
         "account_status": [
@@ -41,11 +39,11 @@ def test_locked_account_master_status_provenance_and_population_contract(monkeyp
         "basis": ["Direct PESLC confirmation collected for the study"] * 84,
         "closed_since_year": [2021 if key == "A064" else None for key in b2b_keys],
         "closure_date_precision": [
-            "Year only; month/day not supplied" if key == "A064" else None
+            "Month only: May 2021; exact day not supplied" if key == "A064" else None
             for key in b2b_keys
         ],
         "closure_reported_on": [
-            "2026-10-11" if key == "A064" else None for key in b2b_keys
+            "2026-10-16" if key == "A064" else None for key in b2b_keys
         ],
     })
     identity = master[["account_key", "account_name", "entity_type", "primary_business_type"]].copy()
@@ -74,13 +72,12 @@ def test_locked_account_master_status_provenance_and_population_contract(monkeyp
         db.commit()
         rows = db.scalars(select(DimAccount)).all()
         assert result == {
-            "historical_identity_count": 85,
+            "registered_account_count": 84,
             "b2b_analytical_count": 84,
             "current_actionable_count": 83,
         }
-        personal = next(row for row in rows if row.standardized_account_name == "ROD DE GUIA")
-        assert personal.b2b_priority_eligible is False
-        assert personal.account_status is None
+        assert len(rows) == 84
+        assert all(row.b2b_priority_eligible for row in rows)
         closed = next(row for row in rows if row.standardized_account_name.startswith("ROSTRAM"))
         assert closed.b2b_priority_eligible is True
         assert closed.account_status == "Client-Confirmed Closed"
@@ -89,8 +86,8 @@ def test_locked_account_master_status_provenance_and_population_contract(monkeyp
         assert closed.verification_basis == "Direct PESLC confirmation collected for the study"
         assert closed.status_claim_scope == "PESLC account actionability"
         assert closed.closed_since_year == 2021
-        assert closed.closure_date_precision == "Year only; month/day not supplied"
-        assert closed.closure_reported_on == date(2026, 10, 11)
+        assert closed.closure_date_precision == "Month only: May 2021; exact day not supplied"
+        assert closed.closure_reported_on == date(2026, 10, 16)
         assert closed.identity_source_reference == "PESLC account master"
 
 

@@ -85,8 +85,8 @@ def test_single_class_metrics_suppress_balanced_measures():
 def test_locked_integer_class_orientation_is_explicit():
     assert _canonical_class(0) == FUTURE_TRANSACTION
     assert _canonical_class(1) == NO_FUTURE_TRANSACTION
-    assert _canonical_class("Future Transaction") == FUTURE_TRANSACTION
-    assert _canonical_class("No Future Transaction") == NO_FUTURE_TRANSACTION
+    assert _canonical_class("With Future Sales") == FUTURE_TRANSACTION
+    assert _canonical_class("With No Future Sales") == NO_FUTURE_TRANSACTION
     with pytest.raises(ValueError, match="unsupported"):
         _canonical_class(2)
 

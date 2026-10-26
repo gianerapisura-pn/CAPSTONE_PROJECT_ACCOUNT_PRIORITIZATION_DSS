@@ -191,6 +191,10 @@ def test_explicit_successful_analytics_run_requires_coverage_and_no_refresh(monk
     monkeypatch.setattr(main, "persist_run_output", lambda db, run, result: setattr(
         run, "status", "successful"
     ))
+    monkeypatch.setattr(main, "monitor_registered_predictions", lambda *args: {
+        "matured": 0, "pending": 0, "study_outcome_status": "unavailable",
+        "review_recommended": False,
+    })
     monkeypatch.setattr(main, "audit", lambda *args: None)
     tasks = BackgroundTasks()
 

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import date
+from io import BytesIO
 
+import pandas as pd
 import pytest
 from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy import create_engine, func, select
@@ -9,11 +11,12 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthenticatedUser
 from app.db.models import AnalyticsRun, Base, DimAccount, ImportBatch, InvoiceGroupRecord, RawSourceRow
-from app.db.repository import latest_successful_run, run_payload
+from app.db.repository import historical_named_identities, latest_successful_run, run_payload
 from app.services.import_workflow import commit_source, preview_source
+from app.services.model_lifecycle import monitor_registered_predictions
 from app.services.si_coverage import confirm_si_coverage
 from app.services.storage import SourceStorage
-from app.main import RunRequest, native_insights, run_analytics
+from app.main import RunRequest, native_insights, native_overview, run_analytics
 
 
 ADMIN = AuthenticatedUser("00000000-0000-4000-8000-000000000001", "administrator")
@@ -21,10 +24,46 @@ HEADER = "ACCOUNT NAMES,SI NO.,SI DATE,SI AMOUNT,CR NO.,CR DATE,CR AMOUNT,EWT,PA
 REFERENCE = date(2026, 9, 30)
 
 
+def test_historical_named_identities_include_cancelled_only_source_names():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    try:
+        with Session(engine) as db:
+            committed = ImportBatch(file_name="accepted.csv", file_hash="a" * 64, status="committed")
+            preview = ImportBatch(file_name="preview.csv", file_hash="b" * 64, status="preview")
+            db.add_all([committed, preview])
+            db.flush()
+            for batch, row_number, name, status in [
+                (committed, 1, "ACME", "Fully Paid"),
+                (committed, 2, "EASTWOOD", "Cancelled"),
+                (committed, 3, "CANCELLED", "Cancelled"),
+                (preview, 1, "FUTURE ACCOUNT", "Fully Paid"),
+            ]:
+                db.add(RawSourceRow(
+                    import_batch_id=batch.import_batch_id, source_sheet="Sheet1",
+                    source_row_number=row_number, customer_name_raw=name,
+                    payment_status_raw=status, canonical_payload={},
+                ))
+            db.flush()
+            assert historical_named_identities(db) == {"ACME", "EASTWOOD"}
+            assert historical_named_identities(db, preview.import_batch_id) == {
+                "ACME", "EASTWOOD", "FUTURE ACCOUNT"
+            }
+            assert db.scalar(select(func.count()).select_from(InvoiceGroupRecord)) == 0
+    finally:
+        engine.dispose()
+
+
 def test_future_source_publications_are_isolated_and_idempotent(monkeypatch):
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     stored = {}
+    monitored_references = []
+    def record_monitoring(db, groups, as_of, complete_through, source_run_id):
+        monitored_references.append(complete_through)
+        return monitor_registered_predictions(db, groups, as_of, complete_through, source_run_id)
+    monkeypatch.setattr("app.services.import_workflow.monitor_registered_predictions", record_monitoring)
+    monkeypatch.setattr("app.main.monitor_registered_predictions", record_monitoring)
     monkeypatch.setattr(SourceStorage, "put", lambda self, batch_id, name, content: stored.setdefault(batch_id, content) and batch_id)
     monkeypatch.setattr(SourceStorage, "get", lambda self, path: stored[path])
 
@@ -93,6 +132,7 @@ def test_future_source_publications_are_isolated_and_idempotent(monkeypatch):
             report = native_insights(user=ADMIN, db=db)
             assert report["run"]["analysis_run_id"] == new_run["analysis_run_id"]
             assert run_payload(db, second_run) == second_payload
+            assert monitored_references == [REFERENCE] * 4
     finally:
         engine.dispose()
 
@@ -143,5 +183,42 @@ def test_failed_future_publication_preserves_previous_run(monkeypatch):
             assert db.scalar(select(func.count()).select_from(RawSourceRow).where(
                 RawSourceRow.import_batch_id == second["import_batch_id"]
             )) == 0
+    finally:
+        engine.dispose()
+
+
+def test_future_xlsx_commit_refreshes_latest_native_report(monkeypatch):
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    stored = {}
+    monkeypatch.setattr(SourceStorage, "put", lambda self, batch_id, name, content: stored.setdefault(batch_id, content) and batch_id)
+    monkeypatch.setattr(SourceStorage, "get", lambda self, path: stored[path])
+    try:
+        with Session(engine) as db:
+            file = BytesIO()
+            with pd.ExcelWriter(file, engine="openpyxl") as writer:
+                pd.DataFrame([{
+                    "ACCOUNT NAMES": "FUTURE TEST ACCOUNT", "SI NO.": "SI-2026",
+                    "SI DATE": "2026-01-15", "SI AMOUNT": 250,
+                    "CR NO.": "CR-2026", "CR DATE": "2026-02-01", "CR AMOUNT": 250,
+                    "EWT": 0, "PAYMENT MODE": "Bank", "PAYMENT STATUS": "Fully Paid",
+                }]).to_excel(writer, index=False)
+            preview = preview_source(db, ADMIN, "future.xlsx", file.getvalue())
+            assert preview["can_commit"]
+            reference = REFERENCE
+            confirm_si_coverage(
+                db, complete_through=reference, evidence_type="Client confirmation",
+                evidence_reference="Synthetic Excel coverage",
+                evidence_basis="Test file checked through 2026-09-30",
+                confirmed_on=reference, recorded_by=ADMIN.user_id,
+                source_batch_id=preview["import_batch_id"],
+            )
+            db.commit()
+            published = commit_source(db, ADMIN, preview["import_batch_id"], reference)
+            assert published["status"] == "COMMITTED"
+            overview = native_overview(user=ADMIN, db=db)
+            assert overview["run"]["analysis_run_id"] == published["analysis_run_id"]
+            assert overview["business_baselines"]
+            assert db.scalar(select(func.count()).select_from(InvoiceGroupRecord)) == 1
     finally:
         engine.dispose()

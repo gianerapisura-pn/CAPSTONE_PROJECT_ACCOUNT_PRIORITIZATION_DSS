@@ -19,7 +19,8 @@ from app.db.models import (
     ImportRowIssue, InvoiceGroupRecord, PowerBIRefresh, PredictiveStudyPrediction, RFMResult, RawSourceRow,
     SICoverageConfirmation,
     SensitivityScenarioRecord, SettlementResult, CriticInfluenceRecord,
-    PredictiveBenchmarkRecord, PredictiveHorizonEvaluation, PredictiveOOPEvaluation,
+    PredictiveBenchmarkRecord, PredictiveHorizonEvaluation, PredictiveMonitoringEvaluation,
+    PredictiveOOPEvaluation,
     PrescriptiveValidationEvidence,
 )
 from app.db.repository import (
@@ -30,6 +31,7 @@ from app.db.repository import (
     current_account_rows,
     current_actionable_accounts,
     filter_current_account_rows,
+    historical_named_identities,
     latest_successful_run,
     load_invoice_groups,
     predictive_accounts_at,
@@ -50,11 +52,12 @@ from app.services.import_workflow import (
 )
 from app.services.model_lifecycle import (
     active_model_version, future_transaction_for_current_run, monitor_registered_predictions,
+    operational_performance_summary,
     unavailable_prediction,
 )
 from app.services.study_predictions import MODEL_ARTIFACT_SHA256, MODEL_VERSION, final_study_prediction_payload
 from app.services.prescriptive_evidence import EVIDENCE_VERSION
-from app.services.locked_packages import FINAL_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256
+from app.services.locked_packages import FINAL_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256
 from app.services.power_bi_refresh import (
     public_status,
 )
@@ -548,7 +551,8 @@ def run_analytics(request: RunRequest, background_tasks: BackgroundTasks,
         result = asdict(run_account_prioritization(
             groups, pd.Timestamp(request.analysis_reference_date), b2b_accounts,
             actionable_accounts, predictive_result=predictive,
-            predictive_closure_years=predictive_closure_years(db)))
+            predictive_closure_years=predictive_closure_years(db),
+            historical_identity_names=historical_named_identities(db)))
         run = AnalyticsRun(status="running",
                            analysis_reference_date=request.analysis_reference_date,
                            methodology_version=DEFAULT_ANALYTICS_CONFIG.version,
@@ -556,8 +560,16 @@ def run_analytics(request: RunRequest, background_tasks: BackgroundTasks,
         db.add(run)
         db.flush()
         persist_run_output(db, run, result)
+        monitoring = monitor_registered_predictions(
+            db, groups, date.today(), request.analysis_reference_date,
+            run.analysis_run_id,
+        )
         audit(db, user.user_id, "analytics_run", "analytics_run", run.analysis_run_id,
-              {"analysis_reference_date": request.analysis_reference_date.isoformat()})
+              {"analysis_reference_date": request.analysis_reference_date.isoformat(),
+               "monitoring_matured": monitoring["matured"],
+               "monitoring_pending": monitoring["pending"],
+               "study_outcome_status": monitoring["study_outcome_status"],
+               "model_review_recommended": monitoring["review_recommended"]})
         db.commit()
         return serialize_run(run)
     except ValueError as exc:
@@ -600,7 +612,7 @@ def dashboard(user: AuthenticatedUser = Depends(require_user), db: Session = Dep
     run, payload = _latest_or_404(db), None
     payload = run_payload(db, run)
     priorities, accounts = payload["priorities"], payload["accounts"]
-    classes = ("Future Transaction", "No Future Transaction")
+    classes = ("With Future Sales", "With No Future Sales")
     return {
         "run": serialize_run(run),
         "historical_identities": int(
@@ -648,7 +660,8 @@ def native_insights(user: AuthenticatedUser = Depends(require_user),
                     db: Session = Depends(get_db)):
     run = _latest_or_404(db)
     payload = run_payload(db, run)
-    return {"run": serialize_run(run), "accounts": payload["accounts"]}
+    return {"run": serialize_run(run), "accounts": payload["accounts"],
+            "critic_weights": run.critic_weights or {}}
 
 
 def _selected_confusion_summary(benchmarks: list[dict],
@@ -660,13 +673,13 @@ def _selected_confusion_summary(benchmarks: list[dict],
     if len(confusion) != 6 or len({row["source_package_sha256"] for row in confusion}) != 1:
         return None
     true_future = sum(int(row["predicted_future_transaction"]) for row in confusion
-                      if row["actual_class"] == "Future Transaction")
+                      if row["actual_class"] == "With Future Sales")
     missed_future = sum(int(row["predicted_no_future_transaction"]) for row in confusion
-                        if row["actual_class"] == "Future Transaction")
+                        if row["actual_class"] == "With Future Sales")
     true_no_future = sum(int(row["predicted_no_future_transaction"]) for row in confusion
-                         if row["actual_class"] == "No Future Transaction")
+                         if row["actual_class"] == "With No Future Sales")
     false_future = sum(int(row["predicted_future_transaction"]) for row in confusion
-                       if row["actual_class"] == "No Future Transaction")
+                       if row["actual_class"] == "With No Future Sales")
     return {
         "source_member": "confusion_matrices.csv",
         "source_package_sha256": confusion[0]["source_package_sha256"],
@@ -678,7 +691,7 @@ def _selected_confusion_summary(benchmarks: list[dict],
 
 
 @app.get("/reports/native/validation")
-def native_validation(user: AuthenticatedUser = Depends(require_admin),
+def native_validation(user: AuthenticatedUser = Depends(require_user),
                       db: Session = Depends(get_db)):
     run = _latest_or_404(db)
     payload = run_payload(db, run)
@@ -693,14 +706,22 @@ def native_validation(user: AuthenticatedUser = Depends(require_admin),
             model_class.predictive_model_version_id == model_id)).all()]
     horizons = evidence(PredictiveHorizonEvaluation)
     benchmarks = evidence(PredictiveBenchmarkRecord)
+    development_profile = [row for row in benchmarks
+                           if row.get("source_member") == "development_class_profile.csv"]
+    lookback_summary = [row for row in benchmarks
+                        if row.get("source_member") == "lookback_summary.csv"]
+    lookback_folds = [row for row in benchmarks
+                      if row.get("source_member") == "lookback_folds.csv"]
+    yearly_folds = [row for row in benchmarks
+                    if row.get("source_member") == "model_folds.csv"]
     later_checks = [row for row in evidence(PredictiveOOPEvaluation)
-                    if row.get("source_package_sha256") == FINAL_PACKAGE_SHA256]
+                    if row.get("source_package_sha256") in {FINAL_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256}]
     study = final_study_prediction_payload(db) if model_id else {"status": "unavailable"}
     predecessor_verified = (
         study.get("status") == "Validated" and
         study.get("source_package_hash") == STUDY_PREDECESSOR_PACKAGE_SHA256
     )
-    accepted_hashes = {FINAL_PACKAGE_SHA256}
+    accepted_hashes = {FINAL_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256}
     if predecessor_verified:
         accepted_hashes.add(STUDY_PREDECESSOR_PACKAGE_SHA256)
     historical_error_summary = _selected_confusion_summary(benchmarks, accepted_hashes)
@@ -716,6 +737,10 @@ def native_validation(user: AuthenticatedUser = Depends(require_admin),
         "historical_error_summary": historical_error_summary,
         "horizons": horizons,
         "benchmarks": benchmarks,
+        "development_profile": development_profile,
+        "lookback_summary": lookback_summary,
+        "lookback_folds": lookback_folds,
+        "yearly_folds": yearly_folds,
         "later_checks": later_checks,
         "sensitivity": payload["sensitivity"],
         "scenario_detail_count": db.scalar(select(func.count()).select_from(
@@ -894,6 +919,11 @@ def current_model(user: AuthenticatedUser = Depends(require_admin), db: Session 
     model = active_model_version(db)
     if not model:
         return {"status": "model_unavailable", "model_version": None}
+    study_evaluations = db.scalars(select(PredictiveMonitoringEvaluation).where(
+        PredictiveMonitoringEvaluation.predictive_model_version_id == model.predictive_model_version_id,
+    ).order_by(desc(PredictiveMonitoringEvaluation.evaluated_at))).all()
+    study_monitoring = next((row.payload for row in study_evaluations
+                             if row.payload.get("scope") == "final_study_forecast"), {})
     return {"status": model.status, "model_version": model.model_version,
             "model_family": model.model_family, "created_at": model.created_at,
             "trained_through_date": model.trained_through_date,
@@ -904,18 +934,27 @@ def current_model(user: AuthenticatedUser = Depends(require_admin), db: Session 
             "last_validation_date": model.last_validation_date,
             "review_recommended": model.review_recommended,
             "development_metrics": model.development_metrics,
-            "validation_metrics": model.oop_metrics}
+            "validation_metrics": model.oop_metrics,
+            "operational_monitoring": operational_performance_summary(db, model),
+            "study_monitoring": study_monitoring}
 
 
 @app.post("/models/monitor")
 def monitor(request: MonitorRequest, user: AuthenticatedUser = Depends(require_admin),
             db: Session = Depends(get_db)):
+    published = latest_successful_run(db)
+    coverage = latest_verified_si_coverage(db)
+    verified_reference = (
+        min(coverage, published.analysis_reference_date)
+        if published and published.analysis_reference_date and coverage else None
+    )
     result = monitor_registered_predictions(
         db, load_invoice_groups(db), request.as_of_date,
-        latest_verified_si_coverage(db),
+        verified_reference, published.analysis_run_id if published else None,
     )
     audit(db, user.user_id, "model_monitor", "predictive_model", None,
-          {"status": result["status"], "as_of_date": request.as_of_date.isoformat()})
+          {"status": result["status"], "as_of_date": request.as_of_date.isoformat(),
+           "model_review_recommended": result["review_recommended"]})
     db.commit()
     return result
 
@@ -931,10 +970,10 @@ def methodology(user: AuthenticatedUser = Depends(require_admin)):
                         "and complete decision criteria."),
         "rfm": "Descriptive Recency from reference, Frequency per logical SI, and Monetary SI amount; q20/q40/q60/q80 empirical quintiles with ties preserved.",
         "settlement": "Observed SI-to-final-valid-CR duration using only cutoff-known, reconciled, nonnegative evidence.",
-        "predictive": "Frozen CatBoost stage-8 artifact; Future Transaction means a succeeding valid SI within 12 months. CR is cutoff-known settlement evidence only; prediction never changes rank.",
+        "predictive": "Frozen CatBoost stage-8 artifact; With Future Sales means a succeeding valid SI within 12 months. CR is cutoff-known settlement evidence only; prediction never changes rank.",
         "mcs": "CRITIC weights normalized Recency, Frequency, Monetary, and Historical Settlement Duration; additive MCS determines FPS.",
         "priority_groups": "Tie-preserving ranked thirds from each discriminatory four-criterion run.",
-        "backtest": "Seven annual cutoffs (2018-2024) with exact k/n random expectation.",
+        "backtest": "Completed annual 12-month cutoff windows from the study baseline onward, extending as verified complete-through SI coverage permits; exact k/n random expectation.",
         "future_data_rule": "Years and accounts are derived from validated committed data.",
     }
 

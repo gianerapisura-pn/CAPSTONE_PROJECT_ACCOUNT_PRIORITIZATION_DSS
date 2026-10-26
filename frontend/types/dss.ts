@@ -1,5 +1,5 @@
 export type PriorityGroup = "High" | "Medium" | "Low";
-export type FutureTransactionClass = "Future Transaction" | "No Future Transaction";
+export type FutureTransactionClass = "With Future Sales" | "With No Future Sales";
 
 export interface AccountPriority {
   account: string;
@@ -75,8 +75,10 @@ export interface AccountDecisionRow {
   predicted_future_transaction_class: FutureTransactionClass | null;
   latest_valid_si_date: string | null;
   recency_days: number;
-  frequency_count: number;
-  monetary_value: number;
+  frequency_count: number | null;
+  monetary_value: number | null;
+  full_history_frequency: number | null;
+  full_history_monetary: number | null;
   baseline_recency_weight: number | null;
   baseline_frequency_weight: number | null;
   baseline_monetary_weight: number | null;

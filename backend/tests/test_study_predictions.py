@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from io import BytesIO
 import json
 from zipfile import ZipFile
@@ -8,7 +9,8 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import (
-    Base, DimAccount, PredictiveModelVersion, PredictiveStudyPrediction,
+    Base, DimAccount, PredictiveModelVersion, PredictiveMonitoringEvaluation,
+    PredictiveStudyPrediction,
 )
 from app.services import study_predictions
 
@@ -17,7 +19,7 @@ def package_bytes(future_count: int = 10) -> bytes:
     output = BytesIO()
     rows = []
     for index in range(83):
-        label = "Future Transaction" if index < future_count else "No Future Transaction"
+        label = "With Future Sales" if index < future_count else "With No Future Sales"
         rows.append(
             f"T{index + 1:03d},ACCOUNT {index + 1:03d},Final study forecast,"
             f"2025-12-31,2026-01-01,2026-12-31,{label}\n"
@@ -38,7 +40,7 @@ def package_bytes(future_count: int = 10) -> bytes:
                 "model_sha256": study_predictions.MODEL_ARTIFACT_SHA256,
                 "final_study_scoring_protocol": {
                     "forecast_origin": "2025-12-31",
-                    "cr_role": "Settlement only; CR does not define a future transaction.",
+                    "cr_role": "Settlement information only; CR alone does not establish a new valid Sales Invoice.",
                 },
             }),
         )
@@ -79,6 +81,9 @@ def test_final_study_package_is_strictly_validated_and_seeded_once(monkeypatch):
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
+        unavailable = study_predictions.final_study_prediction_payload(db)
+        assert unavailable["status"] == "unavailable"
+        assert unavailable["class_counts"] == {}
         for index in range(83):
             name = f"ACCOUNT {index + 1:03d}"
             db.add(DimAccount(standardized_account_name=name, display_name=name))
@@ -101,9 +106,36 @@ def test_final_study_package_is_strictly_validated_and_seeded_once(monkeypatch):
         assert payload["future_window_start"] == "2026-01-01"
         assert payload["future_window_end"] == "2026-12-31"
         assert payload["class_counts"] == {
-            "Future Transaction": 10,
-            "No Future Transaction": 73,
+            "With Future Sales": 10,
+            "With No Future Sales": 73,
         }
+        assert payload["monitoring_status"] == "Pending"
+        model = db.scalar(select(PredictiveModelVersion).where(
+            PredictiveModelVersion.model_version == "catboost_stage8",
+        ))
+        db.add(PredictiveMonitoringEvaluation(
+            predictive_model_version_id=model.predictive_model_version_id,
+            cutoff_date=date(2025, 12, 31), status="evaluated",
+            payload={"scope": "final_study_forecast", "account_count": 83},
+        ))
+        db.flush()
+        assert study_predictions.final_study_prediction_payload(db)["monitoring_status"] == "Evaluated"
+        from app.main import current_model
+        from app.auth.dependencies import AuthenticatedUser
+        assert current_model(AuthenticatedUser("admin", "administrator"), db)[
+            "study_monitoring"
+        ]["account_count"] == 83
+        for row in db.scalars(select(PredictiveStudyPrediction)).all():
+            row.source_package_hash = study_predictions.PRIOR_ACTIVE_PACKAGE_SHA256
+        db.flush()
+        assert study_predictions.seed_final_study_predictions(db, "final.zip")["already_seeded"]
+        assert study_predictions.final_study_prediction_payload(db)["status"] == "Validated"
+        for row in db.scalars(select(PredictiveStudyPrediction)).all():
+            row.source_package_hash = "unverified-hash"
+        db.flush()
+        unverified = study_predictions.final_study_prediction_payload(db)
+        assert unverified["status"] == "unavailable"
+        assert unverified["class_counts"] == {}
 
 
 def test_final_study_package_rejects_wrong_distribution():

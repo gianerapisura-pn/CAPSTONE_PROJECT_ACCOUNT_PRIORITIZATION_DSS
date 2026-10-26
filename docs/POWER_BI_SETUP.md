@@ -1,6 +1,6 @@
 # Power BI Setup
 
-> Historical specification only. The current approved reporting path is native Web DSS Detailed Analytics. Runtime publication no longer enqueues or supervises Power BI refreshes, and the retry endpoint is retired. Nothing below is a prerequisite for current deployment.
+> Historical specification only. The current approved reporting path is native Web DSS Detailed Analytics. Runtime publication no longer enqueues or supervises Power BI refreshes, and the retry endpoint is retired. The old source counts, model, and live checkpoints below are dated records, not acceptance targets for the current `PESLC_FINAL_ANALYTICS_FINAL_FILTERED_QA.zip`. Nothing below is a prerequisite for current deployment.
 
 Use the dedicated PostgreSQL login that inherits `peslc_reporting_reader`. It must be SELECT-only, non-superuser, without BYPASSRLS, RAW/private access, correction-review access, or write grants.
 
@@ -39,7 +39,7 @@ The standard REST refresh has shared-capacity request limits, including schedule
 
 After refresh reconcile 85 historical identities if shown, 84 B2B analytical profiles, 83 current actionable/MCS/ranked accounts, 28/27/28 groups, 83 final-study predictive outputs with a 10/73 split, current CRITIC weights, 400 scenarios and 33,200 sensitivity detail rows, seven closure-aware cutoff-safe backtests, and final-v2 robustness evidence. Preserve NULL as unavailable.
 
-The four-page contract remains: Page 1 distinguishes 85/84/83 current context; Page 2 shows status/actionability while retaining closed-account history; Page 3 reports the fixed 83-account study prediction; Page 4 reports 83-account current CRITIC/sensitivity/LOO plus supplementary robustness.
+The four-page Power BI contract described here is historical/optional. Current approved reporting consists of three native Web DSS views: Management Overview, Account & Prioritization Insights, and Analytics Validation.
 
 No PBIX exists in this repository. PBIX wiring, live refresh, screenshot evidence, and reconciliation remain external pending work.
 ## Live data checkpoint (2026-09-30)

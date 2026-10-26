@@ -208,3 +208,5 @@ class ModelSummaryResponse(BaseModel):
     review_recommended: bool = False
     development_metrics: dict[str, Any] = Field(default_factory=dict)
     validation_metrics: dict[str, Any] = Field(default_factory=dict)
+    operational_monitoring: dict[str, Any] = Field(default_factory=dict)
+    study_monitoring: dict[str, Any] = Field(default_factory=dict)

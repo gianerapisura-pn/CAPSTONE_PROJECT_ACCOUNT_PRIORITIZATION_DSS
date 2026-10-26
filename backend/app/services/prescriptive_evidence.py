@@ -3,16 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import PrescriptiveValidationEvidence
 from app.services.locked_packages import (
-    FINAL_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256,
+    FINAL_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256,
     read_package_csv, verified_package,
 )
 
-EVIDENCE_VERSION = "prescriptive-robustness-final-v2"
+EVIDENCE_VERSION = "prescriptive-robustness-final-v3"
 PURPOSEFUL_SUMMARIES = {
     "weighting_robustness": (
         "01_DATA/11_ROBUSTNESS/01_WEIGHTING/current_weights.csv",
@@ -25,6 +25,13 @@ PURPOSEFUL_SUMMARIES = {
         "01_DATA/11_ROBUSTNESS/02_AGGREGATION/current_topk.csv",
         "01_DATA/11_ROBUSTNESS/02_AGGREGATION/backtest_summary.csv",
         "01_DATA/11_ROBUSTNESS/02_AGGREGATION/backtest_head_to_head.csv",
+    ),
+    "criterion_ablation": (
+        "05_QA/mcs_validation/criterion_ablation_current.csv",
+        "05_QA/mcs_validation/criterion_ablation_history.csv",
+    ),
+    "boundary_sensitivity": (
+        "01_DATA/07_SENSITIVITY/boundary_movement.csv",
     ),
 }
 
@@ -42,7 +49,7 @@ def unchanged_prescriptive_evidence(db: Session, content: bytes) -> bool:
     if not rows:
         return False
     if {row.source_package_hash for row in rows} not in (
-        {FINAL_PACKAGE_SHA256}, {STUDY_PREDECESSOR_PACKAGE_SHA256}
+        {FINAL_PACKAGE_SHA256}, {PRIOR_ACTIVE_PACKAGE_SHA256}, {STUDY_PREDECESSOR_PACKAGE_SHA256}
     ):
         raise ValueError("Existing prescriptive evidence has unrecognized package provenance.")
     expected = []
@@ -61,9 +68,12 @@ def unchanged_prescriptive_evidence(db: Session, content: bytes) -> bool:
 
 def seed_prescriptive_validation_evidence(db: Session, package_path: str | Path) -> dict:
     _, content = verified_package(package_path, FINAL_PACKAGE_SHA256)
-    db.execute(delete(PrescriptiveValidationEvidence).where(
-        PrescriptiveValidationEvidence.evidence_version == EVIDENCE_VERSION
-    ))
+    if unchanged_prescriptive_evidence(db, content):
+        rows = db.scalars(select(PrescriptiveValidationEvidence).where(
+            PrescriptiveValidationEvidence.evidence_version == EVIDENCE_VERSION
+        )).all()
+        return {scope: sum(row.evidence_scope == scope for row in rows)
+                for scope in PURPOSEFUL_SUMMARIES}
     counts = {scope: 0 for scope in PURPOSEFUL_SUMMARIES}
     for scope, members in PURPOSEFUL_SUMMARIES.items():
         for member in members:

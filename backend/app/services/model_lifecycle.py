@@ -5,9 +5,10 @@ from datetime import date
 from hashlib import sha256
 from io import BytesIO
 import json
-from math import isclose
+from math import isclose, isfinite
 from pathlib import Path
 import re
+from zipfile import ZipFile
 
 import joblib
 import numpy as np
@@ -30,6 +31,7 @@ from app.analytics.predictive.future_transaction import (
 from catboost_model import FrozenCatBoost
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG, AnalyticsConfig
 from app.db.models import (
+    AnalyticsRun,
     AuditLog,
     DimAccount,
     FutureTransactionPrediction,
@@ -38,11 +40,13 @@ from app.db.models import (
     PredictiveModelVersion,
     PredictiveMonitoringEvaluation,
     PredictiveOOPEvaluation,
+    PredictiveStudyPrediction,
 )
 from app.db.repository import audit
 from app.etl.invoices import InvoiceGroup
 from app.services.locked_packages import (
     FINAL_PACKAGE_SHA256,
+    PRIOR_ACTIVE_PACKAGE_SHA256,
     STUDY_PREDECESSOR_PACKAGE_SHA256,
     read_package_csv,
     read_package_json,
@@ -54,15 +58,75 @@ from app.services.prescriptive_evidence import (
     seed_prescriptive_validation_evidence, unchanged_prescriptive_evidence,
 )
 from app.services.study_predictions import (
-    MODEL_VERSION, REVISION_AUDIT_ACTION, seed_final_study_predictions,
+    MODEL_VERSION, REVISION_AUDIT_ACTION, final_study_prediction_payload, seed_final_study_predictions,
     study_snapshot_digest, validate_study_prediction_package,
 )
-from app.db.models import PredictiveStudyPrediction
 
 TARGET_DEFINITION = (
-    "Future Transaction means at least one valid logical Sales Invoice after the cutoff "
+    "With Future Sales means at least one valid logical Sales Invoice after the cutoff "
     "and on or before the end of the next 12 months."
 )
+MONITOR_MIN_OUTCOMES = 30
+MONITOR_MACRO_F1_DROP_FOR_REVIEW = 0.10
+
+
+def _performance_review_signal(
+    model: PredictiveModelVersion, metrics: dict | None, outcome_count: int,
+) -> tuple[float | None, bool, bool]:
+    baseline_raw = (model.oop_metrics or {}).get("macro_f1")
+    try:
+        baseline = float(baseline_raw) if baseline_raw is not None else None
+    except (TypeError, ValueError):
+        baseline = None
+    if baseline is not None and not isfinite(baseline):
+        baseline = None
+    enough_evidence = bool(
+        metrics and outcome_count >= MONITOR_MIN_OUTCOMES
+        and metrics["macro_f1"] is not None and baseline is not None
+    )
+    review = bool(
+        enough_evidence
+        and metrics["macro_f1"] < baseline - MONITOR_MACRO_F1_DROP_FOR_REVIEW
+    )
+    return baseline, enough_evidence, review
+
+
+def operational_performance_summary(db: Session, model: PredictiveModelVersion) -> dict:
+    """Compare the earliest published prediction per account/cutoff with matured SI outcomes."""
+    rows = db.scalars(select(FutureTransactionPrediction).where(
+        FutureTransactionPrediction.model_version == model.model_version,
+        FutureTransactionPrediction.matured.is_(True),
+    )).all()
+    runs = {run.analysis_run_id: run for run in db.scalars(select(AnalyticsRun).where(
+        AnalyticsRun.analysis_run_id.in_({row.analysis_run_id for row in rows}),
+    )).all()} if rows else {}
+    earliest = {}
+    for row in sorted(rows, key=lambda item: (
+        str(runs[item.analysis_run_id].started_at) if item.analysis_run_id in runs else "",
+        item.future_transaction_prediction_id,
+    )):
+        if row.actual_class in (FUTURE_TRANSACTION, NO_FUTURE_TRANSACTION) and row.predicted_class in (
+            FUTURE_TRANSACTION, NO_FUTURE_TRANSACTION,
+        ):
+            earliest.setdefault((row.account_key, row.cutoff_date), row)
+    evaluated = list(earliest.values())
+    metrics = classification_metrics(
+        [row.actual_class for row in evaluated],
+        [row.predicted_class for row in evaluated],
+    ) if evaluated else None
+    baseline, enough_evidence, review = _performance_review_signal(
+        model, metrics, len(evaluated),
+    )
+    return {
+        "status": "evaluated" if enough_evidence else "insufficient_evidence",
+        "evaluated_account_cutoffs": len(evaluated),
+        "forecast_cutoffs": len({row.cutoff_date for row in evaluated}),
+        "metrics": metrics,
+        "historical_macro_f1": baseline,
+        "review_recommended": review,
+        "minimum_outcomes_for_review": MONITOR_MIN_OUTCOMES,
+        "macro_f1_drop_for_review": MONITOR_MACRO_F1_DROP_FOR_REVIEW,
+    }
 LOCKED_PARAMETERS = {
     "iterations": 150,
     "depth": 5,
@@ -190,6 +254,30 @@ def _rows(frame: pd.DataFrame) -> list[dict]:
     ]
 
 
+OPTIONAL_VALIDATION_MEMBERS = (
+    ("development_class_profile.csv", "01_DATA/05_PREDICTIVE/04_DEVELOPMENT/development_class_profile.csv", 5),
+    ("lookback_summary.csv", "05_QA/final_design_tests/lookback_summary.csv", 5),
+    ("lookback_folds.csv", "05_QA/final_design_tests/lookback_folds.csv", 15),
+    ("model_folds.csv", "01_DATA/05_PREDICTIVE/05_BENCHMARK/model_folds.csv", 3),
+)
+
+
+def _additional_validation_rows(content: bytes) -> list[dict]:
+    with ZipFile(BytesIO(content)) as archive:
+        names = set(archive.namelist())
+    rows = []
+    for label, member, expected_count in OPTIONAL_VALIDATION_MEMBERS:
+        if not any(name.endswith("/" + member) for name in names):
+            continue
+        frame = read_package_csv(content, member)
+        if label == "model_folds.csv":
+            frame = frame.loc[frame["family"] == "CatBoost"]
+        if len(frame) != expected_count:
+            raise ValueError(f"Locked {label} has an unexpected row count.")
+        rows.extend({"source_member": label, **source} for source in _rows(frame))
+    return rows
+
+
 def _find_column(frame: pd.DataFrame, candidates: set[str]) -> str | None:
     for column in frame.columns:
         normalized = re.sub(r"[^a-z0-9]+", "_", str(column).strip().casefold()).strip("_")
@@ -278,10 +366,10 @@ def validated_later_checks(package_content: bytes) -> list[dict]:
                 set(feature_rows["cutoff_date"]) != {cutoff}):
             raise ValueError("Later-period feature evidence disagrees with the predictions.")
         for actual, predicted, count in (
-            ("Future Transaction", "Future Transaction", ff),
-            ("Future Transaction", "No Future Transaction", fn),
-            ("No Future Transaction", "Future Transaction", nf),
-            ("No Future Transaction", "No Future Transaction", nn),
+            ("With Future Sales", "With Future Sales", ff),
+            ("With Future Sales", "With No Future Sales", fn),
+            ("With No Future Sales", "With Future Sales", nf),
+            ("With No Future Sales", "With No Future Sales", nn),
         ):
             if len(period_rows.loc[
                 (period_rows["actual_target"] == actual) &
@@ -290,11 +378,11 @@ def validated_later_checks(package_content: bytes) -> list[dict]:
                 raise ValueError("Later-period account predictions disagree with the summary.")
         matrix = matrices.loc[matrices["period"] == row["period"]]
         if len(matrix) != 2 or set(matrix["actual_class"]) != {
-            "Future Transaction", "No Future Transaction"
+            "With Future Sales", "With No Future Sales"
         }:
             raise ValueError("Later-period confusion matrix is incomplete.")
         for actual, future, no_future in (
-            ("Future Transaction", ff, fn), ("No Future Transaction", nf, nn)
+            ("With Future Sales", ff, fn), ("With No Future Sales", nf, nn)
         ):
             item = matrix.loc[matrix["actual_class"] == actual].iloc[0]
             if (int(item["predicted_future_transaction"]) != future or
@@ -332,7 +420,7 @@ def seed_locked_predictive_evidence(
     selected_confusion = confusion.loc[confusion["family"] == "CatBoost"]
     if (len(selected_confusion) != 6
             or set(selected_confusion["outer_year"].astype(int)) != {2020, 2021, 2022}
-            or set(selected_confusion["actual_class"]) != {"Future Transaction", "No Future Transaction"}
+            or set(selected_confusion["actual_class"]) != {"With Future Sales", "With No Future Sales"}
             or selected_confusion.groupby("outer_year").size().ne(2).any()):
         raise ValueError("Locked CatBoost confusion evidence must contain two classes for each outer year.")
     for source in _rows(selected_confusion):
@@ -348,6 +436,14 @@ def seed_locked_predictive_evidence(
         raise ValueError("Supplemental locked benchmark must contain nine unique models.")
     for source in _rows(supplemental):
         db.add(PredictiveBenchmarkRecord(predictive_model_version_id=record.predictive_model_version_id, benchmark_scope="supplemental_nine_classifier_audit", model_name=str(source["family"]), payload={"source_member": "supplemental_model_benchmark.csv", **source}))
+
+    for source in _additional_validation_rows(package_content):
+        db.add(PredictiveBenchmarkRecord(
+            predictive_model_version_id=record.predictive_model_version_id,
+            benchmark_scope="supplemental_validation_context",
+            model_name=f"{source['source_member']}:{source.get('cutoff_year', source.get('lookback_months'))}:{source.get('outer_year', '')}",
+            payload=source,
+        ))
 
     for source in later:
         db.add(PredictiveOOPEvaluation(
@@ -485,18 +581,38 @@ def _unchanged_development_evidence(db: Session, record: PredictiveModelVersion,
         if family:
             frame = frame.loc[frame["family"] == family]
         expected_benchmarks.extend({"source_member": label, **row} for row in _rows(frame))
+    additional = _additional_validation_rows(content)
     actual_benchmarks = [
         {key: value for key, value in row.payload.items() if key != "source_package_sha256"}
         for row in benchmarks
     ]
-    if (len(horizons) != 3 or len(benchmarks) != 37 or
+    core_unchanged = sorted(actual_benchmarks, key=str) == sorted(expected_benchmarks, key=str)
+    complete_unchanged = sorted(actual_benchmarks, key=str) == sorted(
+        expected_benchmarks + additional, key=str
+    )
+    if (len(horizons) != 3 or not (core_unchanged or complete_unchanged) or
             sorted([row.payload for row in horizons], key=str) != sorted(expected_horizons, key=str) or
-            sorted(actual_benchmarks, key=str) != sorted(expected_benchmarks, key=str) or
             any(row.payload.get("source_package_sha256") not in (
-                FINAL_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256
+                FINAL_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256
             ) for row in benchmarks if row.payload.get("source_member") == "confusion_matrices.csv")):
         raise ValueError("Existing development evidence differs from the revised package.")
     return True
+
+
+def _append_missing_validation_context(db: Session, record: PredictiveModelVersion,
+                                       content: bytes) -> None:
+    existing = db.scalars(select(PredictiveBenchmarkRecord).where(
+        PredictiveBenchmarkRecord.predictive_model_version_id == record.predictive_model_version_id
+    )).all()
+    if any(row.benchmark_scope == "supplemental_validation_context" for row in existing):
+        return
+    for source in _additional_validation_rows(content):
+        db.add(PredictiveBenchmarkRecord(
+            predictive_model_version_id=record.predictive_model_version_id,
+            benchmark_scope="supplemental_validation_context",
+            model_name=f"{source['source_member']}:{source.get('cutoff_year', source.get('lookback_months'))}:{source.get('outer_year', '')}",
+            payload=source,
+        ))
 
 
 def sync_revised_package_evidence(db: Session, package_path: str | Path,
@@ -541,7 +657,9 @@ def sync_revised_package_evidence(db: Session, package_path: str | Path,
             raise ValueError("Existing later-period evidence is not the recognized predecessor.")
     if not development_exists:
         seed_locked_predictive_evidence(db, record, content)
-    elif not current:
+    else:
+        _append_missing_validation_context(db, record, content)
+    if development_exists and not current:
         db.execute(delete(PredictiveOOPEvaluation).where(
             PredictiveOOPEvaluation.predictive_model_version_id == record.predictive_model_version_id
         ))
@@ -615,11 +733,80 @@ def future_transaction_for_current_run(
         return unavailable_prediction(config)
 
 
+def _monitor_final_study_outcomes(
+    db: Session,
+    valid_groups: list[InvoiceGroup],
+    as_of_date: date,
+    verified_data_complete_through: date | None,
+    source_run_id: str | None,
+) -> str:
+    study = final_study_prediction_payload(db)
+    if study["status"] != "Validated" or len(study["predictions"]) != 83:
+        return "unavailable"
+    window_end = date.fromisoformat(study["future_window_end"])
+    if (as_of_date < window_end or verified_data_complete_through is None
+            or verified_data_complete_through < window_end or source_run_id is None):
+        return "pending"
+    run = db.get(AnalyticsRun, source_run_id)
+    if (run is None or run.status != "successful" or run.analysis_reference_date is None
+            or run.analysis_reference_date < window_end):
+        return "pending"
+    model = db.scalar(select(PredictiveModelVersion).where(
+        PredictiveModelVersion.model_version == study["model_version"],
+    ))
+    if model is None or model.artifact_hash != study["artifact_hash"]:
+        return "unavailable"
+    origin = date.fromisoformat(study["forecast_origin"])
+    existing = db.scalars(select(PredictiveMonitoringEvaluation).where(
+        PredictiveMonitoringEvaluation.predictive_model_version_id == model.predictive_model_version_id,
+        PredictiveMonitoringEvaluation.cutoff_date == origin,
+    )).all()
+    if any(row.payload.get("scope") == "final_study_forecast" for row in existing):
+        return "evaluated"
+    start = pd.Timestamp(study["future_window_start"])
+    end = pd.Timestamp(window_end)
+    observed = {
+        group.standardized_account_name for group in valid_groups
+        if start <= group.si_date <= end
+    }
+    predictions = study["predictions"]
+    accounts = sorted(predictions)
+    actual = [FUTURE_TRANSACTION if account in observed else NO_FUTURE_TRANSACTION
+              for account in accounts]
+    predicted = [predictions[account] for account in accounts]
+    metrics = classification_metrics(actual, predicted)
+    baseline, enough_evidence, review = _performance_review_signal(model, metrics, len(accounts))
+    if review:
+        model.review_recommended = True
+    db.add(PredictiveMonitoringEvaluation(
+        predictive_model_version_id=model.predictive_model_version_id,
+        cutoff_date=origin,
+        status="evaluated",
+        review_recommended=review,
+        payload={
+            "scope": "final_study_forecast",
+            "source_analysis_run_id": source_run_id,
+            "source_package_hash": study["source_package_hash"],
+            "verified_complete_through": verified_data_complete_through.isoformat(),
+            "forecast_origin": study["forecast_origin"],
+            "future_window_start": study["future_window_start"],
+            "future_window_end": study["future_window_end"],
+            "account_count": len(accounts),
+            "metrics": metrics,
+            "historical_macro_f1": baseline,
+            "comparison_status": "evaluated" if enough_evidence else "insufficient_evidence",
+            "review_recommended": review,
+        },
+    ))
+    return "evaluated"
+
+
 def monitor_registered_predictions(
     db: Session,
     invoice_groups: list[InvoiceGroup],
     as_of_date: date,
     verified_data_complete_through: date | None = None,
+    source_run_id: str | None = None,
 ) -> dict:
     rows = db.scalars(select(FutureTransactionPrediction).where(
         FutureTransactionPrediction.matured.is_(False)
@@ -630,6 +817,9 @@ def monitor_registered_predictions(
     )
     matured = [row for row in rows if boundary and row.future_window_end <= boundary]
     valid = [group for group in invoice_groups if group.rfm_eligible]
+    study_outcome_status = _monitor_final_study_outcomes(
+        db, valid, as_of_date, verified_data_complete_through, source_run_id,
+    )
     account_names = {
         item.account_key: item.standardized_account_name
         for item in db.scalars(select(DimAccount)).all()
@@ -646,6 +836,7 @@ def monitor_registered_predictions(
         row.matured = True
         row.evaluated_on = as_of_date
         row.monitoring_status = "Evaluated"
+    db.flush()
     by_version = {
         version: [row for row in matured if row.model_version == version]
         for version in {row.model_version for row in matured}
@@ -657,13 +848,32 @@ def monitor_registered_predictions(
         )
         for version, version_rows in by_version.items()
     }
-    status = "evaluated" if matured else "pending"
+    active = active_model_version(db)
+    versions = set(by_version)
+    if active is not None:
+        versions.add(active.model_version)
+    performance_by_version = {}
+    for version in versions:
+        model = active if active is not None and active.model_version == version else db.scalar(
+            select(PredictiveModelVersion).where(PredictiveModelVersion.model_version == version)
+        )
+        if model is None:
+            continue
+        summary = operational_performance_summary(db, model)
+        performance_by_version[version] = summary
+        if summary["review_recommended"]:
+            model.review_recommended = True
+    status = "evaluated" if matured or study_outcome_status == "evaluated" else "pending"
     payload = {
         "status": status,
         "matured": len(matured),
         "pending": len(rows) - len(matured),
         "metrics": next(iter(metrics_by_version.values())) if len(metrics_by_version) == 1 else {},
         "model_metrics": metrics_by_version,
+        "performance_by_version": performance_by_version,
+        "active_model_performance": performance_by_version.get(active.model_version) if active else None,
+        "review_recommended": bool(active and active.review_recommended),
+        "study_outcome_status": study_outcome_status,
         "verified_data_complete_through": (
             verified_data_complete_through.isoformat() if verified_data_complete_through else None
         ),

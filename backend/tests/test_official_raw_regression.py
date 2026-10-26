@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import joblib
 import pandas as pd
 import pytest
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, delete, func, select
 from sqlalchemy.orm import Session
 
 from app.analytics.predictive.future_transaction import score_frozen_artifact
@@ -48,16 +48,17 @@ pytestmark = pytest.mark.skipif(
 )
 
 EXPECTED_SENSITIVITY = {
-    0.10: (0.9987756601318164, 0.9958649930733384, 0.0120481927710843, 0.0481927710843373, 6),
-    0.20: (0.9968319969774568, 0.9878888375802862, 0.0289156626506024, 0.072289156626506, 13),
-    0.30: (0.9934530456320052, 0.9809201964653036, 0.0438554216867469, 0.0963855421686747, 17),
-    0.40: (0.9920471432769402, 0.9713488098736408, 0.0508433734939759, 0.1204819277108433, 20),
+    0.10: (0.999517862390328, 0.99869862726166, 0.000481927710843, 0.024096385542169, 2),
+    0.20: (0.998865706729356, 0.995319256118551, 0.006987951807229, 0.048192771084337, 7),
+    0.30: (0.997486041727887, 0.983564921707737, 0.015180722891566, 0.072289156626506, 9),
+    0.40: (0.99532450358927, 0.944166911548634, 0.021084337349398, 0.132530120481928, 13),
 }
 EXPECTED_TOP_TEN = [
-    "MEGAWORLD CORPORATION", "LOXON PHILIPPINES INC", "METRO WORX PROPERTIES INC",
-    "RYXEN INC", "EXQUADRA INC", "WILL DECENA AND ASSOCIATES, INC.",
-    "BCE PROPERTIES INC", "WEE COMMUNITY DEVELOPERS INC",
-    "EXECUTIVE GENESIS SERVICES INC", "WEECOMM CENTRE PROPERTIES, INC.",
+    "MEGAWORLD CORPORATION", "BCE PROPERTIES INC", "EXECUTIVE GENESIS SERVICES INC",
+    "WEE COMMUNITY DEVELOPERS INC", "METRO WORX PROPERTIES INC",
+    "WEECOMM CENTRE PROPERTIES, INC.", "LYCEUM OF THE PHILIPPINES UNIVERSITY INC",
+    "RIVER GREEN RESIDENCES", "LOXON PHILIPPINES INC",
+    "TOTAL INNOVATIVE SECURITY SOLUTIONS INC.",
 ]
 EXPECTED_FUTURE_ACCOUNTS = {
     "3M PHILIPPINES INC",
@@ -72,7 +73,7 @@ EXPECTED_FUTURE_ACCOUNTS = {
     "EXECUTIVE GENESIS SERVICES INC",
 }
 EXPECTED_SALES = {
-    2017: 22685859.51, 2018: 28141212.85, 2019: 25104956.78,
+    2017: 22685859.51, 2018: 28128062.85, 2019: 25104956.78,
     2020: 7422135.75, 2021: 17072550.27, 2022: 16803717.74,
     2023: 20244551.54, 2024: 21069452.09, 2025: 8923088.40,
 }
@@ -134,13 +135,13 @@ def test_private_final_study_predictive_regression(monkeypatch):
     assert predictive.analysis_reference_date == "2025-12-31"
     assert predictive.target_horizon_months == 12
     assert Counter(predictive.predictions.values()) == {
-        "Future Transaction": 10,
-        "No Future Transaction": 73,
+        "With Future Sales": 10,
+        "With No Future Sales": 73,
     }
     assert {
         account
         for account, label in predictive.predictions.items()
-        if label == "Future Transaction"
+        if label == "With Future Sales"
     } == EXPECTED_FUTURE_ACCOUNTS
 
 
@@ -149,13 +150,13 @@ def test_private_current_prescriptive_regression():
     parsed = parse_source_file("PESLC_RAW.xlsx", raw_bytes)
     rows = [row for frame in parsed.frames.values()
             for row in dataframe_to_source_rows(frame, "official")]
-    assert len(rows) == 363
+    assert len(rows) == 291
     assert Counter(row.payment_status for row in rows) == {
-        "Fully Paid": 292, "Cancelled": 71}
+        "Fully Paid": 291}
     groups = group_invoices(rows)
     valid = [item for item in groups if item.rfm_eligible]
-    assert len(valid) == 282
-    assert sum((item.si_amount for item in valid), Decimal("0")) == Decimal("167467524.93")
+    assert len(valid) == 281
+    assert sum((item.si_amount for item in valid), Decimal("0")) == Decimal("167454374.93")
     assert list(master.columns) == [
         "account_key", "account_name", "entity_type", "business_category",
         "primary_business_type",
@@ -178,10 +179,10 @@ def test_private_current_prescriptive_regression():
     eligible = set(master.loc[
         master["entity_type"].astype(str) != "Individual/Personal", "standardized"
     ])
-    assert len(master) == 85
+    assert len(master) == 84
     assert len(eligible) == 84
-    personal = master.loc[master["entity_type"] == "Individual/Personal"]
-    assert personal["standardized"].tolist() == ["ROD DE GUIA"]
+    assert not (master["entity_type"] == "Individual/Personal").any()
+    assert "ROD DE GUIA" not in eligible
     status_context = status.merge(master[["account_key", "standardized"]], on="account_key", validate="one_to_one")
     actionable = set(status_context.loc[
         status_context["account_status"] == "Client-Confirmed Active", "standardized"
@@ -200,14 +201,16 @@ def test_private_current_prescriptive_regression():
     assert result.latest_valid_si_date == "2025-08-13"
     assert result.latest_final_cr_date == "2025-12-13"
     assert len(result.priorities) == 83
+    assert result.context_metrics["historical_account_count"] == 84
+    assert result.context_metrics["historical_valid_si_account_count"] == 84
     assert Counter(item["priority_group"] for item in result.priorities) == {
         "High": 28, "Medium": 27, "Low": 28,
     }
     assert result.critic_weights == pytest.approx({
-        "recency": 0.3744267906167242,
-        "frequency": 0.1837992490377663,
-        "monetary": 0.1755208018503358,
-        "settlement": 0.2662531584951738,
+        "recency": 0.3611623465698158,
+        "frequency": 0.23172179091738482,
+        "monetary": 0.12298946506730102,
+        "settlement": 0.28412639744549834,
     }, abs=1e-12)
     assert [item["account"] for item in result.priorities[:10]] == EXPECTED_TOP_TEN
     expected_priority = read_package_csv(
@@ -219,6 +222,20 @@ def test_private_current_prescriptive_regression():
     for expected in expected_priority.to_dict(orient="records"):
         actual = actual_priority[expected["account_name"]]
         assert actual["recency_days"] == expected["recency_days"]
+        assert actual["frequency_count"] == expected["frequency"]
+        assert actual["monetary_value"] == pytest.approx(expected["monetary"], abs=0.01)
+        assert actual["full_history_frequency"] == expected["full_history_frequency"]
+        assert actual["full_history_monetary"] == pytest.approx(expected["full_history_monetary"], abs=0.01)
+        assert actual["valid_settlement_record_count"] == expected["settlement_invoice_count"]
+        assert actual["average_settlement_days"] == pytest.approx(expected["average_settlement_days"], abs=1e-9)
+        for criterion in ("recency", "frequency", "monetary", "settlement"):
+            assert actual[f"normalized_{criterion}"] == pytest.approx(
+                expected[f"normalized_{criterion}"], abs=1e-12
+            )
+            assert actual[f"{criterion}_contribution"] == pytest.approx(
+                expected[f"contribution_{criterion}"], abs=1e-12
+            )
+        assert sum(actual[f"{criterion}_contribution"] for criterion in ("recency", "frequency", "monetary", "settlement")) == pytest.approx(actual["final_priority_score"], abs=1e-12)
         assert actual["priority_rank"] == expected["priority_rank"]
         assert actual["priority_group"] == expected["priority_group"]
         assert actual["final_priority_score"] == pytest.approx(expected["final_priority_score"], abs=1e-12)
@@ -244,16 +261,16 @@ def test_private_current_prescriptive_regression():
         (49, 5), (57, 6), (62, 7), (66, 7), (68, 7), (76, 8), (78, 8),
     ]
     expected_lifts = [
-        6.563563167489584, 0.387212359351214, 3.714687692810974,
-        2.543674176004408, 2.645040383733523, 6.411002161203225,
-        2.760412086579304,
+        6.563563167112803, 7.94860926623858, 3.7146876927993606,
+        1.8976183861115845, 2.62645995964877, 6.712658029948644,
+        1.2375008108979673,
     ]
     for item, expected in zip(cutoffs, expected_lifts, strict=True):
         assert item["expected_random_capture"] == pytest.approx(
             item["selected_account_count"] / item["eligible_account_count"]
         )
         assert item["lift_over_expected_random"] == pytest.approx(expected, abs=1e-6)
-    assert sum(item["lift_over_expected_random"] > 1 for item in cutoffs) == 6
+    assert sum(item["lift_over_expected_random"] > 1 for item in cutoffs) == 7
 
 
 def test_private_revised_later_confirmation_and_existing_database_sync(monkeypatch):
@@ -286,6 +303,12 @@ def test_private_revised_later_confirmation_and_existing_database_sync(monkeypat
             lifecycle.PredictiveBenchmarkRecord.benchmark_scope == "selected_confusion_matrix"
         )).all():
             row.payload = {**row.payload, "source_package_sha256": STUDY_PREDECESSOR_PACKAGE_SHA256}
+        db.execute(delete(lifecycle.PredictiveBenchmarkRecord).where(
+            lifecycle.PredictiveBenchmarkRecord.benchmark_scope == "supplemental_validation_context"
+        ))
+        core_benchmark_ids = {
+            row.predictive_model_benchmark_id for row in db.scalars(select(lifecycle.PredictiveBenchmarkRecord)).all()
+        }
         old_2024 = db.scalar(select(PredictiveOOPEvaluation).where(
             PredictiveOOPEvaluation.oop_cutoff == pd.Timestamp("2024-12-31").date()
         ))
@@ -312,8 +335,8 @@ def test_private_revised_later_confirmation_and_existing_database_sync(monkeypat
         with db.begin_nested() as nested:
             changed = db.scalar(select(PredictiveStudyPrediction))
             changed.predicted_class = (
-                "No Future Transaction" if changed.predicted_class == "Future Transaction"
-                else "Future Transaction"
+                "With No Future Sales" if changed.predicted_class == "With Future Sales"
+                else "With Future Sales"
             )
             db.flush()
             with pytest.raises(ValueError, match="incompatible immutable"):
@@ -331,6 +354,9 @@ def test_private_revised_later_confirmation_and_existing_database_sync(monkeypat
         assert first["study"]["already_seeded"] and second["study"]["already_seeded"]
         assert db.scalar(select(func.count()).select_from(PredictiveModelVersion)) == 1
         assert model_id == db.scalar(select(PredictiveModelVersion)).predictive_model_version_id
+        assert core_benchmark_ids.issubset({
+            row.predictive_model_benchmark_id for row in db.scalars(select(lifecycle.PredictiveBenchmarkRecord)).all()
+        })
         assert {row.predictive_study_prediction_id for row in db.scalars(select(PredictiveStudyPrediction))} == study_ids
         assert {row.source_package_hash for row in db.scalars(select(PredictiveStudyPrediction))} == {
             STUDY_PREDECESSOR_PACKAGE_SHA256
@@ -338,12 +364,25 @@ def test_private_revised_later_confirmation_and_existing_database_sync(monkeypat
         assert {row.id for row in db.scalars(select(PredictiveOOPEvaluation))} == later_ids
         assert db.scalar(select(func.count()).select_from(AuditLog)) == 1
         assert final_study_prediction_payload(db)["class_counts"] == {
-            "Future Transaction": 10, "No Future Transaction": 73,
+            "With Future Sales": 10, "With No Future Sales": 73,
         }
         response = native_validation(AuthenticatedUser("test-user", "administrator"), db)
         assert response["model_evidence_status"] == "available"
+        assert len(response["development_profile"]) == 5
+        assert sum(row["observations"] for row in response["development_profile"]) == 302
+        assert sum(row["future_transaction"] for row in response["development_profile"]) == 39
+        assert sum(row["no_future_transaction"] for row in response["development_profile"]) == 263
+        assert {row["lookback_months"] for row in response["lookback_summary"]} == {3, 6, 12, 18, 24}
+        assert len(response["lookback_folds"]) == 15
+        assert {row["outer_year"] for row in response["yearly_folds"]} == {2020, 2021, 2022}
         assert response["study"]["status"] == "Validated"
         assert len(response["supplemental"]) > 0
+        assert sum(str(row["source_member"]).endswith("/criterion_ablation_current.csv")
+                   for row in response["supplemental"]) == 4
+        assert sum(str(row["source_member"]).endswith("/criterion_ablation_history.csv")
+                   for row in response["supplemental"]) == 42
+        assert sum(str(row["source_member"]).endswith("/boundary_movement.csv")
+                   for row in response["supplemental"]) == 332
         assert [(row["cutoff_date"], row["future_window_end"]) for row in response["later_checks"]] == [
             ("2023-12-31", "2024-12-31"), ("2024-12-31", "2025-12-31"),
         ]

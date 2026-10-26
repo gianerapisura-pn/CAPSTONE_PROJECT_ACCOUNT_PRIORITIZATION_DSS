@@ -12,6 +12,7 @@ const base = {
   frequency_contribution: .2, monetary_contribution: .2, settlement_contribution: .2,
   latest_valid_transaction_date: "2030-01-01", latest_valid_si_date: "2030-01-01",
   recency_days: 10, frequency_count: 3, monetary_value: 1000,
+  full_history_frequency: 5, full_history_monetary: 1800,
   baseline_recency_weight: .25, baseline_frequency_weight: .25,
   baseline_monetary_weight: .25, baseline_settlement_weight: .25,
   r_score: 5, f_score: 4, m_score: 3,
@@ -19,8 +20,8 @@ const base = {
   ranking_status: "Ranked", ranking_unavailable_reason: null, model_version: "catboost_stage8",
 };
 const rows: AccountDecisionRow[] = [
-  { ...base, account: "ALPHA", account_key: "a", priority_rank: 1, priority_group: "High", final_priority_score: .9, predicted_future_transaction_class: "Future Transaction" },
-  { ...base, account: "BETA", account_key: "b", priority_rank: 2, priority_group: "Low", final_priority_score: .4, predicted_future_transaction_class: "No Future Transaction" },
+  { ...base, account: "ALPHA", account_key: "a", priority_rank: 1, priority_group: "High", final_priority_score: .9, predicted_future_transaction_class: "With Future Sales" },
+  { ...base, account: "BETA", account_key: "b", priority_rank: 2, priority_group: "Low", final_priority_score: .4, predicted_future_transaction_class: "With No Future Sales" },
   { ...base, account: "ROSTRAM PROTECTIVE SYSTEM METIER COMPANY", account_key: "c", account_status: "Client-Confirmed Closed", current_actionable: false, priority_rank: null, priority_group: null, final_priority_score: null, predicted_future_transaction_class: null, model_version: null, average_settlement_days: null, settlement_invoice_count: 0, valid_settlement_record_count: 0, mcs_eligible: false, mcs_eligibility_reason: "Client-confirmed closed; excluded from the current actionable ranking.", is_ranked: false, ranking_status: "Not ranked", ranking_unavailable_reason: "Client-confirmed closed; excluded from the current actionable ranking.", normalized_recency: null, normalized_frequency: null, normalized_monetary: null, normalized_settlement: null, recency_contribution: null, frequency_contribution: null, monetary_contribution: null, settlement_contribution: null },
 ];
 
@@ -77,8 +78,9 @@ test("unranked accounts retain RFM context and show null MCS values truthfully",
 test("priority group and transaction class remain visibly separate columns", () => {
   render(<AccountPriorityTable />);
   expect(screen.getByRole("columnheader", { name: "Current Status" })).toBeInTheDocument();
-  expect(screen.getByRole("columnheader", { name: "Priority" })).toBeInTheDocument();
-  expect(screen.getByRole("columnheader", { name: "Operational 12-Month SI Class" })).toBeInTheDocument();
-  expect(screen.getByRole("columnheader", { name: "Recency" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Priority Group" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Predicted Sales Activity" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Days Since Last Purchase" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Purchases in Last 24 Months" })).toBeInTheDocument();
   expect(screen.queryByRole("columnheader", { name: "Normalized RFM" })).not.toBeInTheDocument();
 });

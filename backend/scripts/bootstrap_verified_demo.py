@@ -23,7 +23,7 @@ from scripts.bootstrap_account_context import bootstrap
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("package", help="Private PESLC_FINAL_ANALYTICS_FINAL (3).zip")
+    parser.add_argument("package", help="Private hash-verified final analytics ZIP")
     parser.add_argument("reference_date", type=date.fromisoformat)
     args = parser.parse_args()
     settings = get_settings()

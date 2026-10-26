@@ -8,8 +8,24 @@ import pandas as pd
 
 from app.analytics.descriptive.rfm import AccountRFM
 from app.analytics.descriptive.settlement import AccountSettlement
+from app.etl.invoices import InvoiceGroup
 
 CRITERIA = ("recency", "frequency", "monetary", "settlement")
+
+
+def scoring_activity_24m(
+    invoice_groups: list[InvoiceGroup], reference: pd.Timestamp,
+    accounts: set[str],
+) -> dict[str, tuple[int, Decimal]]:
+    cutoff = pd.Timestamp(reference)
+    start = cutoff - pd.DateOffset(months=24)
+    activity = {account: (0, Decimal("0")) for account in accounts}
+    for group in invoice_groups:
+        account = group.standardized_account_name
+        if account in activity and group.rfm_eligible and start < group.si_date <= cutoff:
+            count, amount = activity[account]
+            activity[account] = (count + 1, amount + group.si_amount)
+    return activity
 
 
 @dataclass(frozen=True)
@@ -102,7 +118,8 @@ def assign_priority_groups(scored: list[tuple[str, float]]) -> dict[str, str]:
 
 
 def compute_priorities(
-    rfm: list[AccountRFM], settlement: list[AccountSettlement]
+    rfm: list[AccountRFM], settlement: list[AccountSettlement],
+    activity_24m: dict[str, tuple[int, Decimal]],
 ) -> tuple[list[AccountPriority], dict[str, float]]:
     settlement_by_account = {
         item.account: item for item in settlement if item.average_settlement_days is not None
@@ -111,10 +128,12 @@ def compute_priorities(
     accounts = sorted(set(rfm_by_account) & set(settlement_by_account))
     if not accounts:
         return [], {}
+    if any(account not in activity_24m for account in accounts):
+        raise ValueError("Missing 24-month invoice activity for a scoring account.")
     raw = {
         "recency": {account: float(rfm_by_account[account].recency_days) for account in accounts},
-        "frequency": {account: float(rfm_by_account[account].frequency) for account in accounts},
-        "monetary": {account: float(rfm_by_account[account].monetary) for account in accounts},
+        "frequency": {account: float(activity_24m[account][0]) for account in accounts},
+        "monetary": {account: float(activity_24m[account][1]) for account in accounts},
         "settlement": {
             account: float(settlement_by_account[account].average_settlement_days)
             for account in accounts
@@ -148,8 +167,8 @@ def compute_priorities(
             account=account,
             rfm_mean_score=rfm_by_account[account].rfm_mean_score,
             recency_days=rfm_by_account[account].recency_days,
-            frequency=rfm_by_account[account].frequency,
-            monetary=rfm_by_account[account].monetary,
+            frequency=activity_24m[account][0],
+            monetary=activity_24m[account][1],
             settlement_days_avg=raw["settlement"][account],
             normalized_recency=normalized["recency"][account],
             normalized_frequency=normalized["frequency"][account],

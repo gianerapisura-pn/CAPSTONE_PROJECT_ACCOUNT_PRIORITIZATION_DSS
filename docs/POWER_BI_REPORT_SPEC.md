@@ -1,5 +1,7 @@
 # Power BI Report Specification
 
+> Historical optional specification only. Current approved reporting uses the three native Web DSS Detailed Analytics views. The figures below describe an earlier package and are not current acceptance targets.
+
 Power BI consumes certified persisted views only. It does not load RAW files, private artifacts, or recompute analytics.
 
 ## Page 1: Management Overview

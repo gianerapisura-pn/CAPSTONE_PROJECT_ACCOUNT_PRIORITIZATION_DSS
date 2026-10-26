@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from app.analytics.descriptive.rfm import _quantile_scores, compute_rfm
 from app.analytics.descriptive.settlement import compute_settlement_metrics
-from app.analytics.prescriptive.scoring import assign_priority_groups, compute_priorities
+from app.analytics.prescriptive.scoring import assign_priority_groups, compute_priorities, scoring_activity_24m
 from app.analytics.validation.backtest import run_historical_backtest, top_decile_backtest
 from app.analytics.validation.baselines import annual_business_baselines
 from app.analytics.validation.sensitivity import (
@@ -115,11 +115,12 @@ def test_sensitivity_has_100_scenarios_and_separate_loo():
     ]
     rfm = compute_rfm(groups, pd.Timestamp("2026-09-21"))
     settlement = compute_settlement_metrics(groups, pd.Timestamp("2026-09-21"))
-    priorities, weights = compute_priorities(rfm, settlement)
+    activity = scoring_activity_24m(groups, pd.Timestamp("2026-09-21"), {item.account for item in rfm})
+    priorities, weights = compute_priorities(rfm, settlement, activity)
     summary = run_sensitivity(priorities, weights, .4, 100, 42)
     assert summary.iterations == 100
     assert len(summary.scenarios) == 100 * len(priorities)
-    influence = run_leave_one_out_influence(rfm, settlement, priorities, weights)
+    influence = run_leave_one_out_influence(rfm, settlement, priorities, weights, activity)
     assert len(influence) == len(priorities)
 
 
@@ -138,6 +139,35 @@ def test_backtest_uses_seven_cutoffs_and_exact_k_over_n_expectation():
     assert summary.cutoff_count == 7
     assert [x["cutoff_date"] for x in summary.cutoffs] == list(
         DEFAULT_ANALYTICS_CONFIG.backtest_cutoffs)
+
+
+def test_future_backtests_extend_only_after_complete_outcome_windows():
+    source = [group("A", "SI-1", "2024-01-01", 100, "2024-01-10")]
+    before_maturity = run_historical_backtest(
+        source, analysis_reference_date=pd.Timestamp("2026-12-30"),
+    )
+    after_maturity = run_historical_backtest(
+        source, analysis_reference_date=pd.Timestamp("2026-12-31"),
+    )
+    later = run_historical_backtest(
+        source, analysis_reference_date=pd.Timestamp("2028-06-30"),
+    )
+    assert before_maturity.cutoff_count == 7
+    assert after_maturity.cutoff_count == 8
+    assert after_maturity.cutoffs[-1]["cutoff_date"] == "2025-12-31"
+    assert later.cutoff_count == 9
+    assert later.cutoffs[-1]["evaluation_end_date"] == "2027-12-31"
+
+
+def test_backtest_ignores_invoices_after_the_published_reference():
+    source = [group("A", "SI-1", "2024-01-01", 100, "2024-01-10")]
+    future = group("A", "SI-2", "2028-01-01", 200, "2028-01-10")
+    reference = pd.Timestamp("2025-12-31")
+    baseline = run_historical_backtest(source, analysis_reference_date=reference)
+    with_future_import = run_historical_backtest(
+        source + [future], analysis_reference_date=reference,
+    )
+    assert with_future_import == baseline
 
 def test_priority_group_boundaries_follow_locked_rounding_for_future_populations():
     for count in (49, 57, 62, 67, 69, 77, 79, 83, 84):
@@ -164,7 +194,8 @@ def test_sensitivity_suite_consumes_one_continuous_random_stream():
     ]
     rfm = compute_rfm(groups, pd.Timestamp("2026-09-21"))
     settlement = compute_settlement_metrics(groups, pd.Timestamp("2026-09-21"))
-    priorities, weights = compute_priorities(rfm, settlement)
+    activity = scoring_activity_24m(groups, pd.Timestamp("2026-09-21"), {item.account for item in rfm})
+    priorities, weights = compute_priorities(rfm, settlement, activity)
     suite = run_sensitivity_suite(priorities, weights, (.1, .2, .3, .4), 100, 42)
     rng = np.random.default_rng(42)
     sequential = [

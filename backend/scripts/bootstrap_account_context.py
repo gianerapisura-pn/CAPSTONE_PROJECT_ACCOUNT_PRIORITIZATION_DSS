@@ -43,15 +43,11 @@ def bootstrap(db, package_path: str, actor: str | None = None) -> dict:
     ], "status_provenance.csv")
     _require_schema(identity_provenance, ["account_key", "account_name", "entity_type", "primary_business_type", "source_type", "source_reference", "source_url", "source_checked_on", "note"], "account_master_provenance.csv")
     _require_schema(business_mapping, ["primary_business_type", "business_category"], "business_type_mapping.csv")
-    if len(master) != 85:
-        raise ValueError(f"Locked account master must contain 85 identities; found {len(master)}.")
-    personal = master.loc[master["entity_type"] == "Individual/Personal"]
-    if len(personal) != 1 or personal.iloc[0]["account_key"] != "A063" or standardize_account_name(personal.iloc[0]["account_name"]) != "ROD DE GUIA":
-        raise ValueError("The sole historical Individual/Personal identity must be A063 ROD DE GUIA.")
-    b2b = master.loc[master["entity_type"] != "Individual/Personal"]
-    b2b_keys = set(b2b["account_key"].astype(str))
-    if len(b2b_keys) != 84 or set(statuses["account_key"].astype(str)) != b2b_keys or set(provenance["account_key"].astype(str)) != b2b_keys:
-        raise ValueError("B2B master, status, and provenance key sets must match exactly across 84 identities.")
+    b2b_keys = set(master["account_key"].astype(str))
+    if (len(master) != 84 or "Individual/Personal" in set(master["entity_type"])
+            or "A063" in b2b_keys or set(statuses["account_key"].astype(str)) != b2b_keys
+            or set(provenance["account_key"].astype(str)) != b2b_keys):
+        raise ValueError("The approved account master and status provenance must contain the same 84 valid-SI B2B identities.")
     for frame, name in ((master, "master"), (statuses, "status"), (provenance, "status provenance"), (identity_provenance, "identity provenance")):
         if frame["account_key"].isna().any() or frame["account_key"].duplicated().any():
             raise ValueError(f"Duplicate or missing account keys in {name}.")
@@ -85,11 +81,12 @@ def bootstrap(db, package_path: str, actor: str | None = None) -> dict:
         len(closure_rows) != 1
         or str(closure_rows.iloc[0]["account_key"]) != "A064"
         or int(closure_rows.iloc[0]["closed_since_year"]) != 2021
-        or str(closure_rows.iloc[0]["closure_date_precision"]).strip() !=
-            "Year only; month/day not supplied"
-        or str(closure_rows.iloc[0]["closure_reported_on"]).strip() != "2026-10-11"
+        or pd.isna(closure_rows.iloc[0]["closure_date_precision"])
+        or not str(closure_rows.iloc[0]["closure_date_precision"]).strip()
+        or pd.isna(closure_rows.iloc[0]["closure_reported_on"])
     ):
         raise ValueError("Closure provenance must identify only A064 as closed since 2021.")
+    pd.Timestamp(closure_rows.iloc[0]["closure_reported_on"])
 
     merged = master.merge(statuses, on="account_key", how="left", validate="one_to_one").merge(
         provenance.drop(columns="account_status"), on="account_key", how="left", validate="one_to_one"
@@ -135,7 +132,8 @@ def bootstrap(db, package_path: str, actor: str | None = None) -> dict:
         checked = pd.to_datetime(source["source_checked_on"], errors="coerce")
         row.identity_source_checked_on = None if pd.isna(checked) else checked.date()
         row.identity_source_note = None if pd.isna(source["note"]) else str(source["note"]).strip()
-    result = {"historical_identity_count": 85, "b2b_analytical_count": 84, "current_actionable_count": 83}
+    result = {"registered_account_count": len(master), "b2b_analytical_count": len(b2b_keys),
+              "current_actionable_count": status_counts[CLIENT_CONFIRMED_ACTIVE]}
     audit(db, actor, "locked_account_context_bootstrap", "dim_account", None, {
         "package_sha256": FINAL_PACKAGE_SHA256, **result, "publication_required": True,
     })
@@ -153,7 +151,7 @@ def main() -> None:
             result = bootstrap(db, args.package, args.actor)
             db.commit()
             print(
-                f"Verified {result['historical_identity_count']} identities; "
+                f"Verified {result['registered_account_count']} account-master identities; "
                 f"{result['b2b_analytical_count']} are B2B analytical and "
                 f"{result['current_actionable_count']} are currently actionable. Publish a new analytics run."
             )

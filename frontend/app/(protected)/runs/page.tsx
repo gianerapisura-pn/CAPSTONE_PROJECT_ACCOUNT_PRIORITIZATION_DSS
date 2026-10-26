@@ -2,11 +2,12 @@
 import { Play, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Badge, PageHeader, PageState } from "@/components/page-state";
+import { ResultValue } from "@/components/result-explanation";
 import { apiFetch } from "@/lib/api";
 import { useApi } from "@/lib/use-api";
 import type { RunSummary } from "@/types/dss";
 const CRITIC_KEYS = ["recency", "frequency", "monetary", "settlement"] as const;
-export function formatCriticWeights(weights: Record<string, number> | null | undefined) {
+function formatCriticWeights(weights: Record<string, number> | null | undefined) {
   if (!CRITIC_KEYS.every(key => typeof weights?.[key] === "number")) return "Unavailable";
   return CRITIC_KEYS.map(key => key[0].toUpperCase() + " " + (weights![key] * 100).toFixed(1) + "%").join(" / ");
 }
@@ -85,6 +86,6 @@ export default function RunsPage() {
       </div> : <p>No committed import batch is available for coverage confirmation.</p>}
       <div className="dialog-actions"><button className="button secondary" onClick={() => setShowCoverage(false)}>Cancel</button><button className="button primary" disabled={running || !sourceBatch || !evidenceReference.trim() || !evidenceBasis.trim() || !confirmedOn} onClick={recordCoverage}>Record evidence</button></div>
     </section>}
-    <PageState loading={loading} error={error} onRetry={reload} empty={!data?.length}><section className="data-section"><div className="table-wrap"><table><thead><tr><th>Run ID</th><th>Reference date</th><th>Started</th><th>Completed</th><th>Status</th><th>R / F / M / S weights</th><th>Duration</th><th>Warnings</th></tr></thead><tbody>{data?.map(row => <tr key={row.analysis_run_id}><td className="mono">{row.analysis_run_id.slice(0, 12)}</td><td>{row.analysis_reference_date || "-"}</td><td>{new Date(row.started_at).toLocaleString()}</td><td>{row.completed_at ? new Date(row.completed_at).toLocaleString() : "-"}</td><td><Badge tone={row.status === "successful" ? "positive" : row.status === "failed" ? "danger" : "warning"}>{row.status}</Badge></td><td>{formatCriticWeights(row.critic_weights)}</td><td>{row.duration_seconds?.toFixed(2) || "-"} sec</td><td>{row.warnings.length}</td></tr>)}</tbody></table></div></section></PageState>
+    <PageState loading={loading} error={error} onRetry={reload} empty={!data?.length}><section className="data-section"><div className="table-wrap"><table><thead><tr><th>Run ID</th><th>Reference date</th><th>Started</th><th>Completed</th><th>Status</th><th>R / F / M / S weights</th><th>Duration</th><th>Warnings</th></tr></thead><tbody>{data?.map(row => <tr key={row.analysis_run_id}><td className="mono"><ResultValue metric="run">{row.analysis_run_id.slice(0, 12)}</ResultValue></td><td><ResultValue metric="reference">{row.analysis_reference_date || "-"}</ResultValue></td><td><ResultValue metric="run">{new Date(row.started_at).toLocaleString()}</ResultValue></td><td><ResultValue metric="run">{row.completed_at ? new Date(row.completed_at).toLocaleString() : "-"}</ResultValue></td><td><Badge tone={row.status === "successful" ? "positive" : row.status === "failed" ? "danger" : "warning"}>{row.status}</Badge></td><td><ResultValue metric="weight">{formatCriticWeights(row.critic_weights)}</ResultValue></td><td><ResultValue metric="duration">{row.duration_seconds?.toFixed(2) || "-"} sec</ResultValue></td><td><ResultValue metric="warnings">{row.warnings.length}</ResultValue></td></tr>)}</tbody></table></div></section></PageState>
   </div>;
 }

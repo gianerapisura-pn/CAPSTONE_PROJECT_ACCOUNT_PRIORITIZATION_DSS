@@ -1,7 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { vi } from "vitest";
 import DashboardPage from "@/app/(protected)/dashboard/page";
 import type { DashboardData } from "@/types/dss";
+
+const { testState } = vi.hoisted(() => ({ testState: { missingCounts: false } }));
 
 const data = {
   run: {
@@ -22,7 +24,7 @@ const data = {
   mcs_eligible_accounts: 83,
   ranked_accounts: 83,
   priority_group_counts: { High: 28, Medium: 27, Low: 28 },
-  prediction_class_counts: { "Future Transaction": 0, "No Future Transaction": 84 },
+  prediction_class_counts: { "With Future Sales": 0, "With No Future Sales": 84 },
   total_valid_historical_sales: 167467524.93,
   warnings: [],
   top_accounts: [{
@@ -38,7 +40,7 @@ const data = {
 } as unknown as DashboardData;
 
 vi.mock("@/lib/use-api", () => ({
-  useApi: () => ({ data, error: "", loading: false, reload: vi.fn() }),
+  useApi: () => ({ data: testState.missingCounts ? { ...data, prediction_class_counts: undefined } : data, error: "", loading: false, reload: vi.fn() }),
 }));
 
 test("management overview keeps current decision context and a compact stability summary", () => {
@@ -46,14 +48,15 @@ test("management overview keeps current decision context and a compact stability
   expect(screen.getByText("Analysis reference")).toBeInTheDocument();
   expect(screen.getByText("2026-09-21")).toBeInTheDocument();
   expect(screen.getByText("Last successful refresh")).toBeInTheDocument();
-  expect(screen.getByText("Historical identities")).toBeInTheDocument();
-  expect(screen.getByText("85")).toBeInTheDocument();
-  expect(screen.getByText("84 B2B analytical profiles")).toBeInTheDocument();
+  const b2bCard = screen.getByText("Verified B2B accounts").closest(".kpi-card") as HTMLElement;
+  expect(within(b2bCard).getByText("84")).toBeInTheDocument();
+  expect(screen.queryByText("85")).not.toBeInTheDocument();
+  expect(screen.getByText("Descriptive population from valid invoices")).toBeInTheDocument();
   expect(screen.getByText("83 ranked accounts")).toBeInTheDocument();
-  expect(screen.getByText("83 / 83")).toBeInTheDocument();
+  expect(screen.getByText((_, element) => element?.tagName === "STRONG" && element.textContent === "83 / 83")).toBeInTheDocument();
   expect(screen.getByText("83 MCS eligible")).toBeInTheDocument();
-  expect(screen.getByText("Future Transaction")).toBeInTheDocument();
-  expect(screen.getByText("No Future Transaction")).toBeInTheDocument();
+  expect(screen.getByText("With Future Sales")).toBeInTheDocument();
+  expect(screen.getByText("With No Future Sales")).toBeInTheDocument();
   expect(screen.getByText("Top prioritized accounts")).toBeInTheDocument();
   expect(screen.getByText("ALPHA")).toBeInTheDocument();
   expect(screen.getByText("Minimum Spearman")).toBeInTheDocument();
@@ -67,4 +70,15 @@ test("management overview keeps current decision context and a compact stability
     "href",
     "/accounts?priority_group=High",
   );
+});
+
+test("missing prediction counts are unavailable, not invented zeroes or a page crash", () => {
+  testState.missingCounts = true;
+  try {
+    render(<DashboardPage />);
+    expect(screen.getAllByText("Unavailable")).toHaveLength(2);
+    expect(screen.getByText("Management overview")).toBeInTheDocument();
+  } finally {
+    testState.missingCounts = false;
+  }
 });

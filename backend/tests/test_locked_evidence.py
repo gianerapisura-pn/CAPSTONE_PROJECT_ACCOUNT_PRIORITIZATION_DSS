@@ -59,7 +59,7 @@ def predictive_package_bytes(later_rows: str = LATER_ROWS) -> bytes:
                                      (2021, ((6, 3), (3, 54))),
                                      (2022, ((3, 2), (4, 59))))
                 for actual, (future, no_future) in zip(
-                    ("Future Transaction", "No Future Transaction"), values, strict=True
+                    ("With Future Sales", "With No Future Sales"), values, strict=True
                 )
             ) + "\n",
         )
@@ -76,10 +76,10 @@ def predictive_package_bytes(later_rows: str = LATER_ROWS) -> bytes:
         archive.writestr(
             "01_DATA/05_PREDICTIVE/07_LATER_CHECKS/later_period_confusion_matrices.csv",
             "period,actual_class,predicted_future_transaction,predicted_no_future_transaction\n"
-            "2023 confirmation,Future Transaction,6,3\n"
-            "2023 confirmation,No Future Transaction,5,63\n"
-            "2024 confirmation,Future Transaction,4,1\n"
-            "2024 confirmation,No Future Transaction,5,69\n",
+            "2023 confirmation,With Future Sales,6,3\n"
+            "2023 confirmation,With No Future Sales,5,63\n"
+            "2024 confirmation,With Future Sales,4,1\n"
+            "2024 confirmation,With No Future Sales,5,69\n",
         )
         predictions = [
             "period,role,account_key,account_name,cutoff_date,future_window_end,actual_target,predicted_target,correct"
@@ -95,10 +95,10 @@ def predictive_package_bytes(later_rows: str = LATER_ROWS) -> bytes:
         ):
             index = 0
             for actual, predicted, count in (
-                ("Future Transaction", "Future Transaction", cells[0]),
-                ("Future Transaction", "No Future Transaction", cells[1]),
-                ("No Future Transaction", "Future Transaction", cells[2]),
-                ("No Future Transaction", "No Future Transaction", cells[3]),
+                ("With Future Sales", "With Future Sales", cells[0]),
+                ("With Future Sales", "With No Future Sales", cells[1]),
+                ("With No Future Sales", "With Future Sales", cells[2]),
+                ("With No Future Sales", "With No Future Sales", cells[3]),
             ):
                 for _ in range(count):
                     index += 1
@@ -171,7 +171,7 @@ def test_unapproved_package_hash_is_rejected(tmp_path):
         verified_package(package, FINAL_PACKAGE_SHA256)
 
 
-def test_prescriptive_evidence_uses_final_hash_v2_and_eight_compact_files(monkeypatch):
+def test_prescriptive_evidence_uses_final_hash_v3_and_preserves_reseeded_rows(monkeypatch):
     monkeypatch.setattr(prescriptive_evidence, "verified_package", lambda path, digest: (path, b"verified"))
     def summary(_content, suffix):
         if suffix.endswith("current_weights.csv"):
@@ -185,7 +185,14 @@ def test_prescriptive_evidence_uses_final_hash_v2_and_eight_compact_files(monkey
     with Session(engine) as db:
         counts = prescriptive_evidence.seed_prescriptive_validation_evidence(db, "final.zip")
         db.commit()
-        assert counts == {"weighting_robustness": 4, "aggregation_robustness": 4}
+        assert counts == {"weighting_robustness": 4, "aggregation_robustness": 4,
+                          "criterion_ablation": 2, "boundary_sensitivity": 1}
         rows = db.scalars(select(PrescriptiveValidationEvidence)).all()
-        assert {row.evidence_version for row in rows} == {"prescriptive-robustness-final-v2"}
-        assert len({row.payload["source_member"] for row in rows}) == 8
+        assert {row.evidence_version for row in rows} == {"prescriptive-robustness-final-v3"}
+        assert len({row.payload["source_member"] for row in rows}) == 11
+        original_ids = {row.prescriptive_validation_evidence_id for row in rows}
+        assert prescriptive_evidence.seed_prescriptive_validation_evidence(db, "final.zip") == counts
+        db.flush()
+        assert {row.prescriptive_validation_evidence_id for row in db.scalars(
+            select(PrescriptiveValidationEvidence)
+        ).all()} == original_ids

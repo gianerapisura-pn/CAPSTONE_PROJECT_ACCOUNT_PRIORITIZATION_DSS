@@ -8,7 +8,7 @@ import pandas as pd
 
 from app.analytics.descriptive.rfm import compute_rfm
 from app.analytics.descriptive.settlement import compute_settlement_metrics
-from app.analytics.prescriptive.scoring import AccountPriority, compute_priorities
+from app.analytics.prescriptive.scoring import AccountPriority, compute_priorities, scoring_activity_24m
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG, AnalyticsConfig
 from app.etl.invoices import InvoiceGroup
 
@@ -71,14 +71,24 @@ def run_historical_backtest(
     config: AnalyticsConfig = DEFAULT_ANALYTICS_CONFIG,
     eligible_accounts: set[str] | None = None,
     closure_years: dict[str, int] | None = None,
+    analysis_reference_date: pd.Timestamp | None = None,
 ) -> HistoricalBacktestSummary:
+    reference = pd.Timestamp(analysis_reference_date) if analysis_reference_date is not None else None
     valid = [
         group for group in invoice_groups
         if group.rfm_eligible
         and (eligible_accounts is None or group.standardized_account_name in eligible_accounts)
+        and (reference is None or group.si_date <= reference)
     ]
     results: list[dict] = []
-    for cutoff_text in config.backtest_cutoffs:
+    cutoffs = config.backtest_cutoffs
+    if reference is not None:
+        first_year = min(pd.Timestamp(value).year for value in config.backtest_cutoffs)
+        cutoffs = tuple(
+            f"{year}-12-31" for year in range(first_year, reference.year)
+            if pd.Timestamp(f"{year + 1}-12-31") <= reference
+        )
+    for cutoff_text in cutoffs:
         cutoff = pd.Timestamp(cutoff_text)
         eligible_at_cutoff = (
             None if eligible_accounts is None else {
@@ -102,6 +112,10 @@ def run_historical_backtest(
         priorities, _ = compute_priorities(
             compute_rfm(cutoff_valid, cutoff, eligible_at_cutoff),
             compute_settlement_metrics(cutoff_valid, cutoff),
+            scoring_activity_24m(cutoff_valid, cutoff, {
+                group.standardized_account_name for group in cutoff_valid
+                if group.rfm_eligible and group.si_date <= cutoff
+            }),
         )
         results.append(asdict(top_decile_backtest(
             priorities, future, cutoff.date().isoformat(), evaluation_end.date().isoformat()

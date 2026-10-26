@@ -1,4 +1,5 @@
 import asyncio
+from datetime import date
 
 import pytest
 from fastapi import HTTPException
@@ -54,7 +55,6 @@ def test_administrator_detail_routes_enforce_admin_dependency():
         "/models/monitor",
         "/si-coverage",
         "/models/current",
-        "/reports/native/validation",
     }
     dependencies = {
         route.path: {dependency.call for dependency in route.dependant.dependencies}
@@ -65,17 +65,30 @@ def test_administrator_detail_routes_enforce_admin_dependency():
     assert all(require_admin in calls for calls in dependencies.values())
 
 
-def test_management_cannot_fetch_native_validation_over_http():
+def test_management_can_fetch_read_only_native_validation_but_not_model_governance():
     from fastapi.testclient import TestClient
     from app.main import app
+    from app.db.models import AnalyticsRun, Base
     from app.db.session import get_db
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from sqlalchemy.pool import StaticPool
 
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    db = Session(engine)
+    db.add(AnalyticsRun(status="successful", analysis_reference_date=date(2025, 12, 31)))
+    db.commit()
     app.dependency_overrides[require_user] = lambda: AuthenticatedUser("test-user", "management")
-    app.dependency_overrides[get_db] = lambda: None
+    app.dependency_overrides[get_db] = lambda: db
     try:
-        response = TestClient(app).get("/reports/native/validation")
-        assert response.status_code == 403
-        assert response.json()["detail"] == "Administrator role required."
+        client = TestClient(app)
+        response = client.get("/reports/native/validation")
+        assert response.status_code == 200
+        assert response.json()["study"]["status"] == "unavailable"
+        assert client.get("/models/current").status_code == 403
     finally:
         app.dependency_overrides.pop(require_user, None)
         app.dependency_overrides.pop(get_db, None)
+        db.close()
+        engine.dispose()

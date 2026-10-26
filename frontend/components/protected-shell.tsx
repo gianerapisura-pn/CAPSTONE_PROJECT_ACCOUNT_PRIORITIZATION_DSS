@@ -23,7 +23,7 @@ const navGroups = [
     { href: "/settings", label: "Methodology & Governance", icon: Settings },
     { href: "/analytics/rfm", label: "RFM", icon: BarChart3 },
     { href: "/analytics/settlement", label: "Settlement", icon: Clock3 },
-    { href: "/analytics/predictive", label: "Future Transaction", icon: Activity },
+    { href: "/analytics/predictive", label: "With Future Sales", icon: Activity },
     { href: "/analytics/sensitivity", label: "Sensitivity", icon: FlaskConical },
   ] },
 ];

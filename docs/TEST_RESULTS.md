@@ -1,5 +1,21 @@
 # Test Results
 
+## Active Status-Filtered Package (2026-10-25)
+
+- Private ZIP: `PESLC_FINAL_ANALYTICS_FINAL_FILTERED_QA.zip`, SHA-256 `073570d6b255f79501a752e9b61d0ee44cc86597fbadb33f511e89c556c9f758`; enclosed frozen CatBoost artifact SHA-256 `09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3`. Neither artifact is committed.
+- Read-only parsing verified 291 Fully Paid source rows, 281 valid logical invoices, and 84 account-master identities. The three private CatBoost/current-prescriptive/existing-database regressions passed against this ZIP; the separate read-only package and immutable-study tests also passed (3/3).
+- The backend suite without private inputs passed 117 tests with three gated tests skipped. The frontend suite passed 54 tests before the final conditional-display test was added; the focused import-panel suite then passed 3/3, and TypeScript checking passed.
+- A fresh isolated SQLite demo publication produced 291 raw rows, zero cancelled rows in its import batch, 84 historical/B2B identities, 83 current ranks, nine baseline years, PHP 167,454,374.93 sales, 28/27/28 groups, and 10/73 frozen CatBoost classes. The API dashboard returned those counts. Existing local databases and live Supabase were not modified.
+- The Next.js frontend did not pass a live page check in this pass: Turbopack and a webpack-mode retry both exited with memory-allocation errors on this machine. Automated frontend tests and type checking passed, but browser verification remains outstanding.
+
+## Historical Revised Package and Reporting Fixes (2026-10-21)
+
+- Then-active private source: `PESLC_FINAL_ANALYTICS_FINAL%20(2).zip`, SHA-256 `192acbd0509ffa5f32a83582f9acc9557c77b9b4380fa4e0347669482d6c371c`; enclosed frozen CatBoost artifact SHA-256 `09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3`. The ZIP and model were not committed.
+- With `PESLC_FINAL_ANALYTICS_PACKAGE_PATH` pointing to that ZIP, the backend suite passed **120 tests, 0 failed, 30 warnings** using the project virtual environment and a workspace-local pytest base temp. The private regression compares all 83 approved account-level prescriptive results, not only counts.
+- After the RFM filter fix, the frontend suite passed **18 files, 46 tests, 0 failed** with one worker. The focused reporting suite passed **5 tests** after the keyboard tab-order assertion; `npm run typecheck` and direct ESLint on the two edited frontend files passed. After the UI patch, `npm run test:e2e` passed **1 isolated demo browser workflow** (import through updated reports), and `npm run build` passed with **16 routes** generated.
+- That source had 362 physical rows (291 Fully Paid, 71 Cancelled), 281 valid logical invoices, PHP 167,454,374.93 all-valid SI sales, 84 valid-SI B2B accounts, one additional cancelled-only named business identity, 83 current ranks, 10/73 fixed CatBoost study classes, 400 sensitivity scenarios, and seven backtests.
+- No live Supabase migration, source import, new publication, production login, or client UAT was performed. The dated sections below retain their original historical test and deployment results; they are not current-package acceptance results.
+
 ## Revised Later-Period Package Check (2026-10-14)
 
 - Revised private ZIP `PESLC_FINAL_ANALYTICS_FINAL (3)(9).zip`: SHA-256 `6739aad9d809f72cb397c6b226cdcb002e25ee0019e404bb52d7a24e765d125e`. The enclosed frozen CatBoost artifact remains SHA-256 `09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3`; it was loaded for authorized regression and isolated demo scoring, not retrained or replaced.

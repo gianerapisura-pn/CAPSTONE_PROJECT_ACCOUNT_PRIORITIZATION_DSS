@@ -7,7 +7,7 @@
 3. Accepted raw rows remain immutable. Logical invoices are cumulatively reconstructed using account + SI number + SI date + SI amount, independent of import lineage.
 4. Exact duplicate files are audited no-ops. Late distinct CR evidence updates the same logical invoice. A changed row with the same stable CR identity, or a differing SI amount for one account/SI/date, is quarantined for audited correction resolution and cannot silently double-count.
 5. An administrator verifies taxonomy, B2B eligibility, status, and provenance. B2B accounts enter descriptive/predictive analytics; only Client-Confirmed Active B2B accounts with complete criteria enter current CRITIC/MCS.
-6. Python computes descriptive RFM/Settlement, frozen CatBoost classification, CRITIC/additive MCS, one-stream sensitivity, leave-one-out influence, all-valid versus B2B baselines, and seven closure-aware backtests.
+6. Python computes descriptive RFM/Settlement, frozen CatBoost classification, CRITIC/additive MCS, one-stream sensitivity, leave-one-out influence, all-valid versus B2B baselines, and closure-aware backtests. The current study has seven annual cutoffs; later complete 12-month windows extend this history only after verified SI coverage. Publication also evaluates matured frozen-model predictions without retraining.
 7. A successful run atomically persists analytical outputs and an immutable account-context snapshot. Failed/in-progress runs cannot replace the latest successful run, and later dimension edits cannot alter an old publication.
 8. The Web DSS native reports read persisted operational outputs from the latest successful run and separately persisted immutable final-study evidence. No Microsoft refresh is needed for publication or rendering.
 

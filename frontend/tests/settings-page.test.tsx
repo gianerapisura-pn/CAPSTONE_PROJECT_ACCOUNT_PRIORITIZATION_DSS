@@ -32,6 +32,8 @@ test("settings displays settlement and real registered Macro F1 contracts", () =
   expect(screen.getByText(
     "Observed SI-to-final-valid-CR duration using only cutoff-known, reconciled, nonnegative evidence.",
   )).toBeInTheDocument();
-  expect(screen.getByText("Macro F1")).toBeInTheDocument();
+  expect(screen.getByText("Historical Macro F1")).toBeInTheDocument();
   expect(screen.getByText("0.7997")).toBeInTheDocument();
+  expect(screen.getByText("Future Macro F1")).toBeInTheDocument();
+  expect(screen.getByText("Not yet measurable")).toBeInTheDocument();
 });

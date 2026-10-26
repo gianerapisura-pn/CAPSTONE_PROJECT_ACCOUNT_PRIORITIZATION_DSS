@@ -41,7 +41,7 @@ test("closed-since-2021 B2B detail keeps descriptive evidence but no 2025 predic
   expect(screen.getByText("Official company/organization / Official company page")).toBeInTheDocument();
   expect(screen.getByText("Not actionable")).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: /RFM profile/ })).toBeInTheDocument();
-  expect(screen.queryByText("No Future Transaction")).not.toBeInTheDocument();
+  expect(screen.queryByText("With No Future Sales")).not.toBeInTheDocument();
   expect(screen.getAllByText("Unavailable").length).toBeGreaterThan(0);
   expect(screen.getByText("SI-1")).toBeInTheDocument();
   expect(screen.getAllByText("Not ranked").length).toBeGreaterThan(0);

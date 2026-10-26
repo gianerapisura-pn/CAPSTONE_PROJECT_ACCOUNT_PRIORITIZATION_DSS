@@ -71,8 +71,8 @@ def test_service_role_secret_is_not_exposed_to_frontend():
     assert "SUPABASE_SERVICE_ROLE_KEY" not in frontend
 
 
-def test_power_bi_rejects_public_publish_to_web():
-    reports = Path("../frontend/app/(protected)/reports/page.tsx").read_text(
+def test_optional_power_bi_links_reject_public_publish_to_web():
+    reports = Path("../frontend/lib/power-bi-links.ts").read_text(
         encoding="utf-8")
     assert 'url.origin !== "https://app.powerbi.com"' in reports
     assert '(!reportPath && !embedPath)' in reports
@@ -123,6 +123,11 @@ def test_migration_011_snapshots_context_and_preserves_reporting_least_privilege
     assert "security_invoker = true" in sql
     assert "analysis_run_id=reporting_latest_successful_run_id()" in sql
     assert "grant select on fact_account_context" in sql
+    next_sql = Path("../supabase/migrations/20261021090020_prescriptive_robustness_v3.sql").read_text(
+        encoding="utf-8"
+    ).lower()
+    assert "prescriptive-robustness-final-v3" in next_sql
+    assert "security_invoker = true" in next_sql
     assert "grant insert" not in sql and "grant update" not in sql and "grant delete" not in sql
     assert "revoke all on raw_source_rows" in sql
 

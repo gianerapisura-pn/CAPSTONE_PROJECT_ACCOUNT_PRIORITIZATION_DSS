@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 import PredictivePage from "@/app/(protected)/analytics/predictive/page";
 
+const { testState } = vi.hoisted(() => ({ testState: { unavailable: false } }));
+
 vi.mock("@/lib/use-api", () => ({ useApi: () => ({
   data: {
     status: "Validated",
@@ -10,7 +12,7 @@ vi.mock("@/lib/use-api", () => ({ useApi: () => ({
     model_version: "catboost_stage8",
     model_family: "CatBoost Classifier",
     artifact_hash: "model-hash",
-    study: {
+    study: testState.unavailable ? { status: "unavailable" } : {
       status: "Validated",
       forecast_origin: "2025-12-31",
       future_window_start: "2026-01-01",
@@ -21,7 +23,7 @@ vi.mock("@/lib/use-api", () => ({ useApi: () => ({
       model_family: "CatBoost Classifier",
       artifact_hash: "model-hash",
       source_package_hash: "package-hash",
-      class_counts: { "Future Transaction": 10, "No Future Transaction": 73 },
+      class_counts: { "With Future Sales": 10, "With No Future Sales": 73 },
       predictions: {},
     },
     operational: {
@@ -50,4 +52,17 @@ test("predictive page separates fixed study evidence from operational scoring", 
   expect(screen.getByText("Operational scoring")).toBeInTheDocument();
   expect(screen.getByText("2026-09-21")).toBeInTheDocument();
   expect(screen.getByText(/never changes Final Priority Score/i)).toBeInTheDocument();
+});
+
+test("predictive page shows unavailable study evidence without crashing or inventing counts", () => {
+  testState.unavailable = true;
+  try {
+    render(<PredictivePage />);
+    expect(screen.getByText("Study evidence unavailable")).toBeInTheDocument();
+    expect(screen.getByText("With Future Sales")).toBeInTheDocument();
+    expect(screen.getAllByText("Unavailable").length).toBeGreaterThan(1);
+    expect(screen.getByText("Operational scoring")).toBeInTheDocument();
+  } finally {
+    testState.unavailable = false;
+  }
 });

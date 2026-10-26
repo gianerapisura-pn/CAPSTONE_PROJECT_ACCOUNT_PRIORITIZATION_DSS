@@ -28,6 +28,7 @@ from app.db.repository import (
     b2b_analytical_accounts,
     current_actionable_accounts,
     ensure_accounts,
+    historical_named_identities,
     load_invoice_groups,
     predictive_accounts_at,
     predictive_closure_years,
@@ -37,7 +38,7 @@ from app.etl.invoices import SourceRow, dataframe_to_source_rows, group_invoices
 from app.etl.status import standardize_payment_status
 from app.imports.validators import REQUIRED_COLUMNS, parse_source_file, validate_rows
 from app.services.analytics_runner import run_account_prioritization, validate_analysis_reference
-from app.services.model_lifecycle import future_transaction_for_current_run
+from app.services.model_lifecycle import future_transaction_for_current_run, monitor_registered_predictions
 from app.services.si_coverage import require_si_coverage
 from app.services.storage import SourceStorage, sanitize_filename
 
@@ -470,6 +471,7 @@ def commit_source(
             actionable_accounts,
             predictive_result=predictive,
             predictive_closure_years=predictive_closure_years(db),
+            historical_identity_names=historical_named_identities(db, batch_id),
         ))
         run = AnalyticsRun(
             status="running",
@@ -481,10 +483,18 @@ def commit_source(
         db.add(run)
         db.flush()
         persist_run_output(db, run, result)
+        monitoring = monitor_registered_predictions(
+            db, cumulative_groups, date.today(), analysis_reference_date,
+            run.analysis_run_id,
+        )
         batch.analysis_run_id = run.analysis_run_id
         audit(db, user.user_id, "import_committed", "import_batch", batch_id, {
             "analysis_run_id": run.analysis_run_id,
             "analysis_reference_date": analysis_reference_date.isoformat(),
+            "monitoring_matured": monitoring["matured"],
+            "monitoring_pending": monitoring["pending"],
+            "study_outcome_status": monitoring["study_outcome_status"],
+            "model_review_recommended": monitoring["review_recommended"],
         })
         db.commit()
         return {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from decimal import Decimal
 
 import numpy as np
 from scipy.stats import spearmanr
@@ -147,6 +148,7 @@ def run_leave_one_out_influence(
     settlement: list[AccountSettlement],
     baseline_priorities: list[AccountPriority],
     baseline_weights: dict[str, float],
+    activity_24m: dict[str, tuple[int, Decimal]],
 ) -> list[dict]:
     baseline_rank = {item.account: item.priority_rank for item in baseline_priorities}
     baseline_group = {item.account: item.priority_group for item in baseline_priorities}
@@ -155,6 +157,7 @@ def run_leave_one_out_influence(
         reduced_priorities, weights = compute_priorities(
             [item for item in rfm if item.account != removed],
             [item for item in settlement if item.account != removed],
+            {account: value for account, value in activity_24m.items() if account != removed},
         )
         if not reduced_priorities or not weights:
             continue

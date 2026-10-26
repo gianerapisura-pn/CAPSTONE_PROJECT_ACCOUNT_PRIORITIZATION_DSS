@@ -24,9 +24,9 @@ Backend defaults to http://127.0.0.1:8000; frontend defaults to http://localhost
 
 ## Private artifact and data
 
-The revised private `PESLC_FINAL_ANALYTICS_FINAL (3)(9).zip` is the single active package for model registration, account-context bootstrap, predictive evidence, final-v2 robustness evidence, and the opt-in regression. Every workflow verifies SHA-256 `6739aad9d809f72cb397c6b226cdcb002e25ee0019e404bb52d7a24e765d125e`; the ZIP must never be committed. The prior `(3).zip` hash is retained only to verify unchanged immutable study snapshots during an audited transition.
+The private `PESLC_FINAL_ANALYTICS_FINAL_FILTERED_QA.zip` is the active, status-filtered analysis package for model registration, account-context bootstrap, predictive evidence, prescriptive robustness evidence, and the opt-in regression. Every workflow verifies SHA-256 `073570d6b255f79501a752e9b61d0ee44cc86597fbadb33f511e89c556c9f758`; the ZIP must never be committed. Prior package hashes remain recognized only for existing immutable evidence, not new imports.
 
-The main 2024 historical predictive confirmation now uses cutoff 2024-12-31 and outcomes through 2025-12-31. The older 2024-08-13 rolling comparison remains supplementary package evidence, not model-selection evidence. The 2025-12-31 study forecast and seven separate prescriptive backtests are unchanged.
+The main 2024 historical predictive confirmation uses cutoff 2024-12-31 and outcomes through 2025-12-31. The older 2024-08-13 rolling comparison remains supplementary package evidence, not model-selection evidence. The 2025-12-31 study forecast retains its 83-account, 10/73 result; the seven separate prescriptive backtests are recomputed against the revised source.
 
 ## Import and coverage
 
@@ -34,7 +34,7 @@ CSV/XLSX preview reports accepted, flagged, quarantined, and blocked source rows
 
 ## Deployment status
 
-Migration 019 adds SI coverage provenance and must be applied after 018 before deploying this backend version. The live Supabase migration state, CatBoost registration, historical coverage seed, and new immutable publication require separate authorized verification; a Git push does not deploy them. A disposable SQLite integration test exercises later-year import behavior, but live authenticated import, generation-time measurement, and role-based UAT remain pending. Native Detailed Analytics reads the latest successful run directly. The legacy Power BI refresh integration is dormant and is not required or started by this code path; `docs/POWER_BI_SETUP.md` is retained as historical specification, not current deployment instructions.
+Migration 019 adds SI coverage provenance and must be applied after 018 before deploying this backend version; the local prescriptive v3 reporting migration also requires separate review. The live Supabase migration state, CatBoost registration, historical coverage seed, and new immutable publication require separate authorized verification; a Git push does not deploy them. A disposable SQLite integration test exercises later-year import behavior, but live authenticated import, generation-time measurement, and role-based UAT remain pending. Native Detailed Analytics reads the latest successful run directly. The legacy Power BI refresh integration is dormant and is not required or started by this code path; `docs/POWER_BI_SETUP.md` is retained as historical specification, not current deployment instructions.
 
 Supplementary Entropy, Equal Weighting, and CRITIC-weighted TOPSIS comparisons are locked historical robustness evidence, not operational scoring methods. Production FPS, ranks, and groups remain CRITIC plus additive MCS.
 

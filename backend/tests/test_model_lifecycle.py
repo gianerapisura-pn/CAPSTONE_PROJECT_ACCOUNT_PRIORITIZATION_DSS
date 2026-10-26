@@ -13,7 +13,10 @@ from sqlalchemy.orm import Session
 from catboost_model import FrozenCatBoost
 from app.analytics.predictive.future_transaction import FEATURE_COLUMNS, NO_FUTURE_TRANSACTION
 from app.core.analytics_config import AnalyticsConfig, DEFAULT_ANALYTICS_CONFIG
-from app.db.models import Base, DimAccount, FutureTransactionPrediction, PredictiveModelVersion
+from app.db.models import (
+    AnalyticsRun, Base, DimAccount, FutureTransactionPrediction,
+    PredictiveModelVersion, PredictiveMonitoringEvaluation,
+)
 from app.etl.invoices import InvoiceGroup
 from app.services import model_lifecycle
 
@@ -230,7 +233,7 @@ def test_monitoring_uses_succeeding_si_not_late_cr(db, future_si):
 
     assert result["matured"] == 1
     assert prediction.actual_class == (
-        "Future Transaction" if future_si else NO_FUTURE_TRANSACTION
+        "With Future Sales" if future_si else NO_FUTURE_TRANSACTION
     )
 
 
@@ -310,3 +313,130 @@ def test_monitoring_records_original_prediction_model_version(db):
         "older_version": old.predictive_model_version_id,
         "catboost_stage8": active.predictive_model_version_id,
     }
+
+
+def test_final_study_outcome_waits_for_complete_window_and_is_evaluated_once(db, monkeypatch):
+    from dataclasses import replace
+    from sqlalchemy import select
+
+    model = PredictiveModelVersion(
+        model_version="catboost_stage8", status="active",
+        artifact_hash=DEFAULT_ANALYTICS_CONFIG.model_sha256,
+        oop_metrics={"macro_f1": 0.8},
+    )
+    run = AnalyticsRun(status="successful", analysis_reference_date=date(2026, 12, 31))
+    db.add_all([model, run])
+    db.flush()
+    predicted = {f"Account {index:02d}": NO_FUTURE_TRANSACTION for index in range(83)}
+    monkeypatch.setattr(model_lifecycle, "final_study_prediction_payload", lambda _: {
+        "status": "Validated", "model_version": "catboost_stage8",
+        "artifact_hash": DEFAULT_ANALYTICS_CONFIG.model_sha256,
+        "source_package_hash": "a" * 64,
+        "forecast_origin": "2025-12-31",
+        "future_window_start": "2026-01-01",
+        "future_window_end": "2026-12-31",
+        "predictions": predicted,
+    })
+    future_si = replace(
+        group(), standardized_account_name="Account 00", invoice_group_id="future",
+        si_date=pd.Timestamp("2026-06-01"),
+    )
+    for as_of, coverage in [
+        (date(2026, 12, 30), date(2026, 12, 31)),
+        (date(2027, 1, 1), date(2026, 12, 30)),
+    ]:
+        pending = model_lifecycle.monitor_registered_predictions(
+            db, [future_si], as_of, coverage, run.analysis_run_id,
+        )
+        assert pending["study_outcome_status"] == "pending"
+        assert db.scalars(select(PredictiveMonitoringEvaluation)).all() == []
+
+    result = model_lifecycle.monitor_registered_predictions(
+        db, [future_si], date(2027, 1, 1), date(2026, 12, 31), run.analysis_run_id,
+    )
+    assert result["study_outcome_status"] == "evaluated"
+    evaluations = db.scalars(select(PredictiveMonitoringEvaluation)).all()
+    assert len(evaluations) == 1
+    assert evaluations[0].payload["scope"] == "final_study_forecast"
+    assert evaluations[0].payload["account_count"] == 83
+    assert evaluations[0].payload["metrics"]["classification_error"] == pytest.approx(1 / 83)
+    assert evaluations[0].review_recommended is True
+    assert model.review_recommended is True
+    assert model.status == "active"
+    model_lifecycle.monitor_registered_predictions(
+        db, [future_si], date(2027, 1, 2), date(2026, 12, 31), run.analysis_run_id,
+    )
+    assert len(db.scalars(select(PredictiveMonitoringEvaluation)).all()) == 1
+
+
+def test_future_performance_review_deduplicates_reruns_and_keeps_model_active(db):
+    from datetime import datetime, timezone
+    from app.main import current_model
+    from app.auth.dependencies import AuthenticatedUser
+
+    model = PredictiveModelVersion(
+        model_version="catboost_stage8", status="active",
+        artifact_hash=DEFAULT_ANALYTICS_CONFIG.model_sha256,
+        oop_metrics={"macro_f1": 0.8},
+    )
+    first_run = AnalyticsRun(
+        status="successful", analysis_reference_date=date(2025, 12, 31),
+        started_at=datetime(2025, 12, 31, tzinfo=timezone.utc),
+    )
+    repeat_run = AnalyticsRun(
+        status="successful", analysis_reference_date=date(2025, 12, 31),
+        started_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
+    )
+    db.add_all([model, first_run, repeat_run])
+    db.flush()
+    for index in range(40):
+        account = DimAccount(standardized_account_name=f"A{index:02d}", display_name=f"A{index:02d}")
+        db.add(account)
+        db.flush()
+        actual = "With Future Sales" if index < 20 else NO_FUTURE_TRANSACTION
+        db.add_all([
+            FutureTransactionPrediction(
+                analysis_run_id=first_run.analysis_run_id, account_key=account.account_key,
+                model_version=model.model_version, cutoff_date=date(2025, 12, 31),
+                future_window_end=date(2026, 12, 31), predicted_class=NO_FUTURE_TRANSACTION,
+                actual_class=actual, matured=True,
+            ),
+            FutureTransactionPrediction(
+                analysis_run_id=repeat_run.analysis_run_id, account_key=account.account_key,
+                model_version=model.model_version, cutoff_date=date(2025, 12, 31),
+                future_window_end=date(2026, 12, 31), predicted_class=actual,
+                actual_class=actual, matured=True,
+            ),
+        ])
+    db.flush()
+
+    summary = model_lifecycle.operational_performance_summary(db, model)
+    assert summary["evaluated_account_cutoffs"] == 40
+    assert summary["forecast_cutoffs"] == 1
+    assert summary["review_recommended"] is True
+    assert summary["metrics"]["macro_f1"] < 0.7
+    assert model_lifecycle._performance_review_signal(model, summary["metrics"], 29)[2] is False
+
+    monitored = model_lifecycle.monitor_registered_predictions(
+        db, [], date(2027, 1, 1), date(2026, 12, 31), first_run.analysis_run_id,
+    )
+    assert monitored["matured"] == 0
+    assert monitored["active_model_performance"]["review_recommended"] is True
+    assert model.review_recommended is True
+    assert model.status == "active"
+    assert current_model(AuthenticatedUser("admin", "administrator"), db)[
+        "operational_monitoring"
+    ]["evaluated_account_cutoffs"] == 40
+
+
+def test_future_review_does_not_flag_good_or_single_class_results():
+    model = PredictiveModelVersion(
+        model_version="catboost_stage8", status="active",
+        oop_metrics={"macro_f1": 0.8},
+    )
+    assert model_lifecycle._performance_review_signal(
+        model, {"macro_f1": 0.79}, 40,
+    ) == (0.8, True, False)
+    assert model_lifecycle._performance_review_signal(
+        model, {"macro_f1": None}, 40,
+    ) == (0.8, False, False)

@@ -44,6 +44,23 @@ test("invalid preview clearly remains uncommittable", async () => {
   expect(screen.getByRole("button", { name: "Confirm import" })).toBeDisabled();
 });
 
+test("a future source with nonzero cancelled rows still shows its audit count", async () => {
+  apiFetchMock.mockResolvedValueOnce({
+    ...basePreview,
+    cancelled_count: 1,
+    quality_rates: { cancelled_row_rate: 1 },
+    can_commit: false,
+    issues: [],
+  });
+  const user = userEvent.setup();
+  render(<ImportPanel />);
+  const hidden = document.querySelector('input[type="file"]') as HTMLInputElement;
+  await user.upload(hidden, new File(["future"], "future.csv", { type: "text/csv" }));
+  await user.click(screen.getByRole("button", { name: /Validate and preview/i }));
+  expect(await screen.findByText("Cancelled rows")).toBeInTheDocument();
+  expect(screen.getByText("cancelled row rate")).toBeInTheDocument();
+});
+
 test("successful import shows warnings and clear next actions", async () => {
   apiFetchMock
     .mockResolvedValueOnce({ ...basePreview, can_commit: true, issues: [] })
@@ -66,7 +83,8 @@ test("successful import shows warnings and clear next actions", async () => {
   expect(screen.getAllByText("Latest CR evidence").length).toBeGreaterThan(0);
   expect(screen.getAllByText(/2025-07-01/).length).toBeGreaterThan(0);
   expect(screen.getAllByText(/2026-02-01/).length).toBeGreaterThan(0);
-  expect(screen.getByText("cancelled row rate")).toBeInTheDocument();
+  expect(screen.queryByText("cancelled row rate")).not.toBeInTheDocument();
+  expect(screen.queryByText("Cancelled rows")).not.toBeInTheDocument();
   await user.click(await screen.findByRole("button", { name: "Confirm import" }));
   const reference = screen.getByLabelText(/Analysis reference date/i);
   expect(reference).not.toHaveAttribute("min");

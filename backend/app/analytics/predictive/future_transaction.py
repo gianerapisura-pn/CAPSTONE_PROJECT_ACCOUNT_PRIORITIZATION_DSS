@@ -15,8 +15,8 @@ from sklearn.metrics import (
 
 from app.etl.invoices import InvoiceGroup
 
-FUTURE_TRANSACTION = "Future Transaction"
-NO_FUTURE_TRANSACTION = "No Future Transaction"
+FUTURE_TRANSACTION = "With Future Sales"
+NO_FUTURE_TRANSACTION = "With No Future Sales"
 TARGET_COLUMN = "actual_future_transaction_class"
 FEATURE_COLUMNS = (
     "recency_days",

@@ -9,7 +9,7 @@ import pandas as pd
 from app.analytics.descriptive.rfm import compute_rfm
 from app.analytics.descriptive.settlement import compute_settlement_metrics
 from app.analytics.predictive.future_transaction import FutureTransactionResult
-from app.analytics.prescriptive.scoring import compute_priorities
+from app.analytics.prescriptive.scoring import compute_priorities, scoring_activity_24m
 from app.analytics.validation.backtest import run_historical_backtest
 from app.analytics.validation.baselines import annual_business_baselines
 from app.analytics.validation.sensitivity import (
@@ -74,6 +74,7 @@ def run_account_prioritization(
     config: AnalyticsConfig = DEFAULT_ANALYTICS_CONFIG,
     predictive_result: FutureTransactionResult | None = None,
     predictive_closure_years: dict[str, int] | None = None,
+    historical_identity_names: set[str] | None = None,
 ) -> AnalyticsRunResult:
     started = datetime.now(timezone.utc)
     reference = pd.Timestamp(analysis_reference_date)
@@ -95,7 +96,10 @@ def run_account_prioritization(
     actionable_settlement = [
         item for item in settlement if item.account in actionable_accounts
     ]
-    priorities, weights = compute_priorities(actionable_rfm, actionable_settlement)
+    activity_24m = scoring_activity_24m(
+        analytical_groups, reference, {item.account for item in actionable_rfm}
+    )
+    priorities, weights = compute_priorities(actionable_rfm, actionable_settlement, activity_24m)
     eligible_mcs_accounts = {
         item.account for item in actionable_rfm
     } & {
@@ -126,7 +130,7 @@ def run_account_prioritization(
     ] if priorities else []
     influence = (
         run_leave_one_out_influence(
-            actionable_rfm, actionable_settlement, priorities, weights
+            actionable_rfm, actionable_settlement, priorities, weights, activity_24m
         )
         if priorities else []
     )
@@ -146,6 +150,8 @@ def run_account_prioritization(
             "latest_valid_si_date": latest_transaction,
             "frequency_count": item.frequency,
             "monetary_value": float(item.monetary),
+            "full_history_frequency": metric.frequency,
+            "full_history_monetary": float(metric.monetary),
             "average_settlement_days": item.settlement_days_avg,
             "valid_settlement_record_count": settlement_metric.settlement_invoice_count,
             "baseline_recency_weight": weights.get("recency"),
@@ -163,7 +169,7 @@ def run_account_prioritization(
         priority_rows.append(row)
     if predictive.status != "Validated":
         warnings.append(
-            "Future Transaction prediction is unavailable because the genuine frozen "
+            "With Future Sales prediction is unavailable because the genuine frozen "
             "CatBoost artifact is not registered and validated."
         )
     completed = datetime.now(timezone.utc)
@@ -189,12 +195,19 @@ def run_account_prioritization(
         backtest=asdict(run_historical_backtest(
             analytical_groups, config=config, eligible_accounts=b2b_accounts,
             closure_years=predictive_closure_years,
+            analysis_reference_date=reference,
         )),
         business_baselines=annual_business_baselines(
             invoice_groups, reference, b2b_accounts,
         ),
         context_metrics={
-            "historical_account_count": len({
+            "historical_account_count": len(historical_identity_names if historical_identity_names is not None else {
+                group.standardized_account_name
+                for group in invoice_groups
+                if group.standardized_account_name
+                and group.standardized_account_name.upper() != "CANCELLED"
+            }),
+            "historical_valid_si_account_count": len({
                 group.standardized_account_name
                 for group in invoice_groups if group.rfm_eligible
             }),
@@ -205,7 +218,7 @@ def run_account_prioritization(
             "prediction_account_count": len(predictive.predictions),
             "prediction_class_counts": {
                 label: sum(value == label for value in predictive.predictions.values())
-                for label in ("Future Transaction", "No Future Transaction")
+                for label in ("With Future Sales", "With No Future Sales")
             },
         },
         warnings=warnings,

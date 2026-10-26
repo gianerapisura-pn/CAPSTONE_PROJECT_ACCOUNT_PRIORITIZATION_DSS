@@ -5,6 +5,8 @@
 !frontend/.env.local.example
 __pycache__/
 .pytest_cache/
+.pytest-*/
+pytest-of-*/
 .test-tmp/
 .demo_data/
 supabase/.temp/
@@ -15,6 +17,7 @@ backend/.venv/
 *.pyc
 *.sqlite3
 node_modules/
+node-compile-cache/
 .next/
 frontend/AGENTS.md
 frontend/CLAUDE.md

@@ -2,6 +2,7 @@
 
 import { Info, Scale } from "lucide-react";
 import { PageHeader, PageState } from "@/components/page-state";
+import { ResultValue } from "@/components/result-explanation";
 import { useApi } from "@/lib/use-api";
 
 type Summary = {
@@ -30,12 +31,12 @@ export default function SensitivityPage() {
         {data && <>
           <section className="weight-strip">
             <Scale />
-            {criteria.map((criterion) => <div key={criterion}><span>{criterion[0].toUpperCase() + criterion.slice(1)}</span><strong>{((data.critic_weights[criterion] || 0) * 100).toFixed(2)}%</strong></div>)}
-            <div><span>Total iterations</span><strong>{data.summaries.reduce((sum, row) => sum + row.iterations, 0)}</strong></div>
+            {criteria.map((criterion) => <div key={criterion}><span>{criterion[0].toUpperCase() + criterion.slice(1)}</span><strong><ResultValue metric="weight">{((data.critic_weights[criterion] || 0) * 100).toFixed(2)}%</ResultValue></strong></div>)}
+            <div><span>Total iterations</span><strong><ResultValue metric="scenarios">{data.summaries.reduce((sum, row) => sum + row.iterations, 0)}</ResultValue></strong></div>
           </section>
           <section className="data-section">
             <div className="section-heading"><h2>Rank stability by perturbation range</h2><span>Published run evidence</span></div>
-            <div className="table-wrap"><table><thead><tr><th>Relative range</th><th>Iterations</th><th>Mean Spearman</th><th>Minimum</th><th>Maximum</th><th>Average group movement</th><th>Maximum movement</th></tr></thead><tbody>{data.summaries.map((row) => <tr key={row.weight_range}><td><strong>+/-{row.weight_range * 100}%</strong></td><td>{row.iterations}</td><td>{row.mean_spearman.toFixed(4)}</td><td>{row.min_spearman.toFixed(4)}</td><td>{row.max_spearman.toFixed(4)}</td><td>{(row.group_movement_rate * 100).toFixed(2)}%</td><td>{(row.max_group_movement_rate * 100).toFixed(2)}%</td></tr>)}</tbody></table></div>
+            <div className="table-wrap"><table><thead><tr><th>Relative range</th><th>Iterations</th><th>Mean Spearman</th><th>Minimum</th><th>Maximum</th><th>Average group movement</th><th>Maximum movement</th></tr></thead><tbody>{data.summaries.map((row) => <tr key={row.weight_range}><td><strong><ResultValue metric="scenarios">+/-{row.weight_range * 100}%</ResultValue></strong></td><td><ResultValue metric="scenarios">{row.iterations}</ResultValue></td><td><ResultValue metric="spearman">{row.mean_spearman.toFixed(4)}</ResultValue></td><td><ResultValue metric="spearman">{row.min_spearman.toFixed(4)}</ResultValue></td><td><ResultValue metric="spearman">{row.max_spearman.toFixed(4)}</ResultValue></td><td><ResultValue metric="movement">{(row.group_movement_rate * 100).toFixed(2)}%</ResultValue></td><td><ResultValue metric="movement">{(row.max_group_movement_rate * 100).toFixed(2)}%</ResultValue></td></tr>)}</tbody></table></div>
           </section>
         </>}
       </PageState>

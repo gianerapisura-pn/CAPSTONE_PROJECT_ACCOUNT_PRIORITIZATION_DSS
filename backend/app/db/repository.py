@@ -9,11 +9,12 @@ from sqlalchemy import desc, select
 from app.db.models import (
     AccountContextSnapshot, AccountPriorityResult, AnalyticsRun, AuditLog,
     BusinessBaselineRecord, CriticInfluenceRecord, DimAccount,
-    FutureTransactionPrediction, InvoiceGroupRecord, ModelRun, RFMResult,
+    FutureTransactionPrediction, ImportBatch, InvoiceGroupRecord, ModelRun, RawSourceRow, RFMResult,
     RankingBacktestRecord, SensitivityScenarioRecord, SensitivitySummaryRecord,
     SettlementResult,
 )
 from app.etl.invoices import InvoiceGroup
+from app.etl.standardization import standardize_account_name
 
 CLIENT_CONFIRMED_ACTIVE = "Client-Confirmed Active"
 CLIENT_CONFIRMED_CLOSED = "Client-Confirmed Closed"
@@ -102,6 +103,23 @@ def load_invoice_groups(db):
         conflicting_invoice=x.conflicting_invoice, rows=[],
         settlement_evidence_complete=x.settlement_eligible,
     ) for x in db.scalars(select(InvoiceGroupRecord)).all()]
+
+
+def historical_named_identities(db, current_batch_id: str | None = None) -> set[str]:
+    names = db.scalars(
+        select(RawSourceRow.customer_name_raw)
+        .join(ImportBatch, ImportBatch.import_batch_id == RawSourceRow.import_batch_id)
+        .where(
+            (ImportBatch.status == "committed") |
+            (ImportBatch.import_batch_id == current_batch_id)
+            if current_batch_id else ImportBatch.status == "committed"
+        )
+    ).all()
+    return {
+        name for value in names
+        if (name := standardize_account_name(value))
+        and name.upper() != "CANCELLED"
+    }
 
 
 def latest_successful_run(db):
@@ -343,9 +361,11 @@ def current_account_rows(db, run):
             "latest_valid_si_date": latest,
             "recency_days": rfm.get("recency_days"),
             "frequency": rfm.get("frequency"),
-            "frequency_count": rfm.get("frequency"),
+            "frequency_count": priority.get("frequency") if priority else None,
             "monetary": rfm.get("monetary"),
-            "monetary_value": rfm.get("monetary"),
+            "monetary_value": priority.get("monetary_value") if priority else None,
+            "full_history_frequency": rfm.get("frequency"),
+            "full_history_monetary": rfm.get("monetary"),
             "r_score": rfm.get("r_score"),
             "f_score": rfm.get("f_score"),
             "m_score": rfm.get("m_score"),
