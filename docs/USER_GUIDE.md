@@ -11,6 +11,12 @@
 7. Hover, focus, or tap explained values to read their meaning and calculation. Enter/Space and Escape control the explanation using a keyboard. Saved components can be expanded inside the explanation. Report-footer exports contain the full published B2B population; filtered exports belong to Account Prioritization and use the same server filters as the list.
 8. My Profile supports own display-name updates, verified email changes, password recovery, and sign-out. Approved identity and access status are managed by the administrator.
 
+### Returning to an Insight
+
+Use the named return link (for example, Back to Business Composition) on a filtered account list or account-detail page to resume the originating graph. Back to Filtered Accounts instead restores the account list's filters and display sorting. Previous Account and Next Account keep that same list context.
+
+Detailed Analytics retains its tab and selections in its URL, including when refreshed. Its sidebar link resumes the last report state in the current browser session. Category selection highlights the complete category comparison; it does not recompute account scores. Changing category clears the dependent business type. RFM and settlement selectors each have their own matching-account link: their full distributions remain visible, and returning restores both selections. Use active-filter chips or Reset filters to remove restrictions.
+
 ## Administrator
 
 Administrators additionally preview/commit files, choose the verified complete-through reference date, maintain controlled account context and provenance, resolve quarantined collection corrections with an audit reason, inspect run history, manage aliases, register the private frozen CatBoost artifact through the controlled backend process, and evaluate predictions after both outcome maturity and verified SI coverage. Context/correction changes require an explicit analytics rerun and never mutate an old publication. Native charts read each successful published run directly. Legacy optional Power BI services are not required for the three native reports.

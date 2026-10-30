@@ -1,5 +1,7 @@
 # Test Results
 
+The local UX/navigation follow-up is recorded in [UX_NAVIGATION_REVIEW_20261030.md](UX_NAVIGATION_REVIEW_20261030.md). It preserves the analytical baseline and separately records browser journeys, source-return state, and verification limits.
+
 The October 30 local implementation and current verification are recorded separately in [FINAL_LOCAL_REVIEW_20261030.md](FINAL_LOCAL_REVIEW_20261030.md). The dated records below are historical evidence, not certification of the current workspace or live deployment.
 
 ## Active Status-Filtered Package (2026-10-25)

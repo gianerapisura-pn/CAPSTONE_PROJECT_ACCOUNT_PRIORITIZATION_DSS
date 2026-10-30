@@ -1,13 +1,24 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, vi } from "vitest";
+import { beforeEach, afterEach, vi } from "vitest";
+import { useSyncExternalStore } from "react";
 
 const authState = vi.hoisted(() => ({ role: "management" }));
 vi.mock("@/lib/api", () => ({ downloadExport: vi.fn() }));
 vi.mock("@/components/auth-provider", () => ({
   useAuth: () => ({ user: { role: authState.role } }),
 }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => {
+  const query = useSyncExternalStore(callback => { window.addEventListener("popstate", callback); return () => window.removeEventListener("popstate", callback); }, () => window.location.search);
+  return new URLSearchParams(query);
+} }));
+beforeEach(() => {
+  window.history.replaceState(null, "", "/reports");
+  for (const method of ["replaceState", "pushState"] as const) {
+    const original = window.history[method].bind(window.history);
+    vi.spyOn(window.history, method).mockImplementation((data: unknown, unused: string, url?: string | URL | null) => { original(data, unused, url); window.dispatchEvent(new PopStateEvent("popstate")); });
+  }
+});
 
 const run = {
   analysis_run_id: "run-1234567890", analysis_reference_date: "2030-06-01",
@@ -59,7 +70,7 @@ vi.mock("@/lib/use-api", () => ({
 import ReportsPage from "@/app/(protected)/reports/page";
 import { approvedPowerBiEmbedUrl, approvedPowerBiReportUrl } from "@/lib/power-bi-links";
 
-afterEach(() => { authState.role = "management"; insightsAccounts = accounts; });
+afterEach(() => { authState.role = "management"; insightsAccounts = accounts; vi.restoreAllMocks(); });
 
 test("native reporting has exactly three views and does not require Power BI", () => {
   render(<ReportsPage />);
@@ -85,11 +96,11 @@ test("contextual filters retain published data and expose a matching-account dri
   expect(screen.queryByPlaceholderText("Search account")).not.toBeInTheDocument();
   await user.selectOptions(screen.getByLabelText("RFM component"), "Recency");
   await user.selectOptions(screen.getByLabelText("RFM component score"), "5");
-  const link = screen.getByRole("link", { name: "View accounts matching report filters" });
+  const link = screen.getByRole("link", { name: "View accounts matching RFM selection" });
   const query = new URLSearchParams(link.getAttribute("href")!.split("?")[1]);
   expect(query.get("rfm_component")).toBe("Recency");
   expect(query.get("rfm_score")).toBe("5");
-  expect(screen.getByText(/1 of 3 verified B2B accounts in view/)).toBeInTheDocument();
+  expect(within(screen.getByLabelText("Active filters")).getByRole("status")).toHaveTextContent("3 matching accounts");
 });
 
 test("recent purchase table uses published 24-month counts and current filters", async () => {
@@ -136,8 +147,9 @@ test("business composition has one total-count chart and contextual category/typ
   expect(within(composition).queryByRole("button", { name: "Next business category" })).not.toBeInTheDocument();
   await user.click(within(composition).getByText("Select a category by name"));
   await user.selectOptions(within(composition).getByLabelText("Business category selection"), "Corporate");
-  expect(within(composition).getByText(/1 ranked accounts matching/)).toBeInTheDocument();
-  const high = within(composition).getByRole("link", { name: /High: 1/ });
+  expect(within(composition).getByText(/1 ranked accounts in the published category/)).toBeInTheDocument();
+  await user.click(within(composition).getByRole("button", { name: "Select High Priority" }));
+  const high = within(composition).getByRole("link", { name: "View Matching Accounts in Account Prioritization" });
   const query = new URLSearchParams(high.getAttribute("href")!.split("?")[1]);
   expect(query.get("business_category")).toBe("Corporate");
   expect(query.get("priority_group")).toBe("High");
@@ -157,10 +169,13 @@ test("report filters use progressive disclosure and duplicate account tables are
   expect(summary.closest("details")).not.toHaveAttribute("open");
   await user.click(summary);
   await user.selectOptions(screen.getByLabelText("Ranking status"), "Not ranked");
-  expect(screen.getByText(/1 of 3 verified B2B accounts in view/)).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "View accounts matching report filters" })).toHaveAttribute("href", expect.stringContaining("eligibility=not_ranked"));
+  expect(within(screen.getByLabelText("Active filters")).getByRole("status")).toHaveTextContent("1 matching account");
+  expect(screen.getByRole("link", { name: "View accounts matching RFM selection" })).toHaveAttribute("href", expect.stringContaining("eligibility=not_ranked"));
+  await user.click(screen.getByText("Select a category by name"));
+  await user.selectOptions(screen.getByLabelText("Business category selection"), "Corporate");
+  expect(screen.getByRole("link", { name: "View Matching Accounts in Account Prioritization" })).toHaveAttribute("href", expect.stringContaining("eligibility=not_ranked"));
   await user.click(screen.getByRole("button", { name: "Reset filters" }));
-  expect(screen.getByText(/3 of 3 verified B2B accounts in view/)).toBeInTheDocument();
+  expect(within(screen.getByLabelText("Active filters")).getByRole("status")).toHaveTextContent("3 matching accounts");
   expect(screen.queryByRole("heading", { name: "B2B status and prioritization" })).not.toBeInTheDocument();
 });
 
@@ -169,14 +184,14 @@ test("RFM component and score filter one criterion and preserve link scope", asy
   render(<ReportsPage />);
   await user.click(screen.getByRole("tab", { name: "Account & Prioritization Insights" }));
   await user.selectOptions(screen.getByLabelText("RFM component score"), "5");
-  expect(screen.getByText(/2 of 3 verified B2B accounts in view/)).toBeInTheDocument();
+  expect(within(screen.getByLabelText("Active filters")).getByRole("status")).toHaveTextContent("3 matching accounts");
   await user.selectOptions(screen.getByLabelText("RFM component"), "Recency");
-  expect(screen.getByText(/1 of 3 verified B2B accounts in view/)).toBeInTheDocument();
+  expect(within(screen.getByLabelText("Active filters")).getByRole("status")).toHaveTextContent("3 matching accounts");
   await user.selectOptions(screen.getByLabelText("RFM component"), "Frequency");
-  const link = screen.getByRole("link", { name: "View accounts matching report filters" });
+  const link = screen.getByRole("link", { name: "View accounts matching RFM selection" });
   expect(link).toHaveAttribute("href", expect.stringContaining("rfm_component=Frequency"));
   await user.click(screen.getByRole("button", { name: "Reset filters" }));
-  expect(screen.getByText(/3 of 3 verified B2B accounts in view/)).toBeInTheDocument();
+  expect(within(screen.getByLabelText("Active filters")).getByRole("status")).toHaveTextContent("3 matching accounts");
 });
 
 test("management can open read-only validation evidence", async () => {
@@ -206,6 +221,25 @@ test("management can open read-only validation evidence", async () => {
   expect(screen.getByText("83")).toBeInTheDocument();
   expect(screen.getByText("Pending")).toBeInTheDocument();
   expect(screen.getByText(/not accuracy claims for the pending 2026 forecast/)).toBeInTheDocument();
+});
+
+test("overview drilldowns use only displayed dimensions while retaining other-tab return context", async () => {
+  window.history.replaceState(null, "", "/reports?tab=management-overview&business_category=Corporate&priority_group=High&rfm_component=Frequency&rfm_score=5&settlement_range=30-%3C60&primary_business_type=Commercial&eligibility=not_ranked");
+  render(<ReportsPage />);
+  const user = userEvent.setup();
+  await user.click(screen.getByText("Open a top account by name"));
+  const account = screen.getByRole("link", { name: /#1 ALPHA/ });
+  const group = screen.getByRole("link", { name: "Review selected Priority Group" });
+  for (const link of [account, group]) {
+    const query = new URL(link.getAttribute("href")!, "http://localhost").searchParams;
+    expect(query.get("eligibility")).toBe("ranked");
+    expect(query.get("business_category")).toBe("Corporate");
+    expect(query.get("priority_group")).toBe("High");
+    for (const key of ["rfm_component", "rfm_score", "settlement_range", "primary_business_type"]) expect(query.has(key)).toBe(false);
+    const origin = new URL(query.get("returnTo")!, "http://localhost");
+    expect(origin.searchParams.get("rfm_score")).toBe("5");
+    expect(origin.searchParams.get("settlement_range")).toBe("30-<60");
+  }
 });
 
 test("legacy Power BI URL guard still rejects public and foreign links", () => {

@@ -21,9 +21,9 @@ test("verified published data, drilldowns, explanations, and responsive reports"
   await expect(page.getByLabel("Search accounts")).toHaveValue(ranked[0].account);
   await page.getByRole("link", { name: "Open " + ranked[0].account, exact: true }).click();
   await expect(page.getByRole("heading", { name: "Why this score?" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Back to prioritization" })).toHaveAttribute("href", "/accounts" + new URL(filteredUrl).search);
+  await expect(page.getByRole("link", { name: "Back to Filtered Accounts" })).toHaveAttribute("href", "/accounts" + new URL(filteredUrl).search);
   await expect(page.getByText("Next Account", { exact: true })).toHaveAttribute("aria-disabled", "true");
-  await page.getByRole("link", { name: "Back to prioritization" }).click();
+  await page.getByRole("link", { name: "Back to Filtered Accounts" }).click();
   await expect(page.getByLabel("Search accounts")).toHaveValue(ranked[0].account);
 
   for (const width of [1440, 1366, 1024, 390]) {

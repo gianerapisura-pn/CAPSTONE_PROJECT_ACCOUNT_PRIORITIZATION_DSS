@@ -3,6 +3,8 @@ export const accountFilterKeys = ["search", "priority_group", "business_category
 export type AccountFilterKey = typeof accountFilterKeys[number];
 export type AccountFilters = Partial<Record<AccountFilterKey, string>>;
 
+import { safeReportReturn } from "./report-navigation";
+
 const filterLabels: Record<string, string> = {
   search: "Account search", priority_group: "Priority Group", business_category: "Business category",
   primary_business_type: "Business type", account_status: "Current status", eligibility: "Population",
@@ -17,9 +19,22 @@ export function accountFilterSummary(filters: Record<string, string | undefined>
   }).join("; ");
 }
 
-export function accountsHref(filters: AccountFilters = {}) {
+export function accountFilterEntries(filters: AccountFilters) {
+  return Object.entries(filters).filter(([key, value]) => filterLabels[key] && value).map(([key, value]) => ({ key, value, label: filterLabels[key], text: key === "eligibility" ? (value === "ranked" ? "Currently ranked" : value === "not_ranked" ? "Historical, not ranked" : "All historical B2B") : value }));
+}
+export function accountApiQuery(params: URLSearchParams) {
+  const api = new URLSearchParams();
+  for (const [key, value] of params) if ((accountFilterKeys as readonly string[]).includes(key) || key === "page" || key === "page_size") api.append(key, value);
+  return api;
+}
+export function accountQueryIssue(params: URLSearchParams) {
+  return [...params.keys()].some(key => key !== "returnTo" && key !== "viaList" && !(accountFilterKeys as readonly string[]).includes(key) && key !== "page" && key !== "page_size") ? "This link contains an unsupported account filter. Reset filters to continue." : "";
+}
+export function accountsHref(filters: AccountFilters = {}, origin?: string) {
   const params = new URLSearchParams({ eligibility: "ranked" });
   for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value);
+  const destination = safeReportReturn(origin);
+  if (destination) params.set("returnTo", destination.href);
   return `/accounts?${params}`;
 }
 

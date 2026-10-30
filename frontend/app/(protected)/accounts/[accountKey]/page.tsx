@@ -4,7 +4,8 @@ import { ArrowLeft, ArrowRight, Activity, Calculator, Clock3, Info, ReceiptText,
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { accountDetailHref } from "@/lib/account-filters";
+import { accountDetailHref, accountApiQuery, accountQueryIssue } from "@/lib/account-filters";
+import { ContextReturn } from "@/components/context-return";
 import { Badge, PageHeader, PageState } from "@/components/page-state";
 import { ResultValue } from "@/components/result-explanation";
 import { useApi } from "@/lib/use-api";
@@ -41,20 +42,23 @@ const percent = (value: number | null | undefined) => value == null ? "N/A" : `$
 
 function AccountDetailsContent() {
   const query = useSearchParams().toString();
+  const params = new URLSearchParams(query);
+  const apiQuery = accountApiQuery(params).toString();
+  const listQuery = new URLSearchParams(params); listQuery.delete("viaList");
   const key = decodeURIComponent(String(useParams().accountKey));
-  const { data, error, loading, reload } = useApi<Detail>(`/accounts/${encodeURIComponent(key)}${query ? `?${query}` : ""}`);
+  const { data, error, loading, reload } = useApi<Detail>(`/accounts/${encodeURIComponent(key)}${apiQuery ? `?${apiQuery}` : ""}`);
   const d = data?.decision;
   const p = data?.priority;
   const rfm = data?.rfm;
   return <div className="page-stack">
-    <Link className="back-link" href={query ? `/accounts?${query}` : "/accounts"}><ArrowLeft size={16} />Back to prioritization</Link>
+    <div className="context-return"><Link className="back-link" href={listQuery.size ? `/accounts?${listQuery}` : "/accounts"}><ArrowLeft size={16} />{params.get("returnTo") && params.get("viaList") !== "1" ? "View matching accounts" : "Back to Filtered Accounts"}</Link><ContextReturn value={params.get("returnTo")} /></div>
     {data && <nav className="account-detail-nav" aria-label="Account navigation">
       {data.navigation?.previous ? <Link className="back-link" href={accountDetailHref(data.navigation.previous.account_key, query)} title={data.navigation.previous.account}><ArrowLeft size={16} />Previous Account</Link> : <span className="back-link" aria-disabled="true"><ArrowLeft size={16} />Previous Account</span>}
       {data.navigation?.next ? <Link className="back-link" href={accountDetailHref(data.navigation.next.account_key, query)} title={data.navigation.next.account}>Next Account<ArrowRight size={16} /></Link> : <span className="back-link" aria-disabled="true">Next Account<ArrowRight size={16} /></span>}
     </nav>}
     <p className="fine-print">Previous and Next follow the published account list with the current filters and sort order.</p>
     <PageHeader eyebrow="Account evidence" title={data?.account || "Account details"} description="Traceable descriptive, prescriptive, predictive, and transaction-level context from the latest successful run." />
-    <PageState loading={loading} error={error} onRetry={reload} empty={!loading && !error && !data}>
+    <PageState loading={loading} error={accountQueryIssue(params) || error} onRetry={reload} empty={!loading && !error && !data}>
       <>{data && d && <>
         <section className="account-identity"><span><ResultValue metric="provenance" row={d}>{String(data.context.business_category ?? "Pending category")}</ResultValue></span><span><ResultValue metric="provenance" row={d}>{String(data.context.primary_business_type ?? "Pending business type")}</ResultValue></span><span><ResultValue metric="status" row={d}>{String(data.context.account_status ?? "Pending status")}</ResultValue></span></section>
         {!d.is_ranked && <div className="method-note"><Info /><div><strong>Not ranked by MCS</strong><span>{d.ranking_unavailable_reason || d.mcs_eligibility_reason}</span></div></div>}

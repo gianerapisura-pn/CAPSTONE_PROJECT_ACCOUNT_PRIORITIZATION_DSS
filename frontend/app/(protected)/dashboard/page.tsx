@@ -44,7 +44,7 @@ export default function DashboardPage() {
         <section className="dashboard-grid">
           <div className="data-section">
             <div className="section-heading"><div><span className="eyebrow">Decision distribution</span><h2>Priority groups</h2></div><span><ResultValue metric="ranked_count">{data.ranked_accounts} ranked accounts</ResultValue></span></div>
-            <div className="compact-list">{groups.map(item => <Link href={"/accounts?priority_group=" + item.name} key={item.name}><div><strong>{item.name} Priority</strong><small>Recommended attention tier</small></div><span className="score"><ResultValue metric="group_count">{item.value}</ResultValue></span></Link>)}</div>
+            <div className="compact-list">{groups.map(item => <div className="compact-row" key={item.name}><Link href={"/accounts?priority_group=" + item.name}><strong>{item.name} Priority</strong><small>Recommended attention tier</small></Link><span className="score"><ResultValue metric="group_count">{item.value}</ResultValue></span></div>)}</div>
           </div>
           <div className="data-section">
             <div className="section-heading"><div><span className="eyebrow">Separate predictive context</span><h2>Operational 12-month With Future Sales class</h2></div><ShieldAlert /></div>
@@ -58,7 +58,7 @@ export default function DashboardPage() {
         <section className="dashboard-grid bottom">
           <div className="data-section">
             <div className="section-heading"><div><span className="eyebrow">Management attention</span><h2>Top prioritized accounts</h2></div><Link href="/accounts">View all accounts</Link></div>
-            <div className="compact-list">{data.top_accounts.slice(0, 6).map(row => <Link href={`/accounts/${encodeURIComponent(row.account)}`} key={row.account}><span className="compact-rank"><ResultValue metric="rank">{row.priority_rank}</ResultValue></span><div><strong>{row.account}</strong><small>{row.priority_group} Priority</small></div><span className="score"><ResultValue metric="fps">{row.final_priority_score.toFixed(4)}</ResultValue></span></Link>)}</div>
+            <div className="compact-list">{data.top_accounts.slice(0, 6).map(row => <div className="compact-row" key={row.account}><span className="compact-rank"><ResultValue metric="rank">{row.priority_rank}</ResultValue></span><Link href={`/accounts/${encodeURIComponent(row.account)}`}><strong>{row.account}</strong><small>{row.priority_group} Priority</small></Link><span className="score"><ResultValue metric="fps">{row.final_priority_score.toFixed(4)}</ResultValue></span></div>)}</div>
           </div>
           <div className="data-section">
             <div className="section-heading"><div><span className="eyebrow">Ranking stability</span><h2>Current sensitivity summary</h2></div><Activity /></div>

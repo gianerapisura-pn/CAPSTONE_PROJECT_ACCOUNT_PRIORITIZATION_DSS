@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
+import { reportStorageKey, savedReportHref } from "@/lib/report-navigation";
 
 const navGroups = [
   { label: "Decision Support", items: [
@@ -53,7 +54,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
           : <span className="nav-group-label">{group.label}</span>}
         {(!group.detail || advancedOpen) && group.items.map(item => {
           const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
-          return <Link key={item.href} href={item.href} className={active ? "active" : ""} onClick={() => setMobileOpen(false)}><item.icon size={18} /><span>{item.label}</span></Link>;
+          return <Link key={item.href} href={item.href} className={active ? "active" : ""} onClick={event => { setMobileOpen(false); if (item.href === "/reports" && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { try { const saved = savedReportHref(sessionStorage.getItem(reportStorageKey)); if (saved) { event.preventDefault(); router.push(saved); } } catch { /* A plain report link works without session storage. */ } } }}><item.icon size={18} /><span>{item.label}</span></Link>;
         })}
       </div>)}</nav>
       <div className="sidebar-foot"><span>Methodology version</span><strong>2026.09-final-locked</strong></div>

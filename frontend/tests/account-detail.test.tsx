@@ -39,7 +39,7 @@ vi.mock("@/lib/use-api", () => ({ useApi: () => ({
 
 test("closed-since-2021 B2B detail keeps descriptive evidence but no 2025 prediction or current rank", () => {
   render(<AccountDetailsPage />);
-  expect(screen.getByRole("link", { name: "Back to prioritization" })).toHaveAttribute("href", "/accounts");
+  expect(screen.getByRole("link", { name: "Back to Filtered Accounts" })).toHaveAttribute("href", "/accounts");
   expect(screen.getByRole("link", { name: "Previous Account" })).toHaveAttribute("href", "/accounts/a063");
   expect(screen.getByRole("link", { name: "Next Account" })).toHaveAttribute("href", "/accounts/a065");
   expect(screen.getAllByText("Client-Confirmed Closed").length).toBeGreaterThan(0);

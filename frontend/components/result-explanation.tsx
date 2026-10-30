@@ -53,6 +53,7 @@ export function resultExplanation(key: string, row?: Partial<AccountDecisionRow>
     };
   }
   const explanations: Record<string, ResultExplanation> = {
+    auc: { title: "Historical buyer-discrimination AUC", basis: "How well the saved scores placed historical buyers above historical non-buyers.", calculation: "Across buyer/non-buyer pairs, the share ordered correctly; tied scores count as half.", note: "This is a historical ordering diagnostic, not an individual purchase probability or a causal effect." },
     reference: { title: "Analysis reference", basis: "This is the last date through which Sales Invoice data were confirmed complete for this published analysis.", note: "The system uses only evidence available by this date. A later payment receipt alone does not prove that later sales data are complete." },
     study_origin: { title: "Study forecast date", basis: "The study used Sales Invoices known by December 31, 2025 to predict whether each eligible account would buy in the following 12 months.", note: "This saved study forecast does not change when newer data are imported." },
     run: { title: "Published run", basis: "This identifies one saved analysis and when it finished.", note: "Changing a page filter changes what you see, not the saved analysis or its scores." },
@@ -197,7 +198,7 @@ export function ExplainedValue({ children, explanation, className = "", inline =
       onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (open) setOpen(false); else show(); } }}
       onPointerEnter={event => { if (event.pointerType !== "touch") show(); }} onPointerLeave={scheduleClose} onFocus={() => { if (pointerType.current !== "touch") show(); }} onBlur={scheduleClose}
       onPointerDown={event => { pointerType.current = event.pointerType; }}
-      onClick={event => { if (pointerType.current === "touch") { if (!open) { event.preventDefault(); event.stopPropagation(); show(); } else if (!event.currentTarget.closest("a")) setOpen(false); } pointerType.current = ""; }}>
+      onClick={event => { event.preventDefault(); event.stopPropagation(); if (!open) show(); else if (pointerType.current === "touch") setOpen(false); pointerType.current = ""; }}>
       {children}
     </span>
     {open && position && createPortal(<div ref={cardRef} id={id} role="tooltip" tabIndex={0} className="result-explanation" style={{ left: position.left, top: position.top }}

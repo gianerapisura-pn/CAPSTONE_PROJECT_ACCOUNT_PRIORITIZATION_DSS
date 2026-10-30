@@ -113,3 +113,9 @@
 .native-export .export-card { max-width: 900px; }
 @media (max-width: 1060px) { .native-chart-grid { grid-template-columns: 1fr; } .native-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .report-tabs { flex-wrap: wrap; overflow-x: visible; } .native-filter { min-width: 100%; } .native-filter input, .native-filter select { max-width: none; } .native-multi-filter { width: 100%; } .native-detail-grid { grid-template-columns: 1fr; } .native-chart { padding: 12px 7px; } .native-chart-canvas { height: 250px; } .native-chart-canvas.tall { height: 360px; } .native-group-explorer { padding: 12px; } .native-group-explorer-plot { height: 220px; } }
+.insight-target{scroll-margin-top:110px}.insight-target:focus{outline:2px solid #168366;outline-offset:4px}
+.metric-explorer{display:grid;gap:12px;min-width:0;align-content:start}.metric-explorer>.native-filter-bar{margin:0}.metric-explorer>.button{justify-self:start}
+.business-group-card>button{border:0;background:transparent;padding:4px 0;font:inherit;cursor:pointer;color:inherit}.business-group-card:has(button[aria-pressed="true"]){background:#edf7f3;border-color:#168366}
+.validation-finding{padding:12px 0;border-top:1px solid var(--line);min-width:0}.validation-finding h3{font-size:15px;margin:0 0 8px}.validation-finding p{font-size:13px;line-height:1.65;color:var(--muted);margin:8px 0}
+.finding-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.finding-values>div{display:grid;gap:6px}.finding-values span{font-size:12px;color:var(--muted)}.finding-values strong{font-size:20px}
+@media(max-width:560px){.finding-values{grid-template-columns:1fr;gap:10px}.finding-values>div{grid-template-columns:1fr auto;align-items:center}.finding-values strong{font-size:17px}}

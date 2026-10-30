@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "final-local-review.spec.ts",
+  testMatch: ["final-local-review.spec.ts", "ux-journeys.spec.ts"],
   outputDir: "./test-results/final-review",
   workers: 1,
   timeout: 300_000,
