@@ -27,6 +27,7 @@ class UserProfile(Base):
     user_id: Mapped[str] = mapped_column(UUID_STRING, primary_key=True)
     role: Mapped[str] = mapped_column(String(32), nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(160))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 

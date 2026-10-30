@@ -4,7 +4,7 @@ from datetime import date
 import pytest
 from fastapi import HTTPException
 
-from app.auth.dependencies import AuthenticatedUser, require_admin, require_user
+from app.auth.dependencies import AuthenticatedUser, require_admin, require_analytical_reader, require_user
 from app.core.config import Settings, get_settings, validate_runtime_configuration
 
 
@@ -43,10 +43,6 @@ def test_administrator_detail_routes_enforce_admin_dependency():
 
     protected_paths = {
         "/analytics/latest",
-        "/analytics/rfm",
-        "/analytics/settlement",
-        "/analytics/cart",
-        "/analytics/sensitivity",
         "/analytics/runs",
         "/analytics/runs/{run_id}",
         "/analytics/run",
@@ -63,6 +59,17 @@ def test_administrator_detail_routes_enforce_admin_dependency():
     }
     assert set(dependencies) == protected_paths
     assert all(require_admin in calls for calls in dependencies.values())
+
+    shared_paths = {"/analytics/rfm", "/analytics/settlement",
+                    "/analytics/predictive", "/analytics/sensitivity"}
+    shared = {
+        route.path: {dependency.call for dependency in route.dependant.dependencies}
+        for route in app.routes
+        if isinstance(route, APIRoute) and route.path in shared_paths
+    }
+    assert set(shared) == shared_paths
+    assert all(require_analytical_reader in calls and require_admin not in calls
+               for calls in shared.values())
 
 
 def test_management_can_fetch_read_only_native_validation_but_not_model_governance():

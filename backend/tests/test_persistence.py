@@ -15,7 +15,7 @@ from app.etl.invoices import InvoiceGroup
 from app.services.analytics_runner import run_account_prioritization
 from app.analytics.predictive.future_transaction import FutureTransactionResult
 from app.auth.dependencies import AuthenticatedUser
-from app.main import native_insights, native_overview
+from app.main import account_detail, native_insights, native_overview
 
 
 def group(i):
@@ -81,6 +81,18 @@ def test_final_run_persistence_and_public_contract():
         assert db.scalar(select(FutureTransactionPrediction)) is not None
         assert serialize_run(latest)["analysis_reference_date"] == "2026-09-21"
         viewer = AuthenticatedUser("test-user", "management")
+        first = account_detail(rows[0]["account_key"], viewer, db)
+        middle = account_detail(rows[1]["account_key"], viewer, db)
+        last = account_detail(rows[-1]["account_key"], viewer, db)
+        assert first["navigation"] == {
+            "previous": None,
+            "next": {"account_key": rows[1]["account_key"], "account": rows[1]["account"]},
+        }
+        assert middle["navigation"] == {
+            "previous": {"account_key": rows[0]["account_key"], "account": rows[0]["account"]},
+            "next": {"account_key": rows[2]["account_key"], "account": rows[2]["account"]},
+        }
+        assert last["navigation"]["next"] is None
         overview = native_overview(viewer, db)
         insights = native_insights(viewer, db)
         assert overview["run"]["analysis_run_id"] == latest.analysis_run_id

@@ -33,15 +33,20 @@ beforeEach(() => {
   authState.path = "/dashboard";
 });
 
-test("management navigation shows only the operational decision workflow", () => {
+test("management navigation includes the shared analytical workflow", async () => {
+  const user = userEvent.setup();
   render(<ProtectedShell><div>Dashboard API content</div></ProtectedShell>);
 
   expect(screen.getByText("Dashboard API content")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Overview" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Account Prioritization" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Detailed Analytics" })).toBeInTheDocument();
-  expect(screen.getAllByRole("link")).toHaveLength(3);
-  expect(screen.queryByRole("button", { name: /Advanced/ })).not.toBeInTheDocument();
+  const toggle = screen.getByRole("button", { name: "Advanced Analysis" });
+  await user.click(toggle);
+  for (const link of ["RFM", "Settlement", "With Future Sales", "Sensitivity"]) {
+    expect(screen.getByRole("link", { name: link })).toBeInTheDocument();
+  }
+  expect(screen.queryByRole("link", { name: "Methodology & Governance" })).not.toBeInTheDocument();
 });
 
 test("administrator advanced navigation is collapsed by default and retains every route", async () => {
@@ -55,13 +60,13 @@ test("administrator advanced navigation is collapsed by default and retains ever
   for (const link of ["Overview", "Account Prioritization", "Detailed Analytics", "Import Data", "Import History", "Analytics Runs"]) {
     expect(screen.getByRole("link", { name: link })).toBeInTheDocument();
   }
-  const toggle = screen.getByRole("button", { name: "Advanced / Analysis Details" });
+  const toggle = screen.getByRole("button", { name: "Advanced Analysis" });
   expect(toggle).toHaveAttribute("aria-expanded", "false");
-  expect(screen.queryByRole("link", { name: "Methodology & Governance" })).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Methodology & Governance" })).toBeInTheDocument();
 
   await user.click(toggle);
   expect(toggle).toHaveAttribute("aria-expanded", "true");
-  for (const link of ["Methodology & Governance", "RFM", "Settlement", "With Future Sales", "Sensitivity"]) {
+  for (const link of ["RFM", "Settlement", "With Future Sales", "Sensitivity"]) {
     expect(screen.getByRole("link", { name: link })).toBeInTheDocument();
   }
 });

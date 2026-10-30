@@ -64,7 +64,7 @@ async def require_user(
     claims = _verify_supabase_token(authorization.split(" ", 1)[1].strip())
     user_id = str(claims.get("sub") or claims.get("id") or "")
     profile = db.get(UserProfile, user_id)
-    if not profile or profile.role not in {"administrator", "management"}:
+    if not profile or not profile.is_active or profile.role not in {"administrator", "management"}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="An approved DSS role is required.")
     metadata = claims.get("user_metadata") or {}
     return AuthenticatedUser(user_id, profile.role, claims.get("email"), profile.display_name or metadata.get("full_name"), False)
@@ -73,4 +73,12 @@ async def require_user(
 async def require_admin(user: AuthenticatedUser = Depends(require_user)) -> AuthenticatedUser:
     if user.role != "administrator":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required.")
+    return user
+
+
+async def require_analytical_reader(
+    user: AuthenticatedUser = Depends(require_user),
+) -> AuthenticatedUser:
+    if user.role not in {"administrator", "management"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Approved DSS role required.")
     return user

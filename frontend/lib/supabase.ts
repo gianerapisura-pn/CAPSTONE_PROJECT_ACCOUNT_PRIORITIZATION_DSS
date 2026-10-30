@@ -3,10 +3,11 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 let client: SupabaseClient | null | undefined;
 
 export function isDemoEnvironment() {
-  return process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+  return process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 }
 
 export function isolatedDemoApiUrl(): string | null {
+  if (process.env.NODE_ENV === "production") return null;
   const configured = process.env.NEXT_PUBLIC_DEMO_API_URL;
   if (!configured) return null;
   try {

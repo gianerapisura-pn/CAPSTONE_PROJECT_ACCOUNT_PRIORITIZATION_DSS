@@ -85,8 +85,8 @@ test("filters retain published score and the account drilldown", async () => {
   expect(screen.getByRole("heading", { name: "RFM Score Distribution" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Historical Settlement Duration Distribution" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Published CRITIC Criterion Weights" })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Priority Groups by Business Category" })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Priority Groups by Primary Business Type" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Business Category Composition of Ranked Accounts" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Priority Groups by Primary Business Type" })).not.toBeInTheDocument();
   expect(screen.getByText("BETA")).toBeInTheDocument();
   await user.selectOptions(screen.getByLabelText("RFM component score"), "5");
   expect(screen.queryByText("BETA")).not.toBeInTheDocument();
@@ -134,25 +134,22 @@ test("current overview counts exclude historical-only identities from the rankin
   expect(screen.queryByText("Historical identities")).not.toBeInTheDocument();
 });
 
-test("category and business type explorers show exact ranked accounts with navigation", async () => {
+test("business composition drills from a category to verified types and ranked accounts", async () => {
   const user = userEvent.setup();
   render(<ReportsPage />);
   await user.click(screen.getByRole("tab", { name: "Account & Prioritization Insights" }));
-  const category = screen.getByRole("region", { name: "Priority Groups by Business Category" });
-  const type = screen.getByRole("region", { name: "Priority Groups by Primary Business Type" });
+  const category = screen.getByRole("region", { name: "Business Composition" });
   expect(within(category).getByText("1 ranked account")).toBeInTheDocument();
   expect(within(category).getByRole("link", { name: /ALPHA/ })).toHaveAttribute("href", "/accounts/a");
   expect(within(category).queryByRole("link", { name: /BETA/ })).not.toBeInTheDocument();
   await user.click(within(category).getByRole("button", { name: "Next business category" }));
-  expect(within(category).getByRole("combobox", { name: "business category to inspect" })).toHaveValue("Retail");
+  expect(within(category).getByRole("combobox", { name: "Selected category" })).toHaveValue("Retail");
   expect(within(category).getByRole("link", { name: /GAMMA/ })).toHaveAttribute("href", "/accounts/c");
-  await user.click(within(category).getByRole("button", { name: /^Medium/ }));
-  expect(within(category).getByText("Medium - 1 account")).toBeInTheDocument();
+  await user.click(within(category).getByRole("button", { name: "Medium 1" }));
+  expect(within(category).getByText("Showing 1-1 of 1")).toBeInTheDocument();
   await user.click(within(category).getByRole("button", { name: "Previous business category" }));
   expect(within(category).getByRole("link", { name: /ALPHA/ })).toBeInTheDocument();
-  expect(within(type).getByRole("combobox", { name: "primary business type to inspect" })).toHaveValue("Commercial");
-  await user.click(within(type).getByRole("button", { name: "Next primary business type" }));
-  expect(within(type).getByRole("link", { name: /ALPHA/ })).toHaveAttribute("href", "/accounts/a");
+  expect(within(category).getByRole("button", { name: "Industrial 1" })).toBeInTheDocument();
 });
 
 test("B2B table shows ten accounts per page and resets to page one after filtering", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, BarChart3, Boxes, ChevronDown, CircleGauge, Clock3, FileBarChart, FileUp, FlaskConical, History, LogOut, Menu, Settings, ShieldCheck, Users, X } from "lucide-react";
+import { Activity, BarChart3, Boxes, ChevronDown, CircleGauge, Clock3, FileBarChart, FileUp, FlaskConical, History, LogOut, Menu, Settings, ShieldCheck, UserRound, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -19,16 +19,19 @@ const navGroups = [
     { href: "/import/history", label: "Import History", icon: History },
     { href: "/runs", label: "Analytics Runs", icon: Boxes },
   ] },
-  { label: "Advanced / Analysis Details", admin: true, detail: true, items: [
-    { href: "/settings", label: "Methodology & Governance", icon: Settings },
+  { label: "Advanced Analysis", detail: true, items: [
     { href: "/analytics/rfm", label: "RFM", icon: BarChart3 },
     { href: "/analytics/settlement", label: "Settlement", icon: Clock3 },
     { href: "/analytics/predictive", label: "With Future Sales", icon: Activity },
     { href: "/analytics/sensitivity", label: "Sensitivity", icon: FlaskConical },
   ] },
+  { label: "Governance", admin: true, items: [
+    { href: "/settings", label: "Methodology & Governance", icon: Settings },
+  ] },
 ];
 
-const adminRoutePrefixes = ["/import", "/runs", "/settings", "/analytics/rfm", "/analytics/settlement", "/analytics/predictive", "/analytics/sensitivity"];
+const adminRoutePrefixes = ["/import", "/runs", "/settings"];
+const analyticalRoutePrefixes = ["/analytics/rfm", "/analytics/settlement", "/analytics/predictive", "/analytics/sensitivity"];
 
 export function ProtectedShell({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut } = useAuth();
@@ -36,7 +39,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(() => adminRoutePrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`)));
+  const [advancedOpen, setAdvancedOpen] = useState(() => analyticalRoutePrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`)));
   const restrictedRoute = user?.role === "management" && adminRoutePrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
   useEffect(() => { if (!loading && !user) router.replace(`/login?next=${encodeURIComponent(pathname)}`) }, [loading, pathname, router, user]);
   if (loading || !user) return <div className="auth-loading"><div className="brand-mark"><Boxes /></div><span>Securing your workspace...</span></div>;
@@ -56,7 +59,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
       <div className="sidebar-foot"><span>Methodology version</span><strong>2026.09-final-locked</strong></div>
     </aside>
     <div className="workspace">
-      <header className="topbar"><button className="icon-button menu-button" aria-label="Open navigation" onClick={() => setMobileOpen(true)}><Menu /></button><div className="topbar-context"><span>Decision Support System</span><strong>Management workspace</strong></div><div className="profile-wrap"><button className="profile-button" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen}><span className="avatar">{user.displayName.slice(0, 2).toUpperCase()}</span><span><strong>{user.displayName}</strong><small>{user.role}</small></span><ChevronDown size={16} /></button>{menuOpen && <div className="profile-menu"><div><strong>{user.email}</strong><span>{user.demo ? "Local demo session" : "Secure authenticated session"}</span></div><button onClick={async () => { await signOut(); router.replace("/login") }}><LogOut size={16} />Sign out</button></div>}</div></header>
+      <header className="topbar"><button className="icon-button menu-button" aria-label="Open navigation" onClick={() => setMobileOpen(true)}><Menu /></button><div className="topbar-context"><span>Decision Support System</span><strong>Management workspace</strong></div><div className="profile-wrap"><button className="profile-button" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen}><span className="avatar">{user.displayName.slice(0, 2).toUpperCase()}</span><span><strong>{user.displayName}</strong><small>{user.role}</small></span><ChevronDown size={16} /></button>{menuOpen && <div className="profile-menu"><div><strong>{user.email}</strong><span>{user.demo ? "Local demo session" : "Secure authenticated session"}</span></div><Link href="/profile" onClick={() => setMenuOpen(false)}><UserRound size={16} />My Profile</Link><button onClick={async () => { await signOut(); router.replace("/login") }}><LogOut size={16} />Sign out</button></div>}</div></header>
       <main className="main">{restrictedRoute ? <div className="state-panel error-state" role="alert"><ShieldCheck /><strong>Administrator access required</strong><span>Your management role does not permit access to this area.</span><Link className="button secondary" href="/dashboard">Return to Overview</Link></div> : children}</main>
     </div>
   </div>;

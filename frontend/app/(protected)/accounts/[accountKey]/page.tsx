@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Activity, Calculator, Clock3, Info, ReceiptText, Scale } from "lucide-react";
+import { ArrowLeft, ArrowRight, Activity, Calculator, Clock3, Info, ReceiptText, Scale } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Badge, PageHeader, PageState } from "@/components/page-state";
@@ -12,6 +12,10 @@ type Evidence = Record<string, string | number | boolean | null>;
 type Detail = {
   account_key: string;
   account: string;
+  navigation?: {
+    previous: { account_key: string; account: string } | null;
+    next: { account_key: string; account: string } | null;
+  };
   decision: AccountDecisionRow;
   priority: AccountDecisionRow | null;
   rfm: Evidence | null;
@@ -41,6 +45,10 @@ export default function AccountDetailsPage() {
   const rfm = data?.rfm;
   return <div className="page-stack">
     <Link className="back-link" href="/accounts"><ArrowLeft size={16} />Back to prioritization</Link>
+    {data && <nav className="account-detail-nav" aria-label="Account navigation">
+      {data.navigation?.previous ? <Link className="back-link" href={`/accounts/${encodeURIComponent(data.navigation.previous.account_key)}`} title={data.navigation.previous.account}><ArrowLeft size={16} />Previous Account</Link> : <span className="back-link" aria-disabled="true"><ArrowLeft size={16} />Previous Account</span>}
+      {data.navigation?.next ? <Link className="back-link" href={`/accounts/${encodeURIComponent(data.navigation.next.account_key)}`} title={data.navigation.next.account}>Next Account<ArrowRight size={16} /></Link> : <span className="back-link" aria-disabled="true">Next Account<ArrowRight size={16} /></span>}
+    </nav>}
     <PageHeader eyebrow="Account evidence" title={data?.account || "Account details"} description="Traceable descriptive, prescriptive, predictive, and transaction-level context from the latest successful run." />
     <PageState loading={loading} error={error} onRetry={reload} empty={!loading && !error && !data}>
       <>{data && d && <>

@@ -7,7 +7,7 @@ import { getSupabaseClient, isDemoEnvironment, isolatedDemoApiUrl } from "@/lib/
 
 export type AppUser = { userId: string; email: string; role: "administrator" | "management"; displayName: string; demo: boolean };
 type AuthContextValue = { user: AppUser | null; loading: boolean; demo: boolean;
-  signIn(email: string, password: string): Promise<void>; demoSignIn(): void; signOut(): Promise<void> };
+  signIn(email: string, password: string): Promise<void>; demoSignIn(): void; signOut(): Promise<void>; refreshProfile(): Promise<void> };
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function mapUser(authUser: User, profile: Record<string, unknown>): AppUser {
@@ -51,8 +51,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const client = getSupabaseClient();
       if (!client) throw new Error("Production sign-in is not configured. Use the labeled demo access instead.");
       const { data, error } = await client.auth.signInWithPassword({ email, password });
-      if (error || !data.user) throw new Error(error?.message || "Sign-in failed.");
-      setUser(mapUser(data.user, await apiFetch<Record<string, unknown>>("/auth/me")));
+      if (error || !data.user) throw new Error("Unable to sign in. Check your credentials or contact the administrator.");
+      try {
+        setUser(mapUser(data.user, await apiFetch<Record<string, unknown>>("/auth/me")));
+      } catch {
+        await client.auth.signOut();
+        throw new Error("This account is not approved for DSS access.");
+      }
     },
     demoSignIn() {
       if (!isolatedDemoApiUrl()) throw new Error("The isolated demo backend is not configured.");
@@ -60,6 +65,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser({ userId: "00000000-0000-4000-8000-000000000001", email: "demo@local.invalid", role: "administrator", displayName: "Demo Administrator", demo: true });
     },
     async signOut() { sessionStorage.removeItem("peslc-demo-session"); if (!demoOnly && !user?.demo) await getSupabaseClient()!.auth.signOut(); setUser(null) },
+    async refreshProfile() {
+      if (!user || user.demo) return;
+      const client = getSupabaseClient();
+      const { data } = await client!.auth.getUser();
+      if (data.user) setUser(mapUser(data.user, await apiFetch<Record<string, unknown>>("/auth/me")));
+    },
   }), [demo, demoOnly, loading, user]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

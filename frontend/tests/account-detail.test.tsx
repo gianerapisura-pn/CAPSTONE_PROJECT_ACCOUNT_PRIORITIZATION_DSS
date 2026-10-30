@@ -6,6 +6,10 @@ vi.mock("next/navigation", () => ({ useParams: () => ({ accountKey: "a064" }) })
 vi.mock("@/lib/use-api", () => ({ useApi: () => ({
   data: {
     account_key: "a064", account: "ROSTRAM PROTECTIVE SYSTEM METIER COMPANY",
+    navigation: {
+      previous: { account_key: "a063", account: "Previous published account" },
+      next: { account_key: "a065", account: "Next published account" },
+    },
     decision: {
       account_key: "a064", account: "ROSTRAM PROTECTIVE SYSTEM METIER COMPANY",
       is_ranked: false, ranking_unavailable_reason: "Client-confirmed closed; excluded from the current actionable ranking.",
@@ -35,6 +39,9 @@ vi.mock("@/lib/use-api", () => ({ useApi: () => ({
 
 test("closed-since-2021 B2B detail keeps descriptive evidence but no 2025 prediction or current rank", () => {
   render(<AccountDetailsPage />);
+  expect(screen.getByRole("link", { name: "Back to prioritization" })).toHaveAttribute("href", "/accounts");
+  expect(screen.getByRole("link", { name: "Previous Account" })).toHaveAttribute("href", "/accounts/a063");
+  expect(screen.getByRole("link", { name: "Next Account" })).toHaveAttribute("href", "/accounts/a065");
   expect(screen.getAllByText("Client-Confirmed Closed").length).toBeGreaterThan(0);
   expect(screen.getByText("Client-confirmed closed; excluded from the current actionable ranking.")).toBeInTheDocument();
   expect(screen.getByText("Direct PESLC client confirmation")).toBeInTheDocument();

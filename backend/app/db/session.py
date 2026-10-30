@@ -18,6 +18,9 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=make_engine(
 
 
 DEMO_ADDITIONS = {
+    "user_profiles": {
+        "is_active": "BOOLEAN NOT NULL DEFAULT 1",
+    },
     "import_batches": {
         "analysis_reference_date": "DATE",
     },

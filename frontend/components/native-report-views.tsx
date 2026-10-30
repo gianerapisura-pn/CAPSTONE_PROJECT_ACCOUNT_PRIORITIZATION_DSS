@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChevronLeft, ChevronRight, RefreshCw, RotateCcw } from "lucide-react";
 import { PageState } from "@/components/page-state";
+import { AdditionalValidation, type AdditionalEvidence } from "@/components/additional-validation";
+import { BusinessComposition } from "@/components/business-composition";
 import { ExplainedValue, ResultValue, type ResultExplanation } from "@/components/result-explanation";
 import { useApi } from "@/lib/use-api";
 import type { AccountDecisionRow, RunSummary } from "@/types/dss";
@@ -41,6 +43,7 @@ type Validation = {
   backtest: { cutoffs?: { cutoff_date: string; eligible_account_count: number; selected_account_count: number; expected_random_capture: number | null; top_decile_capture: number | null; lift_over_expected_random: number | null }[] };
   critic_weights: Record<string, number>;
   supplemental: EvidenceRow[];
+  additional_evidence?: AdditionalEvidence;
 };
 
 const colors = { high: "#168366", medium: "#4d78ac", low: "#d59c43", line: "#167d68", muted: "#788d98" };
@@ -125,72 +128,6 @@ function MultiFilter({ label, values, options, onChange }: { label: string; valu
   </details>;
 }
 
-function RankedGroupExplorer({ title, description, dimension, field, rows, caption }: {
-  title: string; description: string; dimension: string;
-  field: "business_category" | "primary_business_type";
-  rows: AccountDecisionRow[]; caption: string;
-}) {
-  const [selectedLabel, setSelectedLabel] = useState("");
-  const [selectedGroup, setSelectedGroup] = useState("");
-  const ranked = rows.filter(row => row.is_ranked && groups.some(group => group === row.priority_group));
-  const options = [...new Set(ranked.map(row => row[field] || "Unspecified"))].sort((a, b) => {
-    const aCount = ranked.filter(row => (row[field] || "Unspecified") === a).length;
-    const bCount = ranked.filter(row => (row[field] || "Unspecified") === b).length;
-    return bCount - aCount || a.localeCompare(b);
-  });
-  const current = options.includes(selectedLabel) ? selectedLabel : options[0];
-  const index = options.indexOf(current);
-  const members = ranked.filter(row => (row[field] || "Unspecified") === current)
-    .sort((a, b) => (a.priority_rank ?? Infinity) - (b.priority_rank ?? Infinity) || a.account.localeCompare(b.account));
-  const chartRows = groups.map(name => ({ name, members: members.filter(row => row.priority_group === name) }))
-    .map(row => ({ ...row, count: row.members.length }));
-  const maxCount = Math.max(...chartRows.map(row => row.count));
-  const rawStep = Math.max(1, maxCount / 4);
-  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
-  const normalizedStep = rawStep / magnitude;
-  const tickStep = (normalizedStep <= 1 ? 1 : normalizedStep <= 2 ? 2 : normalizedStep <= 5 ? 5 : 10) * magnitude;
-  const axisMax = Math.max(tickStep, Math.ceil(maxCount / tickStep) * tickStep);
-  const ticks = Array.from({ length: Math.round(axisMax / tickStep) + 1 }, (_, tick) => tick * tickStep);
-  const visibleMembers = selectedGroup ? members.filter(row => row.priority_group === selectedGroup) : members;
-  const choose = (label: string) => { setSelectedLabel(label); setSelectedGroup(""); };
-  return <section className="native-chart native-group-explorer" aria-label={title}>
-    <div className="native-chart-heading"><h3>{title}</h3><p>{description}</p></div>
-    {!current ? <div className="native-chart-empty" role="status">No ranked accounts match the current filters.</div> : <>
-      <div className="native-group-explorer-nav">
-        <button type="button" className="native-group-explorer-arrow" aria-label={`Previous ${dimension}`} title={`Previous ${dimension}`} disabled={index === 0} onClick={() => choose(options[index - 1])}><ChevronLeft size={18} /></button>
-        <label>{dimension}<select aria-label={`${dimension} to inspect`} value={current} onChange={event => choose(event.target.value)}>{options.map(option => <option key={option} value={option}>{option}</option>)}</select></label>
-        <button type="button" className="native-group-explorer-arrow" aria-label={`Next ${dimension}`} title={`Next ${dimension}`} disabled={index === options.length - 1} onClick={() => choose(options[index + 1])}><ChevronRight size={18} /></button>
-        <span className="native-group-explorer-position">{index + 1} of {options.length}</span>
-      </div>
-      <p className="native-group-explorer-total"><strong>{current}</strong><span>{number.format(members.length)} ranked {members.length === 1 ? "account" : "accounts"}</span></p>
-      <div className="native-group-explorer-plot" role="group" aria-label={`Ranked account counts by priority group in ${current}`}>
-        <ResponsiveContainer width="100%" height="100%"><BarChart data={chartRows} layout="vertical" margin={{ top: 8, right: 42, bottom: 6, left: 6 }} barCategoryGap={16}>
-          <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-          <XAxis type="number" domain={[0, axisMax]} ticks={ticks} allowDecimals={false} />
-          <YAxis type="category" dataKey="name" width={65} tick={{ fontSize: 12 }} />
-          <Tooltip cursor={{ fill: "#f1f6f4" }} content={({ active, payload }) => {
-            const row = payload?.[0]?.payload as (typeof chartRows)[number] | undefined;
-            return active && row ? <div className="native-group-explorer-tooltip"><strong>{row.name}: {row.count} ranked {row.count === 1 ? "account" : "accounts"}</strong><small>Client-verified {dimension.toLowerCase()}: {current}. Select the bar to see the account names below.</small></div> : null;
-          }} />
-          <Bar dataKey="count" name="Ranked accounts" onClick={entry => { const next = String(entry?.payload?.name ?? ""); setSelectedGroup(selectedGroup === next ? "" : next); }}>
-            {chartRows.map(row => <Cell key={row.name} fill={colors[row.name.toLowerCase() as keyof typeof colors]} fillOpacity={!selectedGroup || selectedGroup === row.name ? 1 : .4} />)}
-            <LabelList dataKey="count" position="right" fill="#17242b" fontSize={12} />
-          </Bar>
-        </BarChart></ResponsiveContainer>
-      </div>
-      <div className="native-chart-axes"><span><b>Horizontal (X):</b> Number of ranked accounts in this {dimension.toLowerCase()} and priority group</span><span><b>Vertical (Y):</b> Saved High, Medium, or Low review group</span><span className="native-chart-axis-context">Counts come from the published ranking after page filters. Select a bar to list the accounts below; {dimension.toLowerCase()} does not determine their scores.</span></div>
-      <div className="native-group-explorer-group-filter" role="group" aria-label={`Account list priority group for ${current}`}>
-        <button type="button" aria-pressed={!selectedGroup} onClick={() => setSelectedGroup("")}>All ({members.length})</button>
-        {chartRows.map(row => <button key={row.name} type="button" aria-pressed={selectedGroup === row.name} onClick={() => setSelectedGroup(row.name)}>{row.name} ({row.count})</button>)}
-      </div>
-      <div className="native-group-explorer-list-heading"><strong>{selectedGroup || "All groups"} - {visibleMembers.length} {visibleMembers.length === 1 ? "account" : "accounts"}</strong>{selectedGroup && <button type="button" onClick={() => setSelectedGroup("")}>Show all</button>}</div>
-      <div className="native-group-explorer-accounts" aria-label={`Accounts in ${current}`}>
-        {visibleMembers.length ? visibleMembers.map(row => <Link key={row.account_key} href={`/accounts/${encodeURIComponent(row.account_key)}`} title={`${row.account} - ${row.priority_group} priority, rank #${row.priority_rank}`}><span className="native-group-explorer-rank">#{row.priority_rank}</span><span className="native-group-explorer-name">{row.account}</span><span className={`native-group-explorer-tag ${row.priority_group?.toLowerCase()}`}>{row.priority_group}</span></Link>) : <p>No accounts in this priority group.</p>}
-      </div>
-    </>}
-    <p className="native-chart-caption">{caption}</p>
-  </section>;
-}
 
 export function ManagementOverview() {
   const { data, error, loading, reload } = useApi<Overview>("/reports/native/overview");
@@ -277,11 +214,10 @@ export function AccountInsights() {
     {data && <div className="native-report-content"><RunContext run={data.run} onRefresh={reload} />
       <div className="native-filter-bar"><label className="native-filter">Account search<input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search account" /></label><MultiFilter label="Business category" values={categories} options={option("business_category")} onChange={setCategories} /><MultiFilter label="Primary business type" values={types} options={option("primary_business_type")} onChange={setTypes} /><FilterSelect label="Priority group" value={group} options={[...groups]} onChange={setGroup} /><FilterSelect label="Current status" value={status} options={option("account_status")} onChange={setStatus} /><FilterSelect label="Ranking status" value={ranking} options={["Ranked", "Not ranked"]} onChange={setRanking} /><FilterSelect label="Future SI class" value={prediction} options={["With Future Sales", "With No Future Sales"]} onChange={setPrediction} /><FilterSelect label="RFM component" value={scoreComponent} options={["Recency", "Frequency", "Monetary"]} onChange={setScoreComponent} /><FilterSelect label="RFM component score" value={scoreSelection == null ? "" : String(scoreSelection)} options={["1", "2", "3", "4", "5"]} onChange={value => setScoreSelection(value ? Number(value) : null)} /><FilterSelect label="Average settlement days" value={binSelection} options={settlementBins} onChange={setBinSelection} /><button className="button secondary" onClick={reset}><RotateCcw size={15} />Reset filters</button></div>
       <p className="native-note">{number.format(filtered.length)} of {number.format(accounts.length)} verified B2B accounts in view. Chart selections filter the view; published weights, scores, ranks, and groups never change. {scoreSelection != null ? `${scoreComponent || "Any R/F/M"} score ${scoreSelection} selected. ` : ""}{binSelection ? `${binSelection} days selected.` : ""}</p>
+      <BusinessComposition rows={filtered} />
       <div className="native-chart-grid"><ChartFrame title="RFM Score Distribution" description="Past buying activity, converted to saved 1-to-5 scores. Select a bar to filter accounts." xLabel="Past-activity score (1 to 5)" yLabel="Number of verified business accounts" caption="These all-history purchase-count and sales-value scores differ from the last-24-month values used in the Final Priority Score." empty={!filtered.length}><ResponsiveContainer width="100%" height="100%"><BarChart data={rfm}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis allowDecimals={false} /><Tooltip content={<ChartResultTooltip format={value => number.format(value)} detail="Number of verified business accounts at this score for the named measure. Scores compare accounts with one another; buying more recently gives a higher Recency score." />} /><Legend /><Bar dataKey="Recency" fill={colors.high} onClick={entry => { setScoreComponent("Recency"); setScoreSelection(Number(entry?.payload?.value)); }} /><Bar dataKey="Frequency" fill={colors.medium} onClick={entry => { setScoreComponent("Frequency"); setScoreSelection(Number(entry?.payload?.value)); }} /><Bar dataKey="Monetary" fill={colors.low} onClick={entry => { setScoreComponent("Monetary"); setScoreSelection(Number(entry?.payload?.value)); }} /></BarChart></ResponsiveContainer></ChartFrame>
         <ChartFrame title="Historical Settlement Duration Distribution" description="Average days from invoice to final valid payment per account. Missing values are left out, not treated as zero." xLabel="Average days to complete collection" yLabel="Number of accounts with payment evidence" caption="This is not a measure of whether an invoice was paid late under its contract." empty={!filtered.some(row => row.average_settlement_days != null)}><ResponsiveContainer width="100%" height="100%"><BarChart data={settlement}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" tick={{ fontSize: 10 }} /><YAxis allowDecimals={false} /><Tooltip content={<ChartResultTooltip format={value => number.format(value)} detail="Number of accounts whose average invoice-to-final-payment time falls in this range. Accounts without a valid payment date are left out." />} /><Bar dataKey="count" name="Accounts" fill={colors.medium} onClick={entry => setBinSelection(String(entry?.payload?.name ?? ""))} /></BarChart></ResponsiveContainer></ChartFrame></div>
       <ChartFrame title="Published CRITIC Criterion Weights" description="Saved shares assigned to the four priority measures; account-view filters do not recalculate them." xLabel="Priority measure" yLabel="Share of total weight (%)" caption="These weights build the Final Priority Score; they are not CatBoost prediction factors." empty={weights.some(row => row.weight == null)}><ResponsiveContainer width="100%" height="100%"><BarChart data={weights}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis domain={[0, 1]} tickFormatter={value => `${Math.round(Number(value) * 100)}%`} /><Tooltip content={<ChartResultTooltip format={value => pct(value)} detail="The method measures how much this factor varies and how different it is from the other three, then divides that amount by the total for all four factors." />} /><Bar dataKey="weight" name="CRITIC weight" fill={colors.high} /></BarChart></ResponsiveContainer></ChartFrame>
-      <RankedGroupExplorer title="Priority Groups by Business Category" description="One verified category at a time; category is descriptive and does not enter CRITIC or MCS." dimension="business category" field="business_category" rows={filtered} caption="Counts are published ranked accounts, not all historical identities. Select a group to see its accounts; category does not cause a priority assignment." />
-      <RankedGroupExplorer title="Priority Groups by Primary Business Type" description="One verified business type at a time; type is descriptive and does not enter the priority formula." dimension="primary business type" field="primary_business_type" rows={filtered} caption="Counts are published ranked accounts. Small groups should not be generalized to an industry." />
       <section className="native-table-section" aria-label="Recent Purchase Activity by Priority Group"><div className="section-heading"><h2>Recent Purchase Activity by Priority Group</h2></div>
         <p className="native-note">Ranked accounts matching the current filters, using saved valid Sales Invoice counts for the 24 months ending at the published analysis reference date ({data.run.analysis_reference_date ?? "unavailable"}). Zero recorded purchases does not confirm inactivity, no ongoing projects, or account closure.</p>
         <div className="table-wrap"><table><thead><tr><th>Priority group</th><th>Ranked accounts</th><th>Zero valid SIs</th><th>At least one valid SI</th>{hasUnavailableActivity && <th>Count unavailable</th>}<th>Zero-purchase share</th></tr></thead><tbody>{purchaseActivity.map(row => <tr key={row.name}><th scope="row">{row.name}</th><td><ExplainedValue explanation={purchaseActivityExplanation(row, "total", data.run.analysis_reference_date)}>{number.format(row.total)}</ExplainedValue></td><td><ExplainedValue explanation={purchaseActivityExplanation(row, "zero", data.run.analysis_reference_date)}>{number.format(row.zero)}</ExplainedValue></td><td><ExplainedValue explanation={purchaseActivityExplanation(row, "withPurchases", data.run.analysis_reference_date)}>{number.format(row.withPurchases)}</ExplainedValue></td>{hasUnavailableActivity && <td><ExplainedValue explanation={purchaseActivityExplanation(row, "unavailable", data.run.analysis_reference_date)}>{number.format(row.unavailable)}</ExplainedValue></td>}<td><ExplainedValue explanation={purchaseActivityExplanation(row, "share", data.run.analysis_reference_date)}>{row.total ? pct(row.zero / row.total) : "Not applicable"}</ExplainedValue></td></tr>)}</tbody></table></div>
@@ -322,6 +258,7 @@ export function AnalyticsValidation() {
       <section className="native-table-section"><div className="section-heading"><h2>Historical lookback comparison</h2></div><div className="table-wrap"><table><thead><tr><th>Lookback</th><th>Mean Macro F1</th><th>Mean error</th><th>Balanced accuracy</th><th>Future-class F1</th></tr></thead><tbody>{data.lookback_summary.map(row => <tr key={String(row.lookback_months)}><td><ResultValue metric="lookback">{row.lookback_months} months</ResultValue></td><td><ResultValue metric="macro_f1">{evidenceScore(row.mean_macro_f1)}</ResultValue></td><td><ResultValue metric="error">{evidencePct(row.mean_error)}</ResultValue></td><td><ResultValue metric="balanced_accuracy">{evidenceScore(row.mean_balanced_accuracy)}</ResultValue></td><td><ResultValue metric="f1">{evidenceScore(row.mean_future_f1)}</ResultValue></td></tr>)}</tbody></table></div><p className="native-note">The lookback comparison tests how far back historical features reach. It is distinct from the 3/6/12-month future outcome horizon.</p></section>
       <p className="native-note">CatBoost was selected on recorded mean chronological Macro F1; its advantage over Extra Trees is small. {data.historical_error_summary ? ("Historical pooled validation recorded " + data.historical_error_summary.errors + " errors in " + data.historical_error_summary.observations + " observations (" + data.historical_error_summary.true_future + " true Future, " + data.historical_error_summary.missed_future + " missed Future, " + data.historical_error_summary.true_no_future + " true No Future, " + data.historical_error_summary.false_future + " false Future).") : "Pooled confusion evidence is unavailable."} This is not confirmed 2026 forecast accuracy.</p>
       <section className="native-table-section"><div className="section-heading"><h2>Historical later-period confirmations</h2></div><div className="table-wrap"><table><thead><tr><th>Period</th><th>Cutoff</th><th>Outcome end</th><th>Accounts</th><th>Actual Future / No Future</th><th>Predicted Future / No Future</th><th>Error</th><th>Macro F1</th><th>Accuracy</th></tr></thead><tbody>{data.later_checks.map(row => <tr key={String(row.cutoff_date)}><td>{row.period}</td><td>{row.cutoff_date}</td><td>{row.future_window_end}</td><td><ResultValue metric="count">{row.observations}</ResultValue></td><td><ResultValue metric="count">{row.actual_future_transaction} / {row.actual_no_future_transaction}</ResultValue></td><td><ResultValue metric="prediction">{row.predicted_future_transaction} / {row.predicted_no_future_transaction}</ResultValue></td><td><ResultValue metric="error">{evidencePct(row.classification_error)}</ResultValue></td><td><ResultValue metric="macro_f1">{evidenceScore(row.macro_f1)}</ResultValue></td><td><ResultValue metric="accuracy">{evidencePct(row.accuracy)}</ResultValue></td></tr>)}</tbody></table></div><p className="native-note">These are historical outcome confirmations, not accuracy claims for the pending 2026 forecast.</p></section>
+      <AdditionalValidation evidence={data.additional_evidence ?? {}} referenceDate={String(data.additional_evidence?.annual_rank_stability?.[0]?.study_reference_date ?? "") || null} />
       <section className="native-table-section"><div className="section-heading"><h2>Prescriptive robustness and historical usefulness</h2></div><p className="native-note">CRITIC derives criterion weights from the eligible account data. Additive MCS combines the four normalized criteria into Final Priority Score. The predicted Future Sales class does not contribute to the score.</p><div className="table-wrap"><table><thead><tr><th>Criterion</th><th>Published run weight</th></tr></thead><tbody>{["recency", "frequency", "monetary", "settlement"].map(key => <tr key={key}><td>{key[0].toUpperCase() + key.slice(1)}</td><td><ResultValue metric="weight">{pct(data.critic_weights[key])}</ResultValue></td></tr>)}</tbody></table></div></section>
       <div className="native-chart-grid"><ChartFrame title="Sensitivity: Mean Spearman Rank Correlation" description="Persisted CRITIC-weight perturbation summaries; no simulation runs in the browser." xLabel="Weight perturbation range" yLabel="Spearman rank correlation (0-1)" caption="High rank correlation describes stability under these tested perturbations, not certainty about future sales." empty={!sensitivity.length}><ResponsiveContainer width="100%" height="100%"><LineChart data={sensitivity}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis domain={[0, 1]} /><Tooltip content={<ChartResultTooltip format={value => score(value)} detail="Spearman compares published baseline account ranks with ranks after the named CRITIC-weight perturbation. Mean and minimum summarize the recorded scenarios." />} /><Legend /><Line dataKey="mean" name="Mean Spearman" stroke={colors.high} strokeWidth={2} /><Line dataKey="min" name="Minimum Spearman" stroke={colors.medium} strokeWidth={2} /></LineChart></ResponsiveContainer></ChartFrame>
         <ChartFrame title={backtest.length ? `Historical Backtests ${backtest[0].name}-${backtest[backtest.length - 1].name}: Lift vs Random` : "Historical Backtests: Lift vs Random"} description="Published closure-aware cutoff results; the dashed line marks random-selection performance." xLabel="Historical cutoff year" yLabel="Future-sales value capture lift vs random (times)" caption="Lift above 1 means the selected accounts captured a higher share of succeeding valid Sales Invoice value than the k/n random-selection expectation. These retrospective checks do not show that follow-up caused the sales." empty={!backtest.length}><ResponsiveContainer width="100%" height="100%"><BarChart data={backtest}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip content={<ChartResultTooltip format={value => `${score(value)} times`} detail="Historical lift = selected top-decile succeeding SI value share divided by the exact random-selection baseline k/n. This is retrospective association, not causal uplift." />} /><ReferenceLine y={1} stroke={colors.muted} strokeDasharray="5 4" label="Random = 1" /><Bar dataKey="lift" name="Lift vs random" fill={colors.medium} /></BarChart></ResponsiveContainer></ChartFrame></div>

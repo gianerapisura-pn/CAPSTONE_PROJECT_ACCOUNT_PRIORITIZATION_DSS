@@ -8,10 +8,10 @@ import pandas as pd
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
-from app.auth.dependencies import AuthenticatedUser, require_admin, require_user
+from app.auth.dependencies import AuthenticatedUser, require_admin, require_analytical_reader, require_user
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
 from app.core.config import get_settings, validate_runtime_configuration
 from app.db.models import (
@@ -21,7 +21,7 @@ from app.db.models import (
     SensitivityScenarioRecord, SettlementResult, CriticInfluenceRecord,
     PredictiveBenchmarkRecord, PredictiveHorizonEvaluation, PredictiveMonitoringEvaluation,
     PredictiveOOPEvaluation,
-    PrescriptiveValidationEvidence,
+    PrescriptiveValidationEvidence, UserProfile,
 )
 from app.db.repository import (
     CLIENT_CONFIRMED_ACTIVE,
@@ -50,7 +50,8 @@ from app.services.model_lifecycle import (
 )
 from app.services.study_predictions import MODEL_ARTIFACT_SHA256, MODEL_VERSION, final_study_prediction_payload
 from app.services.prescriptive_evidence import EVIDENCE_VERSION
-from app.services.locked_packages import FINAL_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256
+from app.services.additional_validation_evidence import EVIDENCE_VERSION as ADDITIONAL_EVIDENCE_VERSION, REPORT_SCOPES
+from app.services.locked_packages import FINAL_PACKAGE_SHA256, FINAL_QA_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256
 from app.services.power_bi_refresh import (
     public_status,
 )
@@ -94,6 +95,11 @@ class SICoverageRequest(BaseModel):
 
 class MonitorRequest(BaseModel):
     as_of_date: date
+
+
+class OwnProfileUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    display_name: str = Field(min_length=1, max_length=160)
 
 
 class AliasDecisionRequest(BaseModel):
@@ -174,6 +180,35 @@ def health():
 @app.get("/auth/me")
 def me(user: AuthenticatedUser = Depends(require_user)):
     return asdict(user)
+
+
+@app.get("/profile")
+def own_profile(user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db)):
+    profile = db.get(UserProfile, user.user_id)
+    if not profile and not user.demo:
+        raise HTTPException(403, "An approved DSS profile is required.")
+    return {"user_id": user.user_id, "email": user.email,
+            "display_name": profile.display_name if profile else user.display_name,
+            "role": user.role, "status": "demo" if user.demo else "active"}
+
+
+@app.patch("/profile")
+def update_own_profile(request: OwnProfileUpdate,
+                       user: AuthenticatedUser = Depends(require_user),
+                       db: Session = Depends(get_db)):
+    if user.demo:
+        raise HTTPException(403, "Demo profiles cannot be changed.")
+    name = request.display_name.strip()
+    if not name:
+        raise HTTPException(422, "Display name cannot be blank.")
+    profile = db.get(UserProfile, user.user_id)
+    if not profile or not profile.is_active:
+        raise HTTPException(403, "An active DSS profile is required.")
+    profile.display_name = name
+    audit(db, user.user_id, "own_profile_display_name_updated", "user_profile",
+          user.user_id, {"field": "display_name"})
+    db.commit()
+    return own_profile(user, db)
 
 
 @app.get("/account-aliases/review")
@@ -693,6 +728,11 @@ def native_validation(user: AuthenticatedUser = Depends(require_user),
         study.pop("predictions", None)
     supplemental = db.scalars(select(PrescriptiveValidationEvidence).where(
         PrescriptiveValidationEvidence.evidence_version == EVIDENCE_VERSION)).all()
+    additional = db.scalars(select(PrescriptiveValidationEvidence).where(
+        PrescriptiveValidationEvidence.evidence_version == ADDITIONAL_EVIDENCE_VERSION,
+        PrescriptiveValidationEvidence.evidence_scope.in_(REPORT_SCOPES),
+        PrescriptiveValidationEvidence.source_package_hash == FINAL_QA_PACKAGE_SHA256,
+    )).all()
     return {
         "run": serialize_run(run),
         "study": study,
@@ -716,6 +756,10 @@ def native_validation(user: AuthenticatedUser = Depends(require_user),
         "critic_weights": run.critic_weights or {},
         "supplemental": [row.payload for row in supplemental
                          if model_id and row.source_package_hash in accepted_hashes],
+        "additional_evidence": {
+            scope: [row.payload for row in additional if row.evidence_scope == scope]
+            for scope in REPORT_SCOPES
+        } if model_id else {},
     }
 
 
@@ -751,10 +795,15 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
     if not account:
         raise HTTPException(404, "Account not found.")
     run = _latest_or_404(db)
-    decision = next((x for x in current_account_rows(db, run)
-                     if x["account_key"] == account.account_key), None)
-    if not decision:
+    account_rows = current_account_rows(db, run)
+    position = next((index for index, row in enumerate(account_rows)
+                     if row["account_key"] == account.account_key), None)
+    if position is None:
         raise HTTPException(404, "Account is not part of the latest verified B2B run.")
+    decision = account_rows[position]
+    def neighbor(index):
+        return {"account_key": account_rows[index]["account_key"],
+                "account": account_rows[index]["account"]} if 0 <= index < len(account_rows) else None
     rfm = db.scalar(select(RFMResult).where(RFMResult.analysis_run_id == run.analysis_run_id,
                                             RFMResult.account_key == account.account_key))
     settlement = db.scalar(select(SettlementResult).where(
@@ -772,6 +821,7 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
     ))
     return {
         "account_key": account.account_key, "account": decision["account"],
+        "navigation": {"previous": neighbor(position - 1), "next": neighbor(position + 1)},
         "context": {key: decision.get(key) for key in (
             "entity_type", "business_category", "primary_business_type",
             "b2b_priority_eligible", "account_status", "last_verified",
@@ -811,7 +861,7 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
 
 
 @app.get("/analytics/rfm")
-def rfm(user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db)):
+def rfm(user: AuthenticatedUser = Depends(require_analytical_reader), db: Session = Depends(get_db)):
     run = _latest_or_404(db)
     return {"analysis_run_id": run.analysis_run_id,
             "analysis_reference_date": serialize_run(run)["analysis_reference_date"],
@@ -819,7 +869,7 @@ def rfm(user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(
 
 
 @app.get("/analytics/settlement")
-def settlement(user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db)):
+def settlement(user: AuthenticatedUser = Depends(require_analytical_reader), db: Session = Depends(get_db)):
     run = _latest_or_404(db)
     return {"analysis_run_id": run.analysis_run_id,
             "analysis_reference_date": serialize_run(run)["analysis_reference_date"],
@@ -827,7 +877,7 @@ def settlement(user: AuthenticatedUser = Depends(require_admin), db: Session = D
 
 
 @app.get("/analytics/predictive")
-def predictive(user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db)):
+def predictive(user: AuthenticatedUser = Depends(require_analytical_reader), db: Session = Depends(get_db)):
     run = latest_successful_run(db)
     operational = (
         run_payload(db, run)["predictive"]
@@ -848,7 +898,7 @@ def cart_redirect(user: AuthenticatedUser = Depends(require_admin)):
 
 @app.get("/analytics/sensitivity")
 def sensitivity(account_key: str | None = None,
-                user: AuthenticatedUser = Depends(require_admin),
+                user: AuthenticatedUser = Depends(require_analytical_reader),
                 db: Session = Depends(get_db)):
     run, payload = _latest_or_404(db), None
     payload = run_payload(db, run)
