@@ -25,7 +25,7 @@ export default function ReportsPage() {
     </div>
     <section className="native-export">
       <div className="section-heading"><div><span className="eyebrow">Approved operational output</span><h2>Account Prioritization export</h2></div></div>
-      <div className="export-card"><span><FileSpreadsheet /></span><div><h3>Account Prioritization</h3><p>Published account profiles, criteria, score, rank, group, and separate predictive context.</p></div>
+      <div className="export-card"><span><FileSpreadsheet /></span><div><h3>Account Prioritization</h3><p>Full published B2B population, including historical unranked accounts. Report filters do not change this download; Account Prioritization provides filtered exports.</p></div>
         <div><button className="button secondary" onClick={() => downloadExport("/exports/priorities.csv", "peslc-account-priorities.csv")}><Download size={16} />CSV</button>
         <button className="button secondary" onClick={() => downloadExport("/exports/priorities.xlsx", "peslc-account-priorities.xlsx")}><Download size={16} />XLSX</button></div></div>
     </section>

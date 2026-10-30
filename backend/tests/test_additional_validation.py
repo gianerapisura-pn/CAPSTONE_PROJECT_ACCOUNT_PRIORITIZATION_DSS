@@ -59,6 +59,8 @@ def test_shared_read_only_results_are_role_identical(controlled_db):
 def test_own_profile_update_cannot_change_role_or_other_user(controlled_db):
     client = _as("management")
     assert client.patch("/profile", json={"display_name": "Manager", "role": "administrator"}).status_code == 422
+    assert client.patch("/profile", json={"display_name": "   "}).status_code == 422
+    assert client.patch("/profile", json={"display_name": "Manager", "user_id": "another-user"}).status_code == 422
     assert client.patch("/profile", json={"display_name": "Manager"}).status_code == 200
     assert client.get("/profile").json()["display_name"] == "Manager"
     assert controlled_db.get(UserProfile, "00000000-0000-4000-8000-000000000011").display_name is None

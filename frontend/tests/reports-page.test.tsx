@@ -76,25 +76,20 @@ test("native reporting has exactly three views and does not require Power BI", (
   expect(screen.getByRole("button", { name: /CSV/ })).toBeInTheDocument();
 });
 
-test("filters retain published score and the account drilldown", async () => {
+test("contextual filters retain published data and expose a matching-account drilldown", async () => {
   const user = userEvent.setup();
   render(<ReportsPage />);
-  await user.selectOptions(screen.getByLabelText("Business category"), "Corporate");
-  expect(screen.getByRole("link", { name: /ALPHA/ })).toHaveAttribute("href", "/accounts/a");
   await user.click(screen.getByRole("tab", { name: "Account & Prioritization Insights" }));
   expect(screen.getByRole("heading", { name: "RFM Score Distribution" })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Historical Settlement Duration Distribution" })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Published CRITIC Criterion Weights" })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Business Category Composition of Ranked Accounts" })).toBeInTheDocument();
-  expect(screen.queryByRole("heading", { name: "Priority Groups by Primary Business Type" })).not.toBeInTheDocument();
-  expect(screen.getByText("BETA")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "B2B status and prioritization" })).not.toBeInTheDocument();
+  expect(screen.queryByPlaceholderText("Search account")).not.toBeInTheDocument();
+  await user.selectOptions(screen.getByLabelText("RFM component"), "Recency");
   await user.selectOptions(screen.getByLabelText("RFM component score"), "5");
-  expect(screen.queryByText("BETA")).not.toBeInTheDocument();
-  await user.selectOptions(screen.getByLabelText("RFM component score"), "");
-  await user.selectOptions(screen.getByLabelText("Average settlement days"), "Below 30");
-  expect(screen.queryByText("BETA")).not.toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "ALPHA" }));
-  expect(screen.getAllByText("0.8123").length).toBeGreaterThan(0);
+  const link = screen.getByRole("link", { name: "View accounts matching report filters" });
+  const query = new URLSearchParams(link.getAttribute("href")!.split("?")[1]);
+  expect(query.get("rfm_component")).toBe("Recency");
+  expect(query.get("rfm_score")).toBe("5");
+  expect(screen.getByText(/1 of 3 verified B2B accounts in view/)).toBeInTheDocument();
 });
 
 test("recent purchase table uses published 24-month counts and current filters", async () => {
@@ -122,8 +117,7 @@ test("recent purchase table uses published 24-month counts and current filters",
   await user.selectOptions(screen.getByLabelText("Priority group"), "High");
   expect(within(table).getByRole("row", { name: /^High / })).toHaveTextContent("50.00%");
   expect(within(table).getByRole("row", { name: /^Medium / })).toHaveTextContent("Not applicable");
-  await user.type(screen.getByPlaceholderText("Search account"), "ALPHA");
-  expect(within(table).getByRole("row", { name: /^High / })).toHaveTextContent("100.00%");
+  expect(screen.queryByPlaceholderText("Search account")).not.toBeInTheDocument();
 });
 
 test("current overview counts exclude historical-only identities from the ranking scope", () => {
@@ -134,78 +128,63 @@ test("current overview counts exclude historical-only identities from the rankin
   expect(screen.queryByText("Historical identities")).not.toBeInTheDocument();
 });
 
-test("business composition drills from a category to verified types and ranked accounts", async () => {
+test("business composition has one total-count chart and contextual category/type links", async () => {
   const user = userEvent.setup();
   render(<ReportsPage />);
   await user.click(screen.getByRole("tab", { name: "Account & Prioritization Insights" }));
-  const category = screen.getByRole("region", { name: "Business Composition" });
-  expect(within(category).getByText("1 ranked account")).toBeInTheDocument();
-  expect(within(category).getByRole("link", { name: /ALPHA/ })).toHaveAttribute("href", "/accounts/a");
-  expect(within(category).queryByRole("link", { name: /BETA/ })).not.toBeInTheDocument();
-  await user.click(within(category).getByRole("button", { name: "Next business category" }));
-  expect(within(category).getByRole("combobox", { name: "Selected category" })).toHaveValue("Retail");
-  expect(within(category).getByRole("link", { name: /GAMMA/ })).toHaveAttribute("href", "/accounts/c");
-  await user.click(within(category).getByRole("button", { name: "Medium 1" }));
-  expect(within(category).getByText("Showing 1-1 of 1")).toBeInTheDocument();
-  await user.click(within(category).getByRole("button", { name: "Previous business category" }));
-  expect(within(category).getByRole("link", { name: /ALPHA/ })).toBeInTheDocument();
-  expect(within(category).getByRole("button", { name: "Industrial 1" })).toBeInTheDocument();
+  const composition = screen.getByRole("region", { name: "Business Composition" });
+  expect(within(composition).queryByRole("button", { name: "Next business category" })).not.toBeInTheDocument();
+  await user.click(within(composition).getByText("Select a category by name"));
+  await user.selectOptions(within(composition).getByLabelText("Business category selection"), "Corporate");
+  expect(within(composition).getByText(/1 ranked accounts matching/)).toBeInTheDocument();
+  const high = within(composition).getByRole("link", { name: /High: 1/ });
+  const query = new URLSearchParams(high.getAttribute("href")!.split("?")[1]);
+  expect(query.get("business_category")).toBe("Corporate");
+  expect(query.get("priority_group")).toBe("High");
+  expect(query.get("eligibility")).toBe("ranked");
+  await user.click(within(composition).getByText(/Explore Primary Business Types/));
+  await user.type(within(composition).getByLabelText("Search Business Type"), "Industrial");
+  const typeLink = within(composition).getByRole("link", { name: "View Matching Accounts" });
+  expect(new URLSearchParams(typeLink.getAttribute("href")!.split("?")[1]).get("primary_business_type")).toBe("Industrial");
+  expect(within(composition).queryByText("ALPHA")).not.toBeInTheDocument();
 });
 
-test("B2B table shows ten accounts per page and resets to page one after filtering", async () => {
-  insightsAccounts = [...accounts, ...Array.from({ length: 12 }, (_, index) => ({
-    ...accounts[0], account: `DELTA ${String(index + 1).padStart(2, "0")}`,
-    account_key: `delta-${index + 1}`, priority_rank: index + 3,
-    priority_group: "High", final_priority_score: .8123,
-    predicted_future_transaction_class: "With Future Sales", average_settlement_days: 25,
-  }))];
+test("report filters use progressive disclosure and duplicate account tables are absent", async () => {
   const user = userEvent.setup();
   render(<ReportsPage />);
   await user.click(screen.getByRole("tab", { name: "Account & Prioritization Insights" }));
-  const table = screen.getByRole("heading", { name: "B2B status and prioritization" }).closest("section")!;
-  expect(within(table).getByText("Showing 1-10 of 15 accounts")).toBeInTheDocument();
-  expect(within(table).getAllByRole("row")).toHaveLength(11);
-  expect(within(table).getByRole("button", { name: "Previous account page" })).toBeDisabled();
-  await user.click(within(table).getByRole("button", { name: "Next account page" }));
-  expect(within(table).getByText("Showing 11-15 of 15 accounts")).toBeInTheDocument();
-  expect(within(table).getAllByRole("row")).toHaveLength(6);
-  expect(within(table).getByRole("button", { name: "DELTA 12" })).toBeInTheDocument();
-  expect(within(table).getByRole("button", { name: "Next account page" })).toBeDisabled();
-  await user.type(screen.getByPlaceholderText("Search account"), "DELTA 12");
-  expect(within(table).getByText("Showing 1-1 of 1 account")).toBeInTheDocument();
-  expect(within(table).getByText("Page 1 of 1")).toBeInTheDocument();
-  expect(within(table).getByRole("button", { name: "DELTA 12" })).toBeInTheDocument();
-});
-
-test("RFM component and score controls filter the selected criterion only", async () => {
-  const user = userEvent.setup();
-  render(<ReportsPage />);
-  await user.click(screen.getByRole("tab", { name: "Account & Prioritization Insights" }));
-  const component = screen.getByLabelText("RFM component");
-  const componentScore = screen.getByLabelText("RFM component score");
-  expect(screen.getByRole("group", { name: /RFM Score Distribution/ })).toBeInTheDocument();
-  await user.selectOptions(componentScore, "5");
-  expect(screen.getByRole("button", { name: "ALPHA" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "GAMMA" })).toBeInTheDocument();
-  await user.selectOptions(component, "Recency");
-  expect(screen.getByRole("button", { name: "ALPHA" })).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "GAMMA" })).not.toBeInTheDocument();
-  await user.selectOptions(component, "Frequency");
-  expect(screen.queryByRole("button", { name: "ALPHA" })).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "GAMMA" })).toBeInTheDocument();
-  component.focus();
-  expect(component).toHaveFocus();
-  await user.tab();
-  expect(componentScore).toHaveFocus();
+  const summary = screen.getByText("More Filters");
+  expect(summary.closest("details")).not.toHaveAttribute("open");
+  await user.click(summary);
+  await user.selectOptions(screen.getByLabelText("Ranking status"), "Not ranked");
+  expect(screen.getByText(/1 of 3 verified B2B accounts in view/)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "View accounts matching report filters" })).toHaveAttribute("href", expect.stringContaining("eligibility=not_ranked"));
   await user.click(screen.getByRole("button", { name: "Reset filters" }));
-  expect(screen.getByRole("button", { name: "ALPHA" })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "GAMMA" })).toBeInTheDocument();
+  expect(screen.getByText(/3 of 3 verified B2B accounts in view/)).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "B2B status and prioritization" })).not.toBeInTheDocument();
+});
+
+test("RFM component and score filter one criterion and preserve link scope", async () => {
+  const user = userEvent.setup();
+  render(<ReportsPage />);
+  await user.click(screen.getByRole("tab", { name: "Account & Prioritization Insights" }));
+  await user.selectOptions(screen.getByLabelText("RFM component score"), "5");
+  expect(screen.getByText(/2 of 3 verified B2B accounts in view/)).toBeInTheDocument();
+  await user.selectOptions(screen.getByLabelText("RFM component"), "Recency");
+  expect(screen.getByText(/1 of 3 verified B2B accounts in view/)).toBeInTheDocument();
+  await user.selectOptions(screen.getByLabelText("RFM component"), "Frequency");
+  const link = screen.getByRole("link", { name: "View accounts matching report filters" });
+  expect(link).toHaveAttribute("href", expect.stringContaining("rfm_component=Frequency"));
+  await user.click(screen.getByRole("button", { name: "Reset filters" }));
+  expect(screen.getByText(/3 of 3 verified B2B accounts in view/)).toBeInTheDocument();
 });
 
 test("management can open read-only validation evidence", async () => {
   const user = userEvent.setup();
   render(<ReportsPage />);
   await user.click(screen.getByRole("tab", { name: "Analytics Validation" }));
+  await user.click(screen.getByText("Model selection and historical classification evidence"));
+  await user.click(screen.getByText("Weight sensitivity, backtests, and technical robustness"));
   expect(screen.getByRole("heading", { name: "Prediction Horizon Comparison" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Model Benchmark: Mean Macro F1" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Development observations by cutoff year" })).toBeInTheDocument();

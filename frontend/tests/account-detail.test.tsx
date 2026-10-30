@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 import AccountDetailsPage from "@/app/(protected)/accounts/[accountKey]/page";
 
-vi.mock("next/navigation", () => ({ useParams: () => ({ accountKey: "a064" }) }));
+vi.mock("next/navigation", () => ({ useParams: () => ({ accountKey: "a064" }), useSearchParams: () => new URLSearchParams() }));
 vi.mock("@/lib/use-api", () => ({ useApi: () => ({
   data: {
     account_key: "a064", account: "ROSTRAM PROTECTIVE SYSTEM METIER COMPANY",

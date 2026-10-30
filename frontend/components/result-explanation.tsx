@@ -10,6 +10,8 @@ export type ResultExplanation = {
   calculation?: string;
   inputs?: string[];
   note?: string;
+  source?: string;
+  interpretation?: string;
 };
 
 type Criterion = "recency" | "frequency" | "monetary" | "settlement";
@@ -151,7 +153,14 @@ export function ExplainedValue({ children, explanation, className = "", inline =
       if (!ref.current?.contains(target) && !cardRef.current?.contains(target)) setOpen(false);
     };
     const closeOnPageScroll = (event: Event) => {
-      if (!(event.target instanceof Node && cardRef.current?.contains(event.target))) setOpen(false);
+      if (event.target instanceof Node && cardRef.current?.contains(event.target)) return;
+      const anchor = ref.current?.getBoundingClientRect();
+      if (!anchor) return;
+      const width = cardRef.current?.getBoundingClientRect().width ?? 420;
+      setPosition(current => current ? {
+        left: Math.max(12, Math.min(anchor.left + anchor.width / 2 - width / 2, window.innerWidth - width - 12)),
+        top: anchor.bottom + 8,
+      } : current);
     };
     window.addEventListener("keydown", close);
     window.addEventListener("pointerdown", closeOnOutsidePress);
@@ -184,7 +193,8 @@ export function ExplainedValue({ children, explanation, className = "", inline =
     setOpen(true);
   }
   return <>
-    <span ref={ref} className={`explained-value ${inline ? "" : "explained-value-block"} ${className}`} tabIndex={0} aria-describedby={open ? id : undefined}
+    <span ref={ref} className={`explained-value ${inline ? "" : "explained-value-block"} ${className}`} tabIndex={0} role="button" aria-expanded={open} aria-describedby={open ? id : undefined}
+      onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (open) setOpen(false); else show(); } }}
       onPointerEnter={event => { if (event.pointerType !== "touch") show(); }} onPointerLeave={scheduleClose} onFocus={() => { if (pointerType.current !== "touch") show(); }} onBlur={scheduleClose}
       onPointerDown={event => { pointerType.current = event.pointerType; }}
       onClick={event => { if (pointerType.current === "touch") { if (!open) { event.preventDefault(); event.stopPropagation(); show(); } else if (!event.currentTarget.closest("a")) setOpen(false); } pointerType.current = ""; }}>
@@ -192,13 +202,15 @@ export function ExplainedValue({ children, explanation, className = "", inline =
     </span>
     {open && position && createPortal(<div ref={cardRef} id={id} role="tooltip" tabIndex={0} className="result-explanation" style={{ left: position.left, top: position.top }}
       onPointerEnter={cancelClose} onPointerLeave={scheduleClose} onFocus={cancelClose} onBlur={scheduleClose}
-      onClick={event => { event.preventDefault(); event.stopPropagation(); }}>
+      onClick={event => { event.stopPropagation(); }}>
       <span className="result-explanation-eyebrow">About this result</span>
       <strong>{explanation.title}</strong>
       <p><b>Meaning</b>{explanation.basis}</p>
+      {explanation.source && <p><b>Information used</b>{explanation.source}</p>}
       {explanation.calculation && <div className="result-explanation-formula"><b>Calculation</b>{explanation.calculation}</div>}
-      {explanation.inputs?.length && <div className="result-explanation-inputs"><b>This account&apos;s saved values</b><ul>{explanation.inputs.map((input, index) => <li key={index}>{input}</li>)}</ul></div>}
+      {explanation.inputs?.length ? <details className="result-explanation-inputs" onToggle={() => setPosition(current => current ? { ...current } : current)}><summary>Saved values for this result</summary><ul>{explanation.inputs.map((input, index) => <li key={index}>{input}</li>)}</ul></details> : null}
       {explanation.note && <small><b>Important</b>{explanation.note}</small>}
+      {explanation.interpretation && <p><b>For management</b>{explanation.interpretation}</p>}
     </div>, document.body)}
   </>;
 }
@@ -210,5 +222,15 @@ export function ResultValue({ metric, row, children, className, inline }: {
   className?: string;
   inline?: boolean;
 }) {
-  return <ExplainedValue explanation={resultExplanation(metric, row)} className={className} inline={inline}>{children}</ExplainedValue>;
+  const explanation = resultExplanation(metric, row);
+  if (row) {
+    explanation.source = `${row.account ?? "This account"}; saved analysis reference ${row.analysis_reference_date ?? "unavailable"}. Several collection rows for one invoice do not multiply a sale.`;
+    if (metric === "provenance") explanation.inputs = [row.business_category, row.primary_business_type, row.account_status].filter((value): value is string => Boolean(value));
+    if (metric === "frequency") explanation.calculation = `Count distinct valid Sales Invoices in the preceding 24 months: ${row.frequency_count ?? "unavailable"}.`;
+    if (metric === "monetary") explanation.calculation = `Sum each valid Sales Invoice once in the preceding 24 months: PHP ${row.monetary_value?.toLocaleString("en-PH", { minimumFractionDigits: 2 }) ?? "unavailable"}.`;
+    if (metric === "rfm_frequency") explanation.calculation = `Count distinct valid Sales Invoices across the available history: ${row.full_history_frequency ?? "unavailable"}.`;
+    if (metric === "rfm_monetary") explanation.calculation = `Sum valid Sales Invoice amounts across the available history: PHP ${row.full_history_monetary?.toLocaleString("en-PH", { minimumFractionDigits: 2 }) ?? "unavailable"}.`;
+    if (metric === "settlement") explanation.calculation = `${row.settlement_invoice_count ?? "Unavailable"} eligible reconciled invoices contribute to this saved mean of ${decimal(row.average_settlement_days)} days. Missing durations are excluded, not zero.`;
+  }
+  return <ExplainedValue explanation={explanation} className={className} inline={inline}>{children}</ExplainedValue>;
 }

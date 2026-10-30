@@ -8,7 +8,7 @@ from fastapi import Depends, Header, HTTPException, status
 from jwt import PyJWKClient
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
+from app.core.config import get_settings, validate_runtime_configuration
 from app.db.models import UserProfile
 from app.db.session import get_db
 
@@ -58,6 +58,7 @@ async def require_user(
 ) -> AuthenticatedUser:
     settings = get_settings()
     if settings.demo_mode:
+        validate_runtime_configuration(settings)
         return AuthenticatedUser(DEMO_ADMIN_USER_ID, "administrator", "demo@local.invalid", "Demo Administrator", True)
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")

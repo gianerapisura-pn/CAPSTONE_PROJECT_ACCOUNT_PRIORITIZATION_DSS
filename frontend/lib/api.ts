@@ -26,7 +26,10 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   if (response.status === 401) throw new Error("Your session expired. Sign in again.");
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(typeof payload.detail === "string" ? payload.detail : "The request could not be completed.");
+    const detail = typeof payload.detail === "string" ? payload.detail : Array.isArray(payload.detail)
+      ? payload.detail.map((issue: { loc?: unknown[]; msg?: string }) => `${issue.loc?.at(-1) ?? "Filter"}: ${issue.msg ?? "Invalid value"}`).join("; ")
+      : "The request could not be completed.";
+    throw new Error(detail);
   }
   return response.json();
 }

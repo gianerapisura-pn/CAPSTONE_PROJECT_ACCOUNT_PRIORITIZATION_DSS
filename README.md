@@ -24,6 +24,8 @@ Backend defaults to http://127.0.0.1:8000; frontend defaults to http://localhost
 
 ## Private artifact and data
 
+The authoritative final QA archive is `PESLC_FINAL_QA.zip` (also distributed as `PESLC_FINAL_QA(1).zip`), SHA-256 `31a59573fa60ce56972771476ca3859978c8a71dced314f10df747bf19e89094`. Its common core data and model members are byte-identical to the verified analysis archive below. Its additional ranking/feature/uncertainty evidence is registered separately by `backend/scripts/seed_additional_validation_evidence.py`, with member hashes and a fixed-study reference. Neither private archive nor the frozen model belongs in Git. See `docs/FINAL_LOCAL_REVIEW_20261030.md` for the current local UI changes and verification.
+
 The private `PESLC_FINAL_ANALYTICS_FINAL_FILTERED_QA.zip` is the active, status-filtered analysis package for model registration, account-context bootstrap, predictive evidence, prescriptive robustness evidence, and the opt-in regression. Every workflow verifies SHA-256 `073570d6b255f79501a752e9b61d0ee44cc86597fbadb33f511e89c556c9f758`; the ZIP must never be committed. Prior package hashes remain recognized only for existing immutable evidence, not new imports.
 
 The main 2024 historical predictive confirmation uses cutoff 2024-12-31 and outcomes through 2025-12-31. The older 2024-08-13 rolling comparison remains supplementary package evidence, not model-selection evidence. The 2025-12-31 study forecast retains its 83-account, 10/73 result; the seven separate prescriptive backtests are recomputed against the revised source.

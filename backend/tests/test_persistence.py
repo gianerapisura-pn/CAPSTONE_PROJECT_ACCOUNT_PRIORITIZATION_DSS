@@ -16,6 +16,7 @@ from app.services.analytics_runner import run_account_prioritization
 from app.analytics.predictive.future_transaction import FutureTransactionResult
 from app.auth.dependencies import AuthenticatedUser
 from app.main import account_detail, native_insights, native_overview
+from app.schemas.account_filters import AccountFilters
 
 
 def group(i):
@@ -81,18 +82,25 @@ def test_final_run_persistence_and_public_contract():
         assert db.scalar(select(FutureTransactionPrediction)) is not None
         assert serialize_run(latest)["analysis_reference_date"] == "2026-09-21"
         viewer = AuthenticatedUser("test-user", "management")
-        first = account_detail(rows[0]["account_key"], viewer, db)
-        middle = account_detail(rows[1]["account_key"], viewer, db)
-        last = account_detail(rows[-1]["account_key"], viewer, db)
+        first = account_detail(rows[0]["account_key"], viewer, db, AccountFilters())
+        middle = account_detail(rows[1]["account_key"], viewer, db, AccountFilters())
+        last = account_detail(rows[-1]["account_key"], viewer, db, AccountFilters())
         assert first["navigation"] == {
+            "total": 8, "scope": "Published account list with the current filters and sort order",
             "previous": None,
             "next": {"account_key": rows[1]["account_key"], "account": rows[1]["account"]},
         }
         assert middle["navigation"] == {
+            "total": 8, "scope": "Published account list with the current filters and sort order",
             "previous": {"account_key": rows[0]["account_key"], "account": rows[0]["account"]},
             "next": {"account_key": rows[2]["account_key"], "account": rows[2]["account"]},
         }
         assert last["navigation"]["next"] is None
+        filtered_detail = account_detail(rows[1]["account_key"], viewer, db,
+                                         AccountFilters(search=rows[1]["account"]))
+        assert filtered_detail["navigation"]["total"] == 1
+        assert filtered_detail["navigation"]["previous"] is None
+        assert filtered_detail["navigation"]["next"] is None
         overview = native_overview(viewer, db)
         insights = native_insights(viewer, db)
         assert overview["run"]["analysis_run_id"] == latest.analysis_run_id

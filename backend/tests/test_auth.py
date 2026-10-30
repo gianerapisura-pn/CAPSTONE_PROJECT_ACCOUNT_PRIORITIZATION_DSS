@@ -37,6 +37,42 @@ def test_production_configuration_fails_closed():
     validate_runtime_configuration(safe)
 
 
+def test_missing_environment_defaults_do_not_enable_demo(monkeypatch):
+    monkeypatch.delenv("APP_ENV", raising=False)
+    monkeypatch.delenv("DEMO_MODE", raising=False)
+    settings = Settings(_env_file=None)
+    assert settings.app_env == "production"
+    assert settings.demo_mode is False
+    with pytest.raises(RuntimeError):
+        validate_runtime_configuration(settings)
+
+
+def test_demo_requires_explicit_local_configuration():
+    with pytest.raises(RuntimeError):
+        validate_runtime_configuration(Settings(_env_file=None, app_env="test", demo_mode=True,
+                                                 database_url="postgresql://example.invalid/private"))
+
+
+def test_legacy_reporting_views_have_forward_only_invoker_hardening():
+    from pathlib import Path
+    migration = Path(__file__).resolve().parents[2] / "supabase/migrations/20261030102932_harden_legacy_reporting_views.sql"
+    sql = migration.read_text().lower()
+    for view in ("reporting_analytics_run_history", "reporting_transaction_history"):
+        assert f"alter view public.{view} set (security_invoker = true)" in sql
+        assert f"revoke all on public.{view} from public, anon" in sql
+
+
+@pytest.mark.parametrize("active,role", [(False, "management"), (True, "unknown")])
+def test_revoked_or_unapproved_profiles_are_denied(monkeypatch, active, role):
+    from types import SimpleNamespace
+    monkeypatch.setattr("app.auth.dependencies.get_settings", lambda: Settings(_env_file=None, demo_mode=False))
+    monkeypatch.setattr("app.auth.dependencies._verify_supabase_token", lambda _: {"sub": "approved-user"})
+    db = SimpleNamespace(get=lambda *_: SimpleNamespace(is_active=active, role=role))
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(require_user("Bearer test-token", db))
+    assert error.value.status_code == 403
+
+
 def test_administrator_detail_routes_enforce_admin_dependency():
     from fastapi.routing import APIRoute
     from app.main import app

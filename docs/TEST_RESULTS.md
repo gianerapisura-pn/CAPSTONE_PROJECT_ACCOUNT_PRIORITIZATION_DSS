@@ -1,5 +1,7 @@
 # Test Results
 
+The October 30 local implementation and current verification are recorded separately in [FINAL_LOCAL_REVIEW_20261030.md](FINAL_LOCAL_REVIEW_20261030.md). The dated records below are historical evidence, not certification of the current workspace or live deployment.
+
 ## Active Status-Filtered Package (2026-10-25)
 
 - Private ZIP: `PESLC_FINAL_ANALYTICS_FINAL_FILTERED_QA.zip`, SHA-256 `073570d6b255f79501a752e9b61d0ee44cc86597fbadb33f511e89c556c9f758`; enclosed frozen CatBoost artifact SHA-256 `09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3`. Neither artifact is committed.

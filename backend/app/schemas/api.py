@@ -148,9 +148,11 @@ class AccountDecisionRowResponse(BaseModel):
     latest_valid_si_date: str | None = None
     recency_days: int
     frequency: int
-    frequency_count: int
+    frequency_count: int | None = None
     monetary: float
-    monetary_value: float
+    monetary_value: float | None = None
+    full_history_frequency: int | None = None
+    full_history_monetary: float | None = None
     r_score: int
     f_score: int
     m_score: int
@@ -185,6 +187,7 @@ class AccountDecisionRowResponse(BaseModel):
 
 
 class AccountListResponse(BaseModel):
+    filter_options: dict[str, list[str]] = Field(default_factory=dict)
     items: list[AccountDecisionRowResponse]
     total: int
     page: int

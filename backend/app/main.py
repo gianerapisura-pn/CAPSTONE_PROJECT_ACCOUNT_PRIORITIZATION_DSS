@@ -16,7 +16,7 @@ from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
 from app.core.config import get_settings, validate_runtime_configuration
 from app.db.models import (
     AccountAlias, AccountAliasReview, AnalyticsRun, CollectionCorrectionReview, DimAccount, ImportBatch,
-    ImportRowIssue, InvoiceGroupRecord, PowerBIRefresh, PredictiveStudyPrediction, RFMResult, RawSourceRow,
+    ImportRowIssue, InvoiceGroupRecord, PowerBIRefresh, PredictiveStudyPrediction, FutureTransactionPrediction, RFMResult, RawSourceRow,
     SICoverageConfirmation,
     SensitivityScenarioRecord, SettlementResult, CriticInfluenceRecord,
     PredictiveBenchmarkRecord, PredictiveHorizonEvaluation, PredictiveMonitoringEvaluation,
@@ -40,6 +40,7 @@ from app.schemas.api import (
     AccountListResponse, AccountPriorityResponse, AnalyticsRunResponse, ImportBatchResponse,
     ImportCommitResponse, ImportDetailResponse, ImportPreviewResponse, ModelSummaryResponse,
 )
+from app.schemas.account_filters import AccountFilters, read_account_filters, validate_snapshot_filters
 from app.services.import_workflow import (
     commit_source, preview_source, resolve_collection_correction,
 )
@@ -772,24 +773,28 @@ def account_priorities(user: AuthenticatedUser = Depends(require_user),
 @app.get("/accounts", response_model=AccountListResponse)
 def accounts(search: str = "", priority_group: str | None = None,
              predicted_future_transaction_class: str | None = None,
-             eligibility: str | None = Query(None, pattern="^(ranked|not_ranked)$"),
+             eligibility: str | None = Query(None, pattern="^(ranked|not_ranked|all)$"),
              page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=500),
-             user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db)):
+             user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db),
+             filters: AccountFilters = Depends(read_account_filters)):
     run = _latest_or_404(db)
-    rows = filter_current_account_rows(
-        current_account_rows(db, run), search, priority_group,
-        predicted_future_transaction_class, eligibility)
+    population = current_account_rows(db, run)
+    options = validate_snapshot_filters(population, filters)
+    rows = filter_current_account_rows(population, **filters.model_dump())
+    page = min(page, max(1, (len(rows) + page_size - 1) // page_size))
     start = (page - 1) * page_size
     reference = run.analysis_reference_date or run.cutoff_date
     return {"items": rows[start:start + page_size], "total": len(rows), "page": page,
             "page_size": page_size, "analysis_run_id": run.analysis_run_id,
             "analysis_reference_date": reference.isoformat() if reference else None,
-            "updated_at": run.completed_at.isoformat() if run.completed_at else None}
+            "updated_at": run.completed_at.isoformat() if run.completed_at else None,
+            "filter_options": options}
 
 
 @app.get("/accounts/{account_key}")
 def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_user),
-                   db: Session = Depends(get_db)):
+                   db: Session = Depends(get_db),
+                   filters: AccountFilters = Depends(read_account_filters)):
     account = db.get(DimAccount, account_key) or db.scalar(select(DimAccount).where(
         DimAccount.standardized_account_name == account_key))
     if not account:
@@ -801,9 +806,16 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
     if position is None:
         raise HTTPException(404, "Account is not part of the latest verified B2B run.")
     decision = account_rows[position]
+    validate_snapshot_filters(account_rows, filters)
+    navigation_rows = filter_current_account_rows(account_rows, **filters.model_dump())
+    navigation_position = next((index for index, row in enumerate(navigation_rows)
+                                if row["account_key"] == account.account_key), None)
     def neighbor(index):
-        return {"account_key": account_rows[index]["account_key"],
-                "account": account_rows[index]["account"]} if 0 <= index < len(account_rows) else None
+        return {"account_key": navigation_rows[index]["account_key"],
+                "account": navigation_rows[index]["account"]} if 0 <= index < len(navigation_rows) else None
+    operational_prediction = db.scalar(select(FutureTransactionPrediction).where(
+        FutureTransactionPrediction.analysis_run_id == run.analysis_run_id,
+        FutureTransactionPrediction.account_key == account.account_key))
     rfm = db.scalar(select(RFMResult).where(RFMResult.analysis_run_id == run.analysis_run_id,
                                             RFMResult.account_key == account.account_key))
     settlement = db.scalar(select(SettlementResult).where(
@@ -821,7 +833,9 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
     ))
     return {
         "account_key": account.account_key, "account": decision["account"],
-        "navigation": {"previous": neighbor(position - 1), "next": neighbor(position + 1)},
+        "navigation": {"previous": neighbor(navigation_position - 1) if navigation_position is not None else None,
+                       "next": neighbor(navigation_position + 1) if navigation_position is not None else None,
+                       "total": len(navigation_rows), "scope": "Published account list with the current filters and sort order"},
         "context": {key: decision.get(key) for key in (
             "entity_type", "business_category", "primary_business_type",
             "b2b_priority_eligible", "account_status", "last_verified",
@@ -837,7 +851,10 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
         "predictive": {
             "predicted_future_transaction_class":
                 decision["predicted_future_transaction_class"],
-            "model_version": decision["model_version"]},
+            "model_version": decision["model_version"],
+            "forecast_origin": operational_prediction.cutoff_date.isoformat() if operational_prediction else None,
+            "future_window_end": operational_prediction.future_window_end.isoformat() if operational_prediction else None,
+            "monitoring_status": operational_prediction.monitoring_status if operational_prediction else None},
         "study_predictive": {
             "predicted_future_transaction_class": study_prediction.predicted_class,
             "model_version": study_prediction.model_version,
@@ -995,8 +1012,9 @@ def methodology(user: AuthenticatedUser = Depends(require_admin)):
 @app.get("/exports/{dataset}.{format}")
 def export(dataset: str, format: str, search: str = "", priority_group: str | None = None,
            predicted_future_transaction_class: str | None = None,
-           eligibility: str | None = Query(None, pattern="^(ranked|not_ranked)$"),
-           user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db)):
+           eligibility: str | None = Query(None, pattern="^(ranked|not_ranked|all)$"),
+           user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db),
+           filters: AccountFilters = Depends(read_account_filters)):
     supported = {"priorities", "rfm", "settlement", "sensitivity", "runs",
                  "predictive", "transactions"}
     if dataset not in supported or format not in {"csv", "xlsx"}:
@@ -1005,10 +1023,9 @@ def export(dataset: str, format: str, search: str = "", priority_group: str | No
         raise HTTPException(403, "Administrator permission is required.")
     run, payload = _latest_or_404(db), None
     payload = run_payload(db, run)
+    validate_snapshot_filters(payload["accounts"], filters)
     sources = {
-        "priorities": filter_current_account_rows(
-            payload["accounts"], search, priority_group,
-            predicted_future_transaction_class, eligibility),
+        "priorities": filter_current_account_rows(payload["accounts"], **filters.model_dump()),
         "rfm": payload["rfm"], "settlement": payload["settlement"],
         "sensitivity": payload["sensitivity"], "runs": [serialize_run(run)],
         "predictive": [payload["predictive"]],
@@ -1020,6 +1037,9 @@ def export(dataset: str, format: str, search: str = "", priority_group: str | No
     }
     rows = [{key: _safe(value) for key, value in row.items()} for row in sources[dataset]]
     frame = pd.json_normalize(rows)
+    # User-supplied names must remain text when opened by spreadsheet software.
+    frame = frame.map(lambda value: "'" + value if isinstance(value, str)
+                      and value.lstrip().startswith(("=", "+", "-", "@", "\t", "\r")) else value)
     if "analysis_run_id" not in frame:
         frame.insert(0, "analysis_run_id", run.analysis_run_id)
     if "analysis_reference_date" not in frame:
@@ -1055,8 +1075,9 @@ def export(dataset: str, format: str, search: str = "", priority_group: str | No
 def export_priorities(format: str = Query("csv", pattern="^(csv|xlsx)$"),
                       search: str = "", priority_group: str | None = None,
                       predicted_future_transaction_class: str | None = None,
-                      eligibility: str | None = Query(None, pattern="^(ranked|not_ranked)$"),
+                      eligibility: str | None = Query(None, pattern="^(ranked|not_ranked|all)$"),
                       user: AuthenticatedUser = Depends(require_user),
-                      db: Session = Depends(get_db)):
+                      db: Session = Depends(get_db),
+                      filters: AccountFilters = Depends(read_account_filters)):
     return export("priorities", format, search, priority_group,
-                  predicted_future_transaction_class, eligibility, user, db)
+                  predicted_future_transaction_class, eligibility, user, db, filters)

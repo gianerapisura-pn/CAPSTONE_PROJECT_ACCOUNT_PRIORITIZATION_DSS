@@ -90,6 +90,7 @@ export interface AccountDecisionRow {
 }
 
 export interface AccountListResponse {
+  filter_options?: Record<string, string[]>;
   items: AccountDecisionRow[];
   total: number;
   page: number;

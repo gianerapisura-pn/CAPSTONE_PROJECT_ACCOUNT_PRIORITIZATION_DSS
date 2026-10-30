@@ -10,8 +10,8 @@ class Settings(BaseSettings):
     supabase_storage_bucket: str = "source-imports"
     supabase_model_storage_bucket: str = "model-artifacts"
     cors_allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
-    app_env: str = "development"
-    demo_mode: bool = True
+    app_env: str = "production"
+    demo_mode: bool = False
     log_level: str = "INFO"
     analytics_random_seed: int = 42
     max_upload_bytes: int = 15_000_000
@@ -43,6 +43,9 @@ def get_settings() -> Settings:
 
 def validate_runtime_configuration(settings: Settings) -> None:
     if settings.app_env.strip().lower() not in {"production", "prod"}:
+        if settings.demo_mode and (settings.app_env.strip().lower() not in {"development", "dev", "test"}
+                                   or not settings.database_url.lower().startswith("sqlite")):
+            raise RuntimeError("Demo mode requires an explicit development/test environment and an isolated SQLite database.")
         return
     missing = []
     if settings.demo_mode:

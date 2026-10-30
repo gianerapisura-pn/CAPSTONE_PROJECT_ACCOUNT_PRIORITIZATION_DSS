@@ -1,6 +1,18 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { vi } from "vitest";
+import { beforeEach, afterEach, vi } from "vitest";
+import { useSyncExternalStore } from "react";
+
+vi.mock("next/navigation", () => ({ useSearchParams: () => {
+  const query = useSyncExternalStore(callback => { window.addEventListener("popstate", callback); return () => window.removeEventListener("popstate", callback); }, () => window.location.search);
+  return new URLSearchParams(query);
+} }));
+beforeEach(() => {
+  window.history.replaceState(null, "", "/accounts");
+  const replace = window.history.replaceState.bind(window.history);
+  vi.spyOn(window.history, "replaceState").mockImplementation((...args) => { replace(...args); window.dispatchEvent(new PopStateEvent("popstate")); });
+});
+afterEach(() => vi.restoreAllMocks());
 import { AccountPriorityTable } from "@/components/account-priority-table";
 import type { AccountDecisionRow } from "@/types/dss";
 
@@ -44,8 +56,7 @@ test("search and priority filters operate on the unified API account data", asyn
   const user = userEvent.setup();
   render(<AccountPriorityTable />);
   expect(screen.getByText("ALPHA")).toBeInTheDocument();
-  expect(screen.getByText("ROSTRAM PROTECTIVE SYSTEM METIER COMPANY")).toBeInTheDocument();
-  expect(within(screen.getByText("ROSTRAM PROTECTIVE SYSTEM METIER COMPANY").closest("tr")!).getByText("Unavailable")).toBeInTheDocument();
+  expect(screen.queryByText("ROSTRAM PROTECTIVE SYSTEM METIER COMPANY")).not.toBeInTheDocument();
   expect(screen.getByText("Analysis reference")).toBeInTheDocument();
   expect(screen.getByText("2030-06-10")).toBeInTheDocument();
   expect(screen.getByText("Last successful refresh")).toBeInTheDocument();
@@ -69,6 +80,7 @@ test("dashboard group initializes the API filter without reranking", () => {
 test("unranked accounts retain RFM context and show null MCS values truthfully", async () => {
   const user = userEvent.setup();
   render(<AccountPriorityTable />);
+  await user.click(screen.getByText("More Filters"));
   await user.selectOptions(screen.getByLabelText("Ranking status"), "not_ranked");
   expect(screen.getByText("ROSTRAM PROTECTIVE SYSTEM METIER COMPANY")).toBeInTheDocument();
   expect(screen.getAllByText("Not ranked").length).toBeGreaterThan(0);
@@ -77,10 +89,10 @@ test("unranked accounts retain RFM context and show null MCS values truthfully",
 
 test("priority group and transaction class remain visibly separate columns", () => {
   render(<AccountPriorityTable />);
-  expect(screen.getByRole("columnheader", { name: "Current Status" })).toBeInTheDocument();
+  expect(screen.queryByRole("columnheader", { name: "Current Status" })).not.toBeInTheDocument();
   expect(screen.getByRole("columnheader", { name: "Priority Group" })).toBeInTheDocument();
   expect(screen.getByRole("columnheader", { name: "Predicted Sales Activity" })).toBeInTheDocument();
-  expect(screen.getByRole("columnheader", { name: "Days Since Last Purchase" })).toBeInTheDocument();
-  expect(screen.getByRole("columnheader", { name: "Purchases in Last 24 Months" })).toBeInTheDocument();
+  expect(screen.queryByRole("columnheader", { name: "Days Since Last Purchase" })).not.toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Business Category" })).toBeInTheDocument();
   expect(screen.queryByRole("columnheader", { name: "Normalized RFM" })).not.toBeInTheDocument();
 });

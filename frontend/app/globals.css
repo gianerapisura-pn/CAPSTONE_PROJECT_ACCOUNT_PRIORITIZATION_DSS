@@ -47,6 +47,26 @@
 @media(max-width:560px){.powerbi-refresh-status{align-items:flex-start;flex-direction:column}}
 @media(max-width:860px){.report-chart-columns{grid-template-columns:1fr}}@media(max-width:560px){.report-chart-row{grid-template-columns:minmax(90px,1fr) minmax(70px,1.5fr) 52px;gap:7px}.report-tabs button{padding:10px}}
 .account-detail-nav{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:24px}
+.account-priority-section .table-toolbar{display:flex;align-items:end;flex-wrap:wrap;gap:10px}
+.account-priority-section .table-toolbar .button:last-child{display:inline-flex}
+.account-priority-section .search-field{min-width:min(260px,100%);flex:1}
+.account-priority-section .native-filter,.account-more-filters .native-filter{display:grid;gap:5px;min-width:150px;font-size:12px;color:var(--muted)}
+.account-priority-section select,.account-more-filters select{min-height:38px;max-width:260px;padding:7px;border:1px solid var(--line);border-radius:5px;background:#fff;color:var(--ink)}
+.account-more-filters{align-self:end;min-width:0}
+.account-more-filters>summary{padding:10px;border:1px solid var(--line);border-radius:5px;background:#fff;font-size:12px;font-weight:700;cursor:pointer}
+.account-more-filters[open]{flex-basis:100%;order:3}
+.account-more-filters>.native-filter-bar{display:flex;align-items:end;flex-wrap:wrap;gap:12px;padding:14px;border-bottom:1px solid var(--line)}
+.account-list-actions{display:flex;align-items:end;justify-content:flex-end;flex-wrap:wrap;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line)}
+.account-filter-summary{padding:0 16px;overflow-wrap:anywhere}
+.decision-table{min-width:850px!important;table-layout:auto}.decision-table td:nth-child(2){min-width:190px;max-width:290px;white-space:normal;overflow-wrap:anywhere}.decision-table td:nth-child(5){max-width:180px;white-space:normal}.decision-table a{color:var(--green-dark);font-weight:700}
+.account-identity{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13px;color:var(--green-dark)}
+.account-calculations{padding:12px 18px;border-top:1px solid var(--line)}
+.account-calculations summary{font-size:13px;font-weight:700;cursor:pointer}
+.account-list-actions .native-filter{min-width:0}
+.account-list-actions select{width:100%;min-width:0}
+@media(max-width:560px){.account-list-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.account-list-actions .native-filter{width:100%}.account-list-actions select{max-width:none}.account-list-actions .button{justify-content:center}}
+.account-calculations .method-facts{padding:12px 0}.data-section>.fine-print{padding:0 18px}
+@media(max-width:560px){.account-priority-section .table-toolbar>*{width:100%}.account-priority-section select{max-width:100%;width:100%}.account-list-actions{justify-content:flex-start}.account-list-actions .native-filter{min-width:0;flex:1}.account-detail-nav{gap:8px}.account-detail-nav .back-link{font-size:12px}.account-hero{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .account-detail-nav .back-link{white-space:nowrap}
 .account-detail-nav .back-link[aria-disabled="true"]{opacity:.45;cursor:default}
 .profile-menu a{display:flex;align-items:center;gap:8px;padding:9px;border-radius:5px;color:var(--ink);font-size:12px}.profile-menu a:hover{background:#edf7f3;color:var(--green-dark)}

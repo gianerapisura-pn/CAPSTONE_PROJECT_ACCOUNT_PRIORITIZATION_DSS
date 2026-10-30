@@ -404,7 +404,10 @@ def current_account_rows(db, run):
 
 
 def filter_current_account_rows(rows, search="", priority_group=None,
-                                predicted_future_transaction_class=None, eligibility=None):
+                                predicted_future_transaction_class=None, eligibility=None,
+                                business_category=None, primary_business_type=None,
+                                account_status=None, rfm_component=None, rfm_score=None,
+                                settlement_range=None, sort_by="rank", sort_direction="asc"):
     query = search.strip().casefold()
     rows = [x for x in rows if not query or query in x["account"].casefold()]
     if priority_group:
@@ -416,7 +419,29 @@ def filter_current_account_rows(rows, search="", priority_group=None,
         rows = [x for x in rows if x.get("is_ranked")]
     elif eligibility == "not_ranked":
         rows = [x for x in rows if not x.get("is_ranked")]
-    return rows
+    for field, value in (("business_category", business_category),
+                         ("primary_business_type", primary_business_type),
+                         ("account_status", account_status)):
+        if value:
+            rows = [x for x in rows if x.get(field) == value]
+    if rfm_score is not None:
+        fields = {"Recency": ["r_score"], "Frequency": ["f_score"],
+                  "Monetary": ["m_score"]}.get(rfm_component, ["r_score", "f_score", "m_score"])
+        rows = [x for x in rows if any(x.get(field) == rfm_score for field in fields)]
+    if settlement_range:
+        lower, upper = {"Below 30": (0, 30), "30-<60": (30, 60),
+                        "60-<90": (60, 90), "90-<120": (90, 120),
+                        "120+": (120, float("inf"))}[settlement_range]
+        rows = [x for x in rows if x.get("average_settlement_days") is not None
+                and lower <= x["average_settlement_days"] < upper]
+    field = {"rank": "priority_rank", "account": "account", "score": "final_priority_score"}[sort_by]
+    present = [x for x in rows if x.get(field) is not None]
+    missing = [x for x in rows if x.get(field) is None]
+    def value(row):
+        result = row[field]
+        return result.casefold() if isinstance(result, str) else result
+    return sorted(present, key=lambda x: (value(x), x["account"].casefold()),
+                  reverse=sort_direction == "desc") + sorted(missing, key=lambda x: x["account"].casefold())
 
 
 def run_payload(db, run):

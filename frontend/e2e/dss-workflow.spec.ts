@@ -3,6 +3,14 @@ import path from "node:path";
 import { readFileSync } from "node:fs";
 
 test("demo administrator imports future data and reaches updated decision outputs", async ({ page }) => {
+  if (process.env.PLAYWRIGHT_REUSE_DEMO_FRONTEND === "true") {
+    // Reuse compiled UI only; every API call still reaches a fresh test database.
+    await page.route("http://127.0.0.1:8021/**", async route => {
+      const target = new URL(route.request().url());
+      target.port = "8011";
+      await route.fulfill({ response: await route.fetch({ url: target.href }) });
+    });
+  }
   await page.goto("/login");
   await expect(page.getByText("Demo mode is active")).toBeVisible();
   await page.getByRole("button", { name: /Enter isolated demo workspace/i }).click();
@@ -43,6 +51,7 @@ test("demo administrator imports future data and reaches updated decision output
   await page.getByRole("tab", { name: "Account & Prioritization Insights" }).click();
   await expect(page.getByRole("heading", { name: "RFM Score Distribution" })).toBeVisible();
   await page.getByRole("tab", { name: "Analytics Validation" }).click();
+  await page.getByText("Model selection and historical classification evidence").click();
   await expect(page.getByRole("heading", { name: "Prediction Horizon Comparison" })).toBeVisible();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "CSV" }).first().click();
