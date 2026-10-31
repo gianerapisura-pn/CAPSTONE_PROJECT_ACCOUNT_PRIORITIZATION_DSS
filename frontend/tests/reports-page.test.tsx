@@ -147,7 +147,7 @@ test("business composition has one total-count chart and contextual category/typ
   expect(within(composition).queryByRole("button", { name: "Next business category" })).not.toBeInTheDocument();
   await user.click(within(composition).getByText("Select a category by name"));
   await user.selectOptions(within(composition).getByLabelText("Business category selection"), "Corporate");
-  expect(within(composition).getByText(/1 ranked accounts in the published category/)).toBeInTheDocument();
+  expect(within(composition).getByText(/1 ranked account in the published category/)).toBeInTheDocument();
   await user.click(within(composition).getByRole("button", { name: "Select High Priority" }));
   const high = within(composition).getByRole("link", { name: "View Matching Accounts in Account Prioritization" });
   const query = new URLSearchParams(high.getAttribute("href")!.split("?")[1]);
@@ -173,7 +173,7 @@ test("report filters use progressive disclosure and duplicate account tables are
   expect(screen.getByRole("link", { name: "View accounts matching RFM selection" })).toHaveAttribute("href", expect.stringContaining("eligibility=not_ranked"));
   await user.click(screen.getByText("Select a category by name"));
   await user.selectOptions(screen.getByLabelText("Business category selection"), "Corporate");
-  expect(screen.getByRole("link", { name: "View Matching Accounts in Account Prioritization" })).toHaveAttribute("href", expect.stringContaining("eligibility=not_ranked"));
+  expect(screen.getByRole("link", { name: "View historical matching accounts" })).toHaveAttribute("href", expect.stringContaining("eligibility=not_ranked"));
   await user.click(screen.getByRole("button", { name: "Reset filters" }));
   expect(within(screen.getByLabelText("Active filters")).getByRole("status")).toHaveTextContent("3 matching accounts");
   expect(screen.queryByRole("heading", { name: "B2B status and prioritization" })).not.toBeInTheDocument();
@@ -249,4 +249,37 @@ test("legacy Power BI URL guard still rejects public and foreign links", () => {
   expect(approvedPowerBiEmbedUrl("https://app.powerbi.com/groups/example")).toBeNull();
   expect(approvedPowerBiEmbedUrl("https://app.powerbi.com/groups/example/reports/report-id"))
     .toBe("https://app.powerbi.com/reportEmbed?reportId=report-id&groupId=example&autoAuth=true");
+});
+
+test("filtered highest-ranked chart states its subset and preserves original ranks", async () => {
+  const user = userEvent.setup();
+  render(<ReportsPage />);
+  await user.selectOptions(screen.getByLabelText("Priority group"), "Medium");
+  const chart = screen.getByRole("region", { name: "Highest-Ranked Accounts Matching Your Filters" });
+  expect(chart).toHaveTextContent("Showing 1 of 1 matching account, at most ten");
+  expect(chart).toHaveTextContent("Original published ranks and Final Priority Scores are unchanged");
+  expect(screen.queryByRole("heading", { name: "Top 10 Ranked Accounts" })).not.toBeInTheDocument();
+  await user.click(screen.getByText("Open a top account by name"));
+  expect(screen.getByRole("link", { name: /#2 GAMMA/ })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "Priority Group Counts" })).toHaveTextContent("other groups remain visible for comparison");
+});
+
+test("historical category matching and type counts are distinct from the ranked baseline", async () => {
+  const user = userEvent.setup();
+  render(<ReportsPage />);
+  await user.click(screen.getByRole("tab", { name: "Account & Prioritization Insights" }));
+  await user.click(screen.getByText("More Filters"));
+  await user.selectOptions(screen.getByLabelText("Ranking status"), "Not ranked");
+  const composition = screen.getByRole("region", { name: "Business Composition" });
+  expect(within(composition).getByLabelText("Historical account filter")).toHaveTextContent("chart compares 2 currently ranked accounts");
+  expect(within(composition).getByLabelText("Historical account filter")).toHaveTextContent("1 account matches");
+  await user.click(within(composition).getByText(/Explore Primary Business Types/));
+  expect(within(composition).getByRole("row", { name: /Commercial/ })).toHaveTextContent("1");
+  const historicalLink = within(composition).getByRole("link", { name: "View historical matching accounts" });
+  expect(historicalLink).toHaveAttribute("href", expect.stringContaining("eligibility=not_ranked"));
+  await user.click(within(composition).getByText("Select a category by name"));
+  await user.selectOptions(within(composition).getByLabelText("Business category selection"), "Corporate");
+  expect(within(composition).getByLabelText("Historical account filter")).toHaveTextContent("0 accounts match");
+  expect(within(composition).getByRole("button", { name: "Select High Priority" })).toBeDisabled();
+  expect(composition).toHaveTextContent("1 ranked account in the published category");
 });

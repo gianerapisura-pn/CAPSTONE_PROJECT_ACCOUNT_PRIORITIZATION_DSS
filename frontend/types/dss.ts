@@ -1,6 +1,23 @@
 export type PriorityGroup = "High" | "Medium" | "Low";
 export type FutureTransactionClass = "With Future Sales" | "With No Future Sales";
 
+export type NormalizationEvidence = {
+  analysis_run_id: string;
+  analysis_reference_date: string | null;
+  eligible_account_count: number;
+  population: string;
+  criteria: Record<string, {
+    direction: "cost" | "benefit";
+    unit: string;
+    original: number | null;
+    minimum: number | null;
+    maximum: number | null;
+    saved_normalized: number | null;
+    calculated_normalized: number | null;
+    status: "verified" | "unavailable" | "unreconciled";
+  }>;
+};
+
 export interface AccountPriority {
   account: string;
   account_key?: string;

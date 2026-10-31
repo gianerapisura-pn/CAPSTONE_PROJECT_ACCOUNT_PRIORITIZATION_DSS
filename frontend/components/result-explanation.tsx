@@ -2,7 +2,11 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { AccountDecisionRow } from "@/types/dss";
+import type { AccountDecisionRow, NormalizationEvidence } from "@/types/dss";
+
+// Removing a tooltip can expose another value beneath a stationary cursor.
+let hoverDismissedUntilMovement = false;
+function resumeExplanationHover() { hoverDismissedUntilMovement = false; }
 
 export type ResultExplanation = {
   title: string;
@@ -30,17 +34,33 @@ export function priorityExplanation(row?: Partial<AccountDecisionRow> | null): R
   };
 }
 
-export function resultExplanation(key: string, row?: Partial<AccountDecisionRow> | null): ResultExplanation {
+export function resultExplanation(key: string, row?: Partial<AccountDecisionRow> | null, normalization?: NormalizationEvidence): ResultExplanation {
   if (key === "fps" || key === "score") return priorityExplanation(row);
   if (key.startsWith("normalized_")) {
     const criterion = key.slice(11) as Criterion;
     const cost = criterion === "recency" || criterion === "settlement";
-    return {
-      title: `Normalized ${criterion}`,
-      basis: `The account's ${criterion} is converted to a 0-to-1 scale using the accounts eligible for this saved ranking. ${cost ? "Fewer days score higher." : "A larger original value scores higher."}`,
-      calculation: cost ? "(largest eligible value - this account's value) / (largest - smallest eligible value)" : "(this account's value - smallest eligible value) / (largest - smallest eligible value)",
-      note: "If all eligible accounts have the same value, each receives 0.5. The smallest and largest source values are not shown here.",
+    const explanation: ResultExplanation = {
+      title: `Normalized ${criterion[0].toUpperCase() + criterion.slice(1)}`,
+      basis: ({ recency: "Days since the latest valid Sales Invoice; fewer days are preferred.", frequency: "Distinct valid invoices in the preceding 24 months; larger counts are preferred.", monetary: "Valid Sales Invoice value in PHP in the preceding 24 months; larger amounts are preferred.", settlement: "Average days from invoice to final valid payment; fewer days are preferred." })[criterion],
+      calculation: cost ? "Cost: (maximum - account value) / (maximum - minimum)." : "Benefit: (account value - minimum) / (maximum - minimum).",
+      note: "Exact eligible-population inputs are unavailable in this view. The saved normalized result is not changed or inferred.",
+      interpretation: "Closer to 1 is more favorable on this measure. It is not a purchase probability or the final rank.",
     };
+    const evidence = normalization?.criteria[criterion];
+    const sameRun = normalization && row?.analysis_run_id === normalization.analysis_run_id && row?.analysis_reference_date === normalization.analysis_reference_date;
+    if (!sameRun || !evidence) return explanation;
+    explanation.source = `${normalization.eligible_account_count} ranked accounts; reference ${normalization.analysis_reference_date ?? "unavailable"}. Page filters do not change these ranges.`;
+    if (evidence.status !== "verified" || [evidence.minimum, evidence.maximum, evidence.original, evidence.saved_normalized, evidence.calculated_normalized].some(value => value == null || !Number.isFinite(value))) {
+      explanation.note = evidence.status === "unreconciled" ? "The saved inputs do not reconcile with this normalized result. No replacement result has been calculated for use in ranking; administrator review is required." : explanation.note;
+      return explanation;
+    }
+    const { minimum, maximum, original, saved_normalized: saved, calculated_normalized: calculated } = evidence as typeof evidence & { minimum: number; maximum: number; original: number; saved_normalized: number; calculated_normalized: number };
+    explanation.inputs = [`Account value: ${original} ${evidence.unit}`, `Eligible minimum: ${minimum} ${evidence.unit}`, `Eligible maximum: ${maximum} ${evidence.unit}`, `Saved normalized result: ${saved.toFixed(10)}`];
+    explanation.calculation = maximum === minimum
+      ? `Maximum equals minimum (${maximum}). The saved scoring rule assigns 0.5 to every eligible account instead of dividing by zero.`
+      : `${explanation.calculation} ${cost ? `(${maximum} - ${original})` : `(${original} - ${minimum})`} / (${maximum} - ${minimum}) = ${calculated.toFixed(10)}.`;
+    explanation.note = "This read-only calculation agrees with the saved result. Display rounding does not alter the full-precision score or its weight.";
+    return explanation;
   }
   if (key.startsWith("contribution_")) {
     const criterion = key.slice(13) as Criterion;
@@ -135,6 +155,7 @@ export function ExplainedValue({ children, explanation, className = "", inline =
   const cardRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerType = useRef("");
+  const dismissed = useRef(false);
   const id = useId();
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const [open, setOpen] = useState(false);
@@ -148,7 +169,15 @@ export function ExplainedValue({ children, explanation, className = "", inline =
   }
   useEffect(() => {
     if (!open) return;
-    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        dismissed.current = true;
+        hoverDismissedUntilMovement = true;
+        window.addEventListener("pointermove", resumeExplanationHover, { once: true });
+        cancelClose();
+        setOpen(false);
+      }
+    };
     const closeOnOutsidePress = (event: PointerEvent) => {
       const target = event.target as Node;
       if (!ref.current?.contains(target) && !cardRef.current?.contains(target)) setOpen(false);
@@ -186,6 +215,7 @@ export function ExplainedValue({ children, explanation, className = "", inline =
     }
   }, [open, position]);
   function show() {
+    if (dismissed.current) return;
     cancelClose();
     const box = ref.current?.getBoundingClientRect();
     if (!box) return;
@@ -195,10 +225,12 @@ export function ExplainedValue({ children, explanation, className = "", inline =
   }
   return <>
     <span ref={ref} className={`explained-value ${inline ? "" : "explained-value-block"} ${className}`} tabIndex={0} role="button" aria-expanded={open} aria-describedby={open ? id : undefined}
-      onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (open) setOpen(false); else show(); } }}
-      onPointerEnter={event => { if (event.pointerType !== "touch") show(); }} onPointerLeave={scheduleClose} onFocus={() => { if (pointerType.current !== "touch") show(); }} onBlur={scheduleClose}
+      onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); dismissed.current = false; if (open) setOpen(false); else show(); } }}
+      onPointerEnter={event => { if (event.pointerType !== "touch" && !hoverDismissedUntilMovement) show(); }}
+      onPointerMove={event => { if (hoverDismissedUntilMovement && event.pointerType !== "touch") { resumeExplanationHover(); show(); } }}
+      onPointerLeave={() => { dismissed.current = false; scheduleClose(); }} onFocus={() => { if (pointerType.current !== "touch") show(); }} onBlur={() => { dismissed.current = false; scheduleClose(); }}
       onPointerDown={event => { pointerType.current = event.pointerType; }}
-      onClick={event => { event.preventDefault(); event.stopPropagation(); if (!open) show(); else if (pointerType.current === "touch") setOpen(false); pointerType.current = ""; }}>
+      onClick={event => { event.preventDefault(); event.stopPropagation(); dismissed.current = false; if (!open) show(); else if (pointerType.current === "touch") setOpen(false); pointerType.current = ""; }}>
       {children}
     </span>
     {open && position && createPortal(<div ref={cardRef} id={id} role="tooltip" tabIndex={0} className="result-explanation" style={{ left: position.left, top: position.top }}
@@ -216,16 +248,17 @@ export function ExplainedValue({ children, explanation, className = "", inline =
   </>;
 }
 
-export function ResultValue({ metric, row, children, className, inline }: {
+export function ResultValue({ metric, row, normalization, children, className, inline }: {
   metric: string;
   row?: Partial<AccountDecisionRow> | null;
+  normalization?: NormalizationEvidence;
   children: ReactNode;
   className?: string;
   inline?: boolean;
 }) {
-  const explanation = resultExplanation(metric, row);
+  const explanation = resultExplanation(metric, row, normalization);
   if (row) {
-    explanation.source = `${row.account ?? "This account"}; saved analysis reference ${row.analysis_reference_date ?? "unavailable"}. Several collection rows for one invoice do not multiply a sale.`;
+    explanation.source ??= `${row.account ?? "This account"}; saved analysis reference ${row.analysis_reference_date ?? "unavailable"}. Several collection rows for one invoice do not multiply a sale.`;
     if (metric === "provenance") explanation.inputs = [row.business_category, row.primary_business_type, row.account_status].filter((value): value is string => Boolean(value));
     if (metric === "frequency") explanation.calculation = `Count distinct valid Sales Invoices in the preceding 24 months: ${row.frequency_count ?? "unavailable"}.`;
     if (metric === "monetary") explanation.calculation = `Sum each valid Sales Invoice once in the preceding 24 months: PHP ${row.monetary_value?.toLocaleString("en-PH", { minimumFractionDigits: 2 }) ?? "unavailable"}.`;

@@ -101,6 +101,13 @@ def test_final_run_persistence_and_public_contract():
         assert filtered_detail["navigation"]["total"] == 1
         assert filtered_detail["navigation"]["previous"] is None
         assert filtered_detail["navigation"]["next"] is None
+        assert filtered_detail["normalization"] == middle["normalization"]
+        assert first["normalization"]["eligible_account_count"] == 8
+        assert first["normalization"]["analysis_run_id"] == str(latest.analysis_run_id)
+        constant = first["normalization"]["criteria"]["frequency"]
+        assert constant["minimum"] == constant["maximum"] == 1
+        assert constant["saved_normalized"] == .5
+        assert constant["status"] == "verified"
         overview = native_overview(viewer, db)
         insights = native_insights(viewer, db)
         assert overview["run"]["analysis_run_id"] == latest.analysis_run_id

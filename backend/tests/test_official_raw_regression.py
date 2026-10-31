@@ -20,6 +20,7 @@ from app.etl.invoices import dataframe_to_source_rows, group_invoices
 from app.etl.standardization import standardize_account_name
 from app.imports.validators import parse_source_file
 from app.services.analytics_runner import run_account_prioritization
+from app.services.normalization_evidence import normalization_evidence
 from app.services.locked_packages import (
     FINAL_PACKAGE_SHA256,
     read_package_csv,
@@ -219,6 +220,15 @@ def test_private_current_prescriptive_regression():
     )
     assert set(expected_priority["analysis_reference"]) == {"2025-12-31"}
     actual_priority = {item["account"]: item for item in result.priorities}
+    assert master["primary_business_type"].nunique() == 59
+    assert master.loc[master["standardized"].isin(actionable), "business_category"].nunique() == 8
+    explanation = normalization_evidence(result.priorities, "MEGAWORLD CORPORATION", "study", "2025-12-31")
+    for criterion, bounds in {"recency": (140, 3274), "frequency": (0, 4),
+                              "monetary": (0, 10360954.09), "settlement": (0, 322.6666666666667)}.items():
+        assert explanation["criteria"][criterion]["minimum"] == pytest.approx(bounds[0])
+        assert explanation["criteria"][criterion]["maximum"] == pytest.approx(bounds[1])
+    assert explanation["criteria"]["recency"]["calculated_normalized"] == pytest.approx(.8934269304403318)
+    assert explanation["criteria"]["settlement"]["calculated_normalized"] == pytest.approx(.8414256198347106)
     for expected in expected_priority.to_dict(orient="records"):
         actual = actual_priority[expected["account_name"]]
         assert actual["recency_days"] == expected["recency_days"]
@@ -239,6 +249,8 @@ def test_private_current_prescriptive_regression():
         assert actual["priority_rank"] == expected["priority_rank"]
         assert actual["priority_group"] == expected["priority_group"]
         assert actual["final_priority_score"] == pytest.approx(expected["final_priority_score"], abs=1e-12)
+        evidence = normalization_evidence(result.priorities, actual["account"], "study", "2025-12-31")
+        assert all(item["status"] == "verified" for item in evidence["criteria"].values())
     assert "ROSTRAM PROTECTIVE SYSTEM METIER COMPANY" not in {item["account"] for item in result.priorities}
     assert len(result.sensitivity) == 4
     assert sum(summary["iterations"] for summary in result.sensitivity) == 400

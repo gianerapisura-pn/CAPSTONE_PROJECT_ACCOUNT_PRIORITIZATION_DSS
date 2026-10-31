@@ -77,6 +77,92 @@
 .active-filters{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:12px 0;font-size:12px;min-width:0}
 .active-filters>span{color:var(--muted);margin-right:8px}.filter-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:5px;background:#f2f8f5;color:var(--ink);padding:6px 9px;max-width:100%;text-align:left;overflow-wrap:anywhere;cursor:pointer;font-size:12px}
 .filter-chip svg{flex-shrink:0}.text-command{border:0;background:transparent;color:var(--green-dark);padding:6px 0;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
-.compact-list>.compact-row{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line)}
-.compact-list>.compact-row>a{flex:1;min-width:0;color:inherit;text-decoration:none}.compact-row strong,.compact-row small{display:block}.compact-row .score{margin-left:auto}
+.compact-list>.compact-row {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) max-content;
+  align-items:center;
+  gap:12px;
+  padding:16px 18px;
+  border-bottom:1px solid var(--line);
+}
+.compact-list>.compact-row:has(>.compact-rank) {
+  grid-template-columns:28px minmax(0,1fr) max-content;
+}
+/* Only the row owns columns; its text link must not inherit the list's link grid. */
+.compact-list>.compact-row>a {
+  display:block;
+  min-width:0;
+  padding:0;
+  border:0;
+  color:inherit;
+  text-decoration:none;
+}
+.compact-list>.compact-row>a:hover { background:transparent; color:var(--green-dark); }
+.compact-list strong,.compact-list small {
+  line-height:1.5;
+  word-break:normal;
+  overflow-wrap:break-word;
+}
+.compact-list small { margin-top:3px; }
+.compact-row .score { margin-left:0; font-variant-numeric:tabular-nums; }
+/* Inset panel content without adding a second gutter to full-width tables or headers. */
+.data-section>.active-filters { padding:12px 18px; }
+.data-section>.data-meta {
+  flex-wrap:wrap;
+  gap:8px 20px;
+  padding:12px 18px;
+  line-height:1.5;
+}
+.data-section>.data-meta>span { min-width:0; overflow-wrap:break-word; }
+.data-section>.button {
+  max-width:calc(100% - 36px);
+  margin:0 18px 18px;
+  white-space:normal;
+  text-align:left;
+  line-height:1.5;
+}
+.data-section>p:not(.fine-print) { margin:12px 18px 16px; }
+.data-section>.page-actions,.data-section>.profile-actions,.data-section>.profile-form {
+  margin:12px 18px 18px;
+  min-width:0;
+}
+.page-actions { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
+.page-actions>label { display:grid; gap:6px; min-width:0; font-size:12px; color:var(--muted); }
+.page-actions input { min-height:38px; max-width:100%; padding:7px 9px; }
+.data-section>.profile-actions>span { min-width:0; overflow-wrap:break-word; }
+.method-facts>div {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  align-items:start;
+  gap:8px 18px;
+  line-height:1.5;
+}
+.method-facts dt,.method-facts dd { min-width:0; overflow-wrap:break-word; word-break:normal; }
+.method-facts dt { text-transform:none; }
+.section-heading { flex-wrap:wrap; }
+.section-heading>div { flex:1 1 180px; }
+.section-heading h2 { overflow-wrap:break-word; }
+.section-heading>svg,.section-heading h2 svg { flex-shrink:0; }
+.kpi-card { min-width:0; }
+.kpi-card strong,.kpi-card small { overflow-wrap:break-word; line-height:1.4; }
+.kpi-card strong .explained-value,.account-hero strong .explained-value,
+.quality-grid strong .explained-value {
+  font-size:inherit;
+  color:inherit;
+  text-transform:none;
+}
+/* Explanation triggers inherit the value, not the surrounding metadata chip. */
+.report-meta .explained-value,.preview-context .explained-value {
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  color:inherit;
+  font-size:inherit;
+}
+@media(max-width:560px) {
+  .compact-list>.compact-row { gap:10px; padding:14px 16px; }
+  .method-facts>div { grid-template-columns:minmax(0,1fr); gap:4px; }
+  .method-facts dd { text-align:left; }
+}
 @media(max-width:560px){.context-return{align-items:flex-start;gap:8px}.filter-chip{font-size:11px}.active-filters>span{width:100%}}

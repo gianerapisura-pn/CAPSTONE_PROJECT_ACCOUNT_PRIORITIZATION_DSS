@@ -8,7 +8,7 @@ const frontendOrigin = reuseDemoFrontend ? "http://127.0.0.1:3021" : "http://127
 
 export default defineConfig({
   testDir: "./e2e",
-  testIgnore: ["final-local-review.spec.ts", "ux-journeys.spec.ts"],
+  testIgnore: ["final-local-review.spec.ts", "ux-journeys.spec.ts", "post-qa-presentation.spec.ts"],
   outputDir: "./test-results/workflow",
   timeout: 300_000,
   expect: { timeout: 60_000 },

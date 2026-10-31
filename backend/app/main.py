@@ -15,7 +15,7 @@ from app.auth.dependencies import AuthenticatedUser, require_admin, require_anal
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
 from app.core.config import get_settings, validate_runtime_configuration
 from app.db.models import (
-    AccountAlias, AccountAliasReview, AnalyticsRun, CollectionCorrectionReview, DimAccount, ImportBatch,
+    AccountAlias, AccountAliasReview, AccountPriorityResult, AnalyticsRun, CollectionCorrectionReview, DimAccount, ImportBatch,
     ImportRowIssue, InvoiceGroupRecord, PowerBIRefresh, PredictiveStudyPrediction, FutureTransactionPrediction, RFMResult, RawSourceRow,
     SICoverageConfirmation,
     SensitivityScenarioRecord, SettlementResult, CriticInfluenceRecord,
@@ -60,6 +60,7 @@ from app.services.si_coverage import (
     confirm_si_coverage, latest_verified_si_coverage,
 )
 from app.services.publication_workflow import publish_existing_source
+from app.services.normalization_evidence import normalization_evidence
 
 settings = get_settings()
 
@@ -831,8 +832,13 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
     study_prediction = db.scalar(select(PredictiveStudyPrediction).where(
         PredictiveStudyPrediction.account_key == account.account_key
     ))
+    saved_priorities = [record.payload for record in db.scalars(select(AccountPriorityResult).where(
+        AccountPriorityResult.analysis_run_id == run.analysis_run_id)).all()]
+    reference = run.analysis_reference_date or run.cutoff_date
     return {
         "account_key": account.account_key, "account": decision["account"],
+        "normalization": normalization_evidence(saved_priorities, decision["account"],
+                                               run.analysis_run_id, reference.isoformat() if reference else None),
         "navigation": {"previous": neighbor(navigation_position - 1) if navigation_position is not None else None,
                        "next": neighbor(navigation_position + 1) if navigation_position is not None else None,
                        "total": len(navigation_rows), "scope": "Published account list with the current filters and sort order"},

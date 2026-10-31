@@ -9,7 +9,7 @@ import { ContextReturn } from "@/components/context-return";
 import { Badge, PageHeader, PageState } from "@/components/page-state";
 import { ResultValue } from "@/components/result-explanation";
 import { useApi } from "@/lib/use-api";
-import type { AccountDecisionRow } from "@/types/dss";
+import type { AccountDecisionRow, NormalizationEvidence } from "@/types/dss";
 
 type Evidence = Record<string, string | number | boolean | null>;
 type Detail = {
@@ -21,6 +21,7 @@ type Detail = {
   };
   decision: AccountDecisionRow;
   priority: AccountDecisionRow | null;
+  normalization?: NormalizationEvidence;
   rfm: Evidence | null;
   settlement: Evidence | null;
   context: Evidence;
@@ -74,10 +75,10 @@ function AccountDetailsContent() {
               <div><dt>Purchases in last 24 months</dt><dd><ResultValue metric="frequency" row={p}>{p?.frequency_count ?? "N/A"}</ResultValue></dd></div>
               <div><dt>Sales value in last 24 months</dt><dd><ResultValue metric="monetary" row={p}>{p?.monetary_value == null ? "N/A" : currency.format(p.monetary_value)}</ResultValue></dd></div>
             </dl><details className="account-calculations"><summary>Saved normalization, weights, and contributions</summary><dl className="method-facts">
-              <div><dt>Normalized Recency</dt><dd><ResultValue metric="normalized_recency">{fixed(p?.normalized_recency)}</ResultValue></dd></div>
-              <div><dt>Normalized Frequency</dt><dd><ResultValue metric="normalized_frequency">{fixed(p?.normalized_frequency)}</ResultValue></dd></div>
-              <div><dt>Normalized Monetary</dt><dd><ResultValue metric="normalized_monetary">{fixed(p?.normalized_monetary)}</ResultValue></dd></div>
-              <div><dt>Normalized Settlement</dt><dd><ResultValue metric="normalized_settlement">{fixed(p?.normalized_settlement)}</ResultValue></dd></div>
+              <div><dt>Normalized Recency</dt><dd><ResultValue metric="normalized_recency" row={p} normalization={data.normalization}>{fixed(p?.normalized_recency)}</ResultValue></dd></div>
+              <div><dt>Normalized Frequency</dt><dd><ResultValue metric="normalized_frequency" row={p} normalization={data.normalization}>{fixed(p?.normalized_frequency)}</ResultValue></dd></div>
+              <div><dt>Normalized Monetary</dt><dd><ResultValue metric="normalized_monetary" row={p} normalization={data.normalization}>{fixed(p?.normalized_monetary)}</ResultValue></dd></div>
+              <div><dt>Normalized Settlement</dt><dd><ResultValue metric="normalized_settlement" row={p} normalization={data.normalization}>{fixed(p?.normalized_settlement)}</ResultValue></dd></div>
               <div><dt>Recency weight / contribution</dt><dd><ResultValue metric="weight">{p ? percent(p.baseline_recency_weight) : "N/A"}</ResultValue> / <ResultValue metric="contribution_recency" row={p}>{fixed(p?.recency_contribution)}</ResultValue></dd></div>
               <div><dt>Frequency weight / contribution</dt><dd><ResultValue metric="weight">{p ? percent(p.baseline_frequency_weight) : "N/A"}</ResultValue> / <ResultValue metric="contribution_frequency" row={p}>{fixed(p?.frequency_contribution)}</ResultValue></dd></div>
               <div><dt>Monetary weight / contribution</dt><dd><ResultValue metric="weight">{p ? percent(p.baseline_monetary_weight) : "N/A"}</ResultValue> / <ResultValue metric="contribution_monetary" row={p}>{fixed(p?.monetary_contribution)}</ResultValue></dd></div>
