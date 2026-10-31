@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from collections import Counter
+import json
 
 import pandas as pd
 from sqlalchemy import select
@@ -61,7 +63,11 @@ def unchanged_prescriptive_evidence(db: Session, content: bytes) -> bool:
                     **{str(key): _json_value(value) for key, value in source.items()},
                 }))
     actual = [(row.evidence_scope, row.payload) for row in rows]
-    if sorted(actual, key=str) != sorted(expected, key=str):
+    # PostgreSQL JSONB reorders object keys; compare content and multiplicity, not repr order.
+    def canonical_counts(items):
+        return Counter((scope, json.dumps(payload, sort_keys=True)) for scope, payload in items)
+
+    if canonical_counts(actual) != canonical_counts(expected):
         raise ValueError("Existing prescriptive evidence differs from the revised package.")
     return True
 

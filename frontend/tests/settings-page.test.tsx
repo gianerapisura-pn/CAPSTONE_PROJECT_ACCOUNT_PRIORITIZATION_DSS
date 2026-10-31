@@ -8,6 +8,7 @@ vi.mock("@/components/auth-provider", () => ({
 
 vi.mock("@/lib/use-api", () => ({
   useApi: (path: string) => {
+    if (path.startsWith("/audit-log")) return { data: { items: [], total: 0, page: 1, total_pages: 1, page_size: 10 }, error: "", loading: false, reload: vi.fn() };
     if (path === "/settings/methodology") return { data: {
       source_schema: ["ACCOUNT NAMES"], analytics_config: { target_horizon_months: 12 },
       rfm: "Descriptive RFM.",

@@ -21,7 +21,7 @@ from app.db.models import (
     SensitivityScenarioRecord, SettlementResult, CriticInfluenceRecord,
     PredictiveBenchmarkRecord, PredictiveHorizonEvaluation, PredictiveMonitoringEvaluation,
     PredictiveOOPEvaluation,
-    PrescriptiveValidationEvidence, UserProfile,
+    PrescriptiveValidationEvidence, UserProfile, AuditLog,
 )
 from app.db.repository import (
     CLIENT_CONFIRMED_ACTIVE,
@@ -211,6 +211,27 @@ def update_own_profile(request: OwnProfileUpdate,
           user.user_id, {"field": "display_name"})
     db.commit()
     return own_profile(user, db)
+
+
+@app.get("/audit-log")
+def audit_history(page: int = Query(default=1, ge=1),
+                  page_size: int = Query(default=10, ge=1, le=100),
+                  user: AuthenticatedUser = Depends(require_admin),
+                  db: Session = Depends(get_db)):
+    total = db.scalar(select(func.count()).select_from(AuditLog)) or 0
+    pages = max(1, (total + page_size - 1) // page_size)
+    current = min(page, pages)
+    rows = db.scalars(select(AuditLog).order_by(
+        AuditLog.created_at.desc(), AuditLog.audit_log_id.desc()
+    ).offset((current - 1) * page_size).limit(page_size)).all()
+    actors = {row.user_id: row.display_name for row in db.scalars(select(UserProfile)).all()}
+    return {"items": [{"id": row.audit_log_id,
+                       "created_at": row.created_at.isoformat(),
+                       "actor": actors.get(row.actor_user_id) or "System / recorded operator",
+                       "action": row.action.replace("_", " "),
+                       "record_type": row.entity_type.replace("_", " ")}
+                      for row in rows],
+            "total": total, "page": current, "page_size": page_size, "total_pages": pages}
 
 
 @app.get("/account-aliases/review")
