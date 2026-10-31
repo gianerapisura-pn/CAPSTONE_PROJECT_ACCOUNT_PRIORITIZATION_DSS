@@ -50,8 +50,7 @@ test("verified published data, drilldowns, explanations, and responsive reports"
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: test.info().outputPath(width + "-insights.png"), fullPage: false });
     await page.getByRole("tab", { name: "Analytics Validation" }).click();
-    await page.getByText("Model selection and historical classification evidence").click();
-    await page.getByText("Weight sensitivity, backtests, and technical robustness").click();
+    await expect(page.locator("#validation-findings details:not([open])")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "CatBoost feature-set sensitivity" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Historical 12-month buyer incidence by Priority Group" })).toBeVisible();
     const layout = await page.evaluate(() => ({ width: window.innerWidth, document: document.documentElement.scrollWidth }));

@@ -7,6 +7,92 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const width of [1440, 1366, 1024, 390]) {
+  test(`RFM and settlement keep all records in ten-row pages at ${width}px`, async ({ page, request }) => {
+    await page.setViewportSize({ width, height: 900 });
+    for (const [name, path] of [["RFM", "rfm"], ["settlement", "settlement"]]) {
+      const evidence: { items: { account: string }[] } = await (await request.get(api + "/analytics/" + path)).json();
+      expect(evidence.items.length).toBeGreaterThan(0);
+      await page.goto("/analytics/" + path);
+      const navigation = page.getByRole("navigation", { name: `${name} pagination` });
+      await expect(navigation).toBeVisible();
+      await expect(navigation.getByRole("button", { name: `Previous ${name} page` })).toBeDisabled();
+      const pages = Math.ceil(evidence.items.length / 10);
+      const accounts: string[] = [];
+      for (let current = 1; current <= pages; current++) {
+        await expect(page.locator("tbody tr")).toHaveCount(Math.min(10, evidence.items.length - (current - 1) * 10));
+        accounts.push(...await page.locator("tbody tr td:first-child").allTextContents());
+        if (current < pages) await navigation.getByRole("button", { name: `Next ${name} page` }).click();
+      }
+      expect(accounts).toEqual(evidence.items.map(row => row.account));
+      await expect(navigation.getByRole("button", { name: `Next ${name} page` })).toBeDisabled();
+      if (pages > 1) {
+        await navigation.getByRole("button", { name: `Previous ${name} page` }).click();
+        await expect(navigation.getByText(`Page ${pages - 1} of ${pages}`, { exact: true })).toBeVisible();
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+      await navigation.screenshot({ path: test.info().outputPath(width + "-" + path + "-pagination.png") });
+    }
+  });
+
+  test(`validation sections start expanded and can be collapsed at ${width}px`, async ({ page, request }) => {
+    const evidence: { supplemental: Array<Record<string, string | number | null>> } = await (await request.get(api + "/reports/native/validation")).json();
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/reports?tab=analytics-validation");
+    const validation = page.locator("#validation-findings");
+    await expect(validation).toBeVisible();
+    const sections = validation.locator("details.native-evidence-details");
+    await expect(sections).toHaveCount(9);
+    await expect(validation.locator("details:not([open])")).toHaveCount(0);
+    for (const section of await sections.all()) {
+      await section.locator(":scope>summary").click();
+      await expect(section).not.toHaveAttribute("open");
+      await section.locator(":scope>summary").click();
+      await expect(section).toHaveAttribute("open");
+    }
+    await expect(validation.locator("details:not([open])")).toHaveCount(0);
+    const influence = validation.locator("summary").filter({ hasText: "Leave-one-account-out CRITIC influence" }).locator("..");
+    const seen: string[] = [];
+    await expect(influence.getByRole("button", { name: "Previous influence page" })).toBeDisabled();
+    for (let current = 1; current <= 9; current++) {
+      await expect(influence.locator("tbody tr")).toHaveCount(current === 9 ? 3 : 10);
+      await expect(influence.getByText(`Page ${current} of 9`, { exact: true })).toBeVisible();
+      seen.push(...await influence.locator("tbody tr td:first-child").allTextContents());
+      if (current < 9) await influence.getByRole("button", { name: "Next influence page" }).click();
+    }
+    expect(seen).toHaveLength(83);
+    expect(new Set(seen).size).toBe(83);
+    await expect(influence.getByRole("button", { name: "Next influence page" })).toBeDisabled();
+    await influence.getByRole("button", { name: "Previous influence page" }).click();
+    await expect(influence.getByText("Showing 71-80 of 83", { exact: true })).toBeVisible();
+    const historical = evidence.supplemental.filter(row => String(row.source_member).endsWith("/criterion_ablation_history.csv"));
+    const boundary = evidence.supplemental.filter(row => String(row.source_member).endsWith("/boundary_movement.csv") && Number(row.group_change_count) > 0).sort((a, b) => Number(b.group_change_rate) - Number(a.group_change_rate));
+    for (const [title, label, expected] of [
+      ["Historical criterion-removal checks", "historical criterion-removal", historical.map(row => `${row.cutoff ?? ""}|${row.removed_criterion ?? ""}`)],
+      ["Priority boundary movement observations", "boundary movement", boundary.map(row => `${(Number(row.perturbation_level) * 100).toFixed(2)}%|${row.account_name}`)],
+    ] as const) {
+      const panel = validation.locator("summary").filter({ hasText: title }).locator("..");
+      const pages = Math.max(1, Math.ceil(expected.length / 10));
+      const actual: string[] = [];
+      await expect(panel.getByRole("button", { name: `Previous ${label} page` })).toBeDisabled();
+      for (let current = 1; current <= pages; current++) {
+        await expect(panel.locator("tbody tr")).toHaveCount(Math.min(10, expected.length - (current - 1) * 10));
+        actual.push(...await panel.locator("tbody tr").evaluateAll(rows => rows.map(row => Array.from(row.querySelectorAll("td")).slice(0, 2).map(cell => cell.textContent).join("|"))));
+        if (current < pages) await panel.getByRole("button", { name: `Next ${label} page` }).click();
+      }
+      expect(actual).toEqual(expected);
+      await expect(panel.getByRole("button", { name: `Next ${label} page` })).toBeDisabled();
+      if (pages > 1) {
+        await panel.getByRole("button", { name: `Previous ${label} page` }).click();
+        await expect(panel.getByText(`Page ${pages - 1} of ${pages}`, { exact: true })).toBeVisible();
+      }
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await page.evaluate(() => scrollTo(0, 0));
+    await page.screenshot({ path: test.info().outputPath(width + "-validation-expanded.png") });
+  });
+}
+
+for (const width of [1440, 1366, 1024, 390]) {
 test(`shared typography preserves readable words, row alignment, and panel bounds at ${width}px`, async ({ page, request }) => {
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.message));

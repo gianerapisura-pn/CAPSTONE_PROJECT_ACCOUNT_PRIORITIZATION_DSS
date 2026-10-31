@@ -40,6 +40,8 @@ const accounts = [
     r_score: 2, f_score: 5, m_score: 2, average_settlement_days: 40, frequency_count: 2 },
 ];
 let insightsAccounts: Array<Record<string, unknown>> = accounts;
+let influenceRows: Array<Record<string, string | number | null>> = [];
+let supplementalRows: Array<Record<string, string | number | null>> = [];
 vi.mock("@/lib/use-api", () => ({
   useApi: (path: string) => ({
     loading: false, error: "", reload: vi.fn(),
@@ -61,8 +63,8 @@ vi.mock("@/lib/use-api", () => ({
           predicted_future_transaction: 9, predicted_no_future_transaction: 70,
           classification_error: .07594936708860756, macro_f1: .7648809523809523,
           accuracy: .9240506329113924 },
-      ], sensitivity: [], critic_influence: [],
-      backtest: { cutoffs: [] }, critic_weights: {}, supplemental: [],
+      ], sensitivity: [], critic_influence: influenceRows,
+      backtest: { cutoffs: [] }, critic_weights: {}, supplemental: supplementalRows,
     },
   }),
 }));
@@ -70,7 +72,7 @@ vi.mock("@/lib/use-api", () => ({
 import ReportsPage from "@/app/(protected)/reports/page";
 import { approvedPowerBiEmbedUrl, approvedPowerBiReportUrl } from "@/lib/power-bi-links";
 
-afterEach(() => { authState.role = "management"; insightsAccounts = accounts; vi.restoreAllMocks(); });
+afterEach(() => { authState.role = "management"; insightsAccounts = accounts; influenceRows = []; supplementalRows = []; vi.restoreAllMocks(); });
 
 test("native reporting has exactly three views and does not require Power BI", () => {
   render(<ReportsPage />);
@@ -194,12 +196,18 @@ test("RFM component and score filter one criterion and preserve link scope", asy
   expect(within(screen.getByLabelText("Active filters")).getByRole("status")).toHaveTextContent("3 matching accounts");
 });
 
-test("management can open read-only validation evidence", async () => {
+test("validation evidence starts expanded and remains manually collapsible", async () => {
   const user = userEvent.setup();
   render(<ReportsPage />);
   await user.click(screen.getByRole("tab", { name: "Analytics Validation" }));
-  await user.click(screen.getByText("Model selection and historical classification evidence"));
-  await user.click(screen.getByText("Weight sensitivity, backtests, and technical robustness"));
+  const disclosures = document.querySelectorAll("#validation-findings details");
+  expect(disclosures).toHaveLength(8);
+  for (const disclosure of disclosures) expect(disclosure).toHaveAttribute("open");
+  const summary = screen.getByText("Model selection and historical classification evidence");
+  await user.click(summary);
+  expect(summary.closest("details")).not.toHaveAttribute("open");
+  await user.click(summary);
+  expect(summary.closest("details")).toHaveAttribute("open");
   expect(screen.getByRole("heading", { name: "Prediction Horizon Comparison" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Model Benchmark: Mean Macro F1" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Development observations by cutoff year" })).toBeInTheDocument();
@@ -221,6 +229,74 @@ test("management can open read-only validation evidence", async () => {
   expect(screen.getByText("83")).toBeInTheDocument();
   expect(screen.getByText("Pending")).toBeInTheDocument();
   expect(screen.getByText(/not accuracy claims for the pending 2026 forecast/)).toBeInTheDocument();
+});
+
+test("CRITIC influence shows ten rows per page without changing saved results", async () => {
+  const user = userEvent.setup();
+  influenceRows = Array.from({ length: 23 }, (_, index) => ({ removed_account: `INFLUENCE ACCOUNT ${index + 1}`, maximum_absolute_weight_change: .0046, spearman_correlation: .99, group_movement_rate: .02 }));
+  const before = JSON.stringify(influenceRows);
+  render(<ReportsPage />);
+  await user.click(screen.getByRole("tab", { name: "Analytics Validation" }));
+  const panel = screen.getByText("Leave-one-account-out CRITIC influence (23)").closest("details")!;
+  const scope = within(panel);
+  const bodyRows = () => panel.querySelectorAll("tbody tr");
+  expect(bodyRows()).toHaveLength(10);
+  expect(scope.getByText("Showing 1-10 of 23")).toBeInTheDocument();
+  expect(scope.getByRole("button", { name: "Previous influence page" })).toBeDisabled();
+  expect(bodyRows()[0]).toHaveTextContent("INFLUENCE ACCOUNT 1");
+  expect(bodyRows()[0]).toHaveTextContent("0.0046");
+  await user.click(scope.getByRole("button", { name: "Next influence page" }));
+  expect(bodyRows()).toHaveLength(10);
+  expect(scope.getByText("Showing 11-20 of 23")).toBeInTheDocument();
+  await user.click(scope.getByRole("button", { name: "Next influence page" }));
+  expect(bodyRows()).toHaveLength(3);
+  expect(scope.getByText("Showing 21-23 of 23")).toBeInTheDocument();
+  expect(scope.getByRole("button", { name: "Next influence page" })).toBeDisabled();
+  await user.click(scope.getByRole("button", { name: "Previous influence page" }));
+  expect(scope.getByText("Showing 11-20 of 23")).toBeInTheDocument();
+  expect(JSON.stringify(influenceRows)).toBe(before);
+});
+
+test("empty CRITIC influence has no phantom page or active navigation", async () => {
+  render(<ReportsPage />);
+  await userEvent.setup().click(screen.getByRole("tab", { name: "Analytics Validation" }));
+  const panel = screen.getByText("Leave-one-account-out CRITIC influence (0)").closest("details")!;
+  expect(panel.querySelectorAll("tbody tr")).toHaveLength(0);
+  expect(within(panel).getByText("Showing 0-0 of 0")).toBeInTheDocument();
+  expect(within(panel).getByRole("button", { name: "Previous influence page" })).toBeDisabled();
+  expect(within(panel).getByRole("button", { name: "Next influence page" })).toBeDisabled();
+  for (const label of ["historical criterion-removal", "boundary movement"]) {
+    expect(screen.getByRole("button", { name: `Previous ${label} page` })).toBeDisabled();
+    expect(screen.getByRole("button", { name: `Next ${label} page` })).toBeDisabled();
+  }
+});
+
+test("historical checks and boundary observations have independent ten-row pages", async () => {
+  const user = userEvent.setup();
+  supplementalRows = [
+    ...Array.from({ length: 23 }, (_, index) => ({ source_member: "qa/criterion_ablation_history.csv", cutoff: `PERIOD ${index + 1}`, removed_criterion: "recency", eligible_accounts: 40, selected_count: 4, capture_rate: .2, lift: 2 })),
+    ...Array.from({ length: 31 }, (_, index) => ({ source_member: "qa/boundary_movement.csv", account_name: `BOUNDARY ACCOUNT ${index + 1}`, group_change_count: 1, group_change_rate: (31 - index) / 100, baseline_priority_group: "High", perturbation_level: .1, maximum_absolute_rank_change: 2 })),
+  ];
+  const before = JSON.stringify(supplementalRows);
+  render(<ReportsPage />);
+  await user.click(screen.getByRole("tab", { name: "Analytics Validation" }));
+  const historical = screen.getByText("Historical criterion-removal checks (23)").closest("details")!;
+  const boundary = screen.getByText("Priority boundary movement observations (31)").closest("details")!;
+  for (const [panel, label, total] of [[historical, "historical criterion-removal", 23], [boundary, "boundary movement", 31]] as const) {
+    const scope = within(panel);
+    expect(panel.querySelectorAll("tbody tr")).toHaveLength(10);
+    expect(scope.getByRole("button", { name: `Previous ${label} page` })).toBeDisabled();
+    const pages = Math.ceil(total / 10);
+    for (let page = 2; page <= pages; page++) await user.click(scope.getByRole("button", { name: `Next ${label} page` }));
+    expect(panel.querySelectorAll("tbody tr")).toHaveLength(total % 10);
+    expect(scope.getByText(`Showing ${(pages - 1) * 10 + 1}-${total} of ${total}`)).toBeInTheDocument();
+    expect(scope.getByRole("button", { name: `Next ${label} page` })).toBeDisabled();
+    await user.click(scope.getByRole("button", { name: `Previous ${label} page` }));
+    expect(panel.querySelectorAll("tbody tr")).toHaveLength(10);
+    if (label === "historical criterion-removal") expect(within(boundary).getByText("Page 1 of 4")).toBeInTheDocument();
+    else expect(within(historical).getByText("Page 2 of 3")).toBeInTheDocument();
+  }
+  expect(JSON.stringify(supplementalRows)).toBe(before);
 });
 
 test("overview drilldowns use only displayed dimensions while retaining other-tab return context", async () => {
