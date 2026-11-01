@@ -1,15 +1,20 @@
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { AdditionalValidation } from "@/components/additional-validation";
-import { ValidationGuide, validationGuides } from "@/components/validation-guide";
+import { ValidationGuide, validationGuides, validationContexts, validationFinding } from "@/components/validation-guide";
 
-test.each(Object.keys(validationGuides) as Array<keyof typeof validationGuides>)("%s explains purpose, reading and limits without requiring hover", topic => {
+test.each(Object.keys(validationGuides) as Array<keyof typeof validationGuides>)("%s is compact by default with optional technical details", async topic => {
   const { container } = render(<ValidationGuide topic={topic} />);
   const guide = container.querySelector(`[data-validation-guide="${topic}"]`)!;
-  expect(within(guide as HTMLElement).getByText("Purpose and source")).toBeVisible();
-  expect(within(guide as HTMLElement).getByText("How to read it")).toBeVisible();
-  expect(within(guide as HTMLElement).getByText("What it tells you")).toBeVisible();
-  expect(guide.querySelectorAll("dd")).toHaveLength(3);
-  expect(guide.querySelector("details")).toBeNull();
+  expect(within(guide as HTMLElement).getByText(validationContexts[topic])).toBeVisible();
+  expect(validationContexts[topic].split(/\s+/).length).toBeLessThan(35);
+  expect(guide.querySelector("details")).not.toHaveAttribute("open");
+  expect(within(guide as HTMLElement).getByText(validationGuides[topic][2])).not.toBeVisible();
+  expect(guide.querySelector("dl")).toBeNull();
+  await userEvent.click(guide.querySelector("summary")!);
+  expect(within(guide as HTMLElement).getByText(validationGuides[topic][2])).toBeVisible();
+  await userEvent.click(guide.querySelector("summary")!);
+  expect(within(guide as HTMLElement).getByText(validationGuides[topic][2])).not.toBeVisible();
   expect(guide.textContent).not.toMatch(/challenger/i);
 });
 
@@ -31,7 +36,20 @@ test("additional study checks explain every table and leave the source evidence 
   for (const table of container.querySelectorAll("table")) {
     expect(table.closest("section, details")?.querySelector("[data-validation-guide]")).not.toBeNull();
   }
-  expect(screen.getByText(/first group minus the second/)).toBeVisible();
-  expect(screen.getByText(/no discrimination and 1 is perfect/)).toBeVisible();
+  expect(screen.getByText(/first group minus the second/)).not.toBeVisible();
+  expect(screen.getByText(/no discrimination and 1 is perfect/)).not.toBeVisible();
+  expect(screen.getByText(/1 of 1 available intervals include zero/)).toBeVisible();
   expect(JSON.stringify(evidence)).toBe(before);
+});
+
+test("findings summarize saved results without changing rows or inventing success", () => {
+  const rows = [{ mean_spearman: .98, max_group_movement_rate: .1 }, { mean_spearman: .94, max_group_movement_rate: .2 }];
+  const before = JSON.stringify(rows);
+  expect(validationFinding("sensitivity", rows)).toContain("0.9400 to 0.9800");
+  expect(validationFinding("sensitivity", rows)).toContain("20.00%");
+  expect(validationFinding("backtest", [{ lift_over_expected_random: .5 }, { lift_over_expected_random: 2 }])).toContain("1 of 2");
+  expect(validationFinding("sensitivity", [{ mean_spearman: null }])).toContain("unavailable");
+  expect(validationFinding("backtest", [])).toBeNull();
+  expect(validationFinding("bootstrap", [{ ci_2_5: NaN, ci_97_5: Infinity }])).toBe("Saved uncertainty bounds are unavailable.");
+  expect(JSON.stringify(rows)).toBe(before);
 });

@@ -1,6 +1,7 @@
+import { Info } from "lucide-react";
 import styles from "./validation-guide.module.css";
 
-// Explanations describe saved evidence; they never calculate or reinterpret results.
+// Technical text documents saved evidence without changing analytical results.
 export const validationGuides = {
   context: [
     "Start here: which results are we checking?",
@@ -148,14 +149,116 @@ export const validationGuides = {
   ],
 } as const;
 
-export function ValidationGuide({ topic }: { topic: keyof typeof validationGuides }) {
+export const validationContexts: Record<keyof typeof validationGuides, string> = {
+  context: "Study forecasts and current ranking results refer to their stated dates; predictions are not confirmed sales.",
+  development: "Historical training examples show how often accounts bought again after each cutoff.",
+  horizon: "Compares historical forecast windows before the final model was selected.",
+  benchmark: "Compares models on completed historical tests; higher Macro F1 means better performance across both classes.",
+  metrics: "Compares CatBoost with Extra Trees on several historical performance measures.",
+  yearly: "Shows whether CatBoost's historical performance varied across evaluation years.",
+  canonical: "Full historical model comparison; these positions rank models, not client accounts.",
+  lookback: "Compares how much past purchase history was used as model input, not how far ahead it predicts.",
+  later: "Checks earlier predictions against purchases observed in later, completed periods.",
+  features: "Checks how historical model performance changes when different sets of inputs are used.",
+  weights: "Published CRITIC weights show each factor's share in the Final Priority Score; predictions are excluded.",
+  sensitivity: "Tests whether account rankings and Priority Groups change when criterion weights are adjusted.",
+  backtest: "Compares the top-ranked accounts' next-year invoice-value share with a same-size random selection.",
+  removal: "Checks how omitting one factor changes the four-factor study ranking.",
+  historicalRemoval: "Checks next-year sales-value capture when one factor is omitted at historical cutoffs.",
+  boundary: "Lists account-and-range tests where weight changes moved an account to another Priority Group.",
+  influence: "Checks how much each account affects the shared CRITIC weights; no account is deleted.",
+  alternatives: "Compares study rankings under alternative weighting and scoring methods; the official method is unchanged.",
+  alternativeBacktests: "Compares alternative methods' sales-value capture across completed historical periods.",
+  incidence: "Shows how often historical group members bought again and their share of next-year invoice value.",
+  annual: "Compares consecutive historical rankings for accounts present in both years.",
+  recency: "Compares the four-factor method with selecting accounts by their most recent purchase alone.",
+  relationship: "Checks whether higher priority scores were associated with later purchases and invoice value.",
+  bootstrap: "Shows uncertainty in historical buyer-rate differences; an interval containing zero has an uncertain direction.",
+};
+
+export function ValidationGuide({ topic, contextVisible = true }: { topic: keyof typeof validationGuides; contextVisible?: boolean }) {
   const [title, purpose, reading, meaning] = validationGuides[topic];
   return <div className={styles.guide} data-validation-guide={topic}>
-    <p className={styles.title}>{title}</p>
-    <dl>
-      <div><dt>Purpose and source</dt><dd>{purpose}</dd></div>
-      <div><dt>How to read it</dt><dd>{reading}</dd></div>
-      <div><dt>What it tells you</dt><dd>{meaning}</dd></div>
-    </dl>
+    {contextVisible && <p className={styles.context}>{validationContexts[topic]}</p>}
+    <details className={styles.details}>
+      <summary title={`Technical details: ${title}`}><Info size={14} aria-hidden="true" />Details<span className={styles.srOnly}>: {title}</span></summary>
+      <div className={styles.body}><p>{purpose}</p><p>{reading}</p><p>{meaning}</p></div>
+    </details>
   </div>;
+}
+
+type Evidence = Readonly<Record<string, unknown>>;
+type Topic = keyof typeof validationGuides;
+
+// Display summaries use only saved rows, never thresholds that grade or alter analytics.
+export function validationFinding(topic: Topic, rows: readonly Evidence[]): string | null {
+  if (!rows.length) return null;
+  const numbers = (key: string) => rows.flatMap(row => typeof row[key] === "number" && Number.isFinite(row[key]) ? [row[key] as number] : []);
+  const range = (key: string, percentage = false) => {
+    const values = numbers(key);
+    if (!values.length) return "unavailable";
+    const format = (value: number) => percentage ? `${(value * 100).toFixed(2)}%` : value.toFixed(4);
+    return `${format(Math.min(...values))} to ${format(Math.max(...values))}`;
+  };
+  switch (topic) {
+    case "sensitivity": {
+      const movements = numbers("max_group_movement_rate");
+      return `Mean rank agreement: ${range("mean_spearman")} (1 = identical order). Largest group movement: ${movements.length ? `${(Math.max(...movements) * 100).toFixed(2)}%` : "unavailable"} in a tested scenario.`;
+    }
+    case "backtest": {
+      const lift = numbers("lift_over_expected_random");
+      return lift.length ? `${lift.filter(value => value > 1).length} of ${lift.length} available historical tests exceeded random expectation; lift ranged from ${range("lift_over_expected_random")} times. This measures sales-value capture, not a causal sales increase.` : "Historical lift is unavailable.";
+    }
+    case "benchmark": case "metrics": case "canonical": {
+      const a = rows.find(row => row.family === "CatBoost")?.mean_macro_f1;
+      const b = rows.find(row => row.family === "Extra Trees")?.mean_macro_f1;
+      return typeof a === "number" && Number.isFinite(a) && typeof b === "number" && Number.isFinite(b) ? `Historical mean Macro F1: CatBoost ${a.toFixed(4)}; Extra Trees ${b.toFixed(4)}. This does not establish pending-forecast accuracy.` : `${rows.length} model results recorded; the CatBoost/Extra Trees score comparison is incomplete.`;
+    }
+    case "yearly": case "later": return `Historical Macro F1: ${range("macro_f1")} across ${rows.length} recorded periods; not pending-forecast accuracy.`;
+    case "influence": {
+      const changes = numbers("maximum_absolute_weight_change");
+      return `${rows.length} account-omission checks; largest weight change: ${changes.length ? `${(Math.max(...changes) * 100).toFixed(2)} percentage points` : "unavailable"}. Published weights are unchanged.`;
+    }
+    case "boundary": return `${rows.length} account-and-range observations had group changes; accounts may repeat. Published groups are unchanged.`;
+    case "development": {
+      const counts = numbers("observations");
+      return counts.length === rows.length ? `${counts.reduce((sum, value) => sum + value, 0)} account-cutoff observations across ${rows.length} years, not distinct-company counts.` : "Development observation counts are incomplete.";
+    }
+    case "horizon": {
+      const selected = rows.find(row => row.stage4_decision === "SELECTED");
+      return selected ? `Recorded target choice: ${selected.horizon_months} months, selected before final model comparison.` : "The recorded target-window choice is unavailable.";
+    }
+    case "lookback": return `${rows.length} past-data windows compared; the future prediction horizon is unchanged.`;
+    case "features": {
+      const differences = numbers("delta_macro_f1_vs_all_7");
+      return differences.length ? `${differences.filter(value => value > 0).length} of ${differences.length} recorded input sets scored above the seven-input reference; the frozen model is unchanged.` : "Input-set score differences are unavailable.";
+    }
+    case "weights": {
+      const valid = rows.filter(row => typeof row.weight === "number" && Number.isFinite(row.weight));
+      if (!valid.length) return "Published criterion weights are unavailable.";
+      const maximum = Math.max(...valid.map(row => Number(row.weight)));
+      const names = valid.filter(row => row.weight === maximum).map(row => String(row.criterion)).join(", ");
+      return `Largest published weight: ${names} (${(maximum * 100).toFixed(2)}%); the four-factor score excludes predicted sales.`;
+    }
+    case "annual": return `Annual rank agreement: ${range("spearman_rho")} (1 = identical order); this checks review-order stability, not future purchases.`;
+    case "incidence": return `Historical buyer incidence: ${range("purchase_incidence", true)} across saved groups; not individual purchase probabilities.`;
+    case "relationship": return `FPS / next-year invoice-value association: ${range("spearman_fps_vs_next_year_si")}; association does not promise sales.`;
+    case "bootstrap": {
+      const bounds = rows.filter(row => typeof row.ci_2_5 === "number" && Number.isFinite(row.ci_2_5) && typeof row.ci_97_5 === "number" && Number.isFinite(row.ci_97_5));
+      return bounds.length ? `${bounds.filter(row => Number(row.ci_2_5) <= 0 && Number(row.ci_97_5) >= 0).length} of ${bounds.length} available intervals include zero; those differences have an uncertain direction.` : "Saved uncertainty bounds are unavailable.";
+    }
+    case "removal": {
+      const counts = numbers("group_changes");
+      return counts.length ? `${Math.min(...counts)} to ${Math.max(...counts)} accounts changed group across omitted-factor tests; the official method retains all four factors.` : "Criterion-removal group-change counts are unavailable.";
+    }
+    case "historicalRemoval": return `${rows.length} historical cutoff-and-factor checks; supplementary comparisons, not replacement rankings.`;
+    case "alternatives": return `Priority Group agreement: ${range("group_agreement", true)} across comparisons; official CRITIC/MCS results are unchanged.`;
+    case "alternativeBacktests": return `Mean historical lift: ${range("mean_lift")} times across methods; these are supplementary comparisons.`;
+    default: return null;
+  }
+}
+
+export function ValidationFinding({ topic, rows }: { topic: Topic; rows: readonly Evidence[] }) {
+  const finding = validationFinding(topic, rows);
+  return finding ? <p className={styles.finding} data-validation-finding={topic}>{finding}</p> : null;
 }

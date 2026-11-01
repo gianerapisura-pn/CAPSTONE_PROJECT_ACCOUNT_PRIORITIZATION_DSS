@@ -76,7 +76,12 @@ test("validation tables and charts include visible plain-language guides without
   const { container } = render(<ReportsPage />);
   expect(container.querySelector("[data-validation-guide]")).toBeNull();
   await userEvent.click(screen.getByRole("tab", { name: "Analytics Validation" }));
-  expect(screen.getByRole("heading", { name: "What these checks tell us" })).toBeVisible();
+  expect(screen.queryByRole("heading", { name: "What these checks tell us" })).not.toBeInTheDocument();
+  expect(screen.queryByText("Purpose and source")).not.toBeInTheDocument();
+  expect(screen.queryByText("How to read it")).not.toBeInTheDocument();
+  for (const guide of container.querySelectorAll("[data-validation-guide]")) {
+    expect(guide.querySelector("details")).not.toHaveAttribute("open");
+  }
   expect(screen.queryByText(/challenger/i)).not.toBeInTheDocument();
   for (const table of container.querySelectorAll("table")) {
     expect(table.closest("section, details")?.querySelector("[data-validation-guide]")).not.toBeNull();
@@ -84,7 +89,7 @@ test("validation tables and charts include visible plain-language guides without
   for (const chart of container.querySelectorAll(".native-chart")) {
     expect(chart.querySelector("[data-validation-guide]")).not.toBeNull();
   }
-  expect(screen.getByText(/0.01 means one percentage point/)).toBeVisible();
+  expect(screen.getByText(/0.01 means one percentage point/)).not.toBeVisible();
   expect(screen.getAllByText(/not twice as many buyers/)).toHaveLength(2);
   expect(screen.getByText("0.7649")).toBeInTheDocument();
   expect(screen.getByText("92.41%")).toBeInTheDocument();
@@ -220,7 +225,7 @@ test("validation evidence starts expanded and remains manually collapsible", asy
   const user = userEvent.setup();
   render(<ReportsPage />);
   await user.click(screen.getByRole("tab", { name: "Analytics Validation" }));
-  const disclosures = document.querySelectorAll("#validation-findings details");
+  const disclosures = document.querySelectorAll("#validation-findings details.native-evidence-details");
   expect(disclosures).toHaveLength(8);
   for (const disclosure of disclosures) expect(disclosure).toHaveAttribute("open");
   const summary = screen.getByText("Model selection and historical classification evidence");
@@ -238,7 +243,7 @@ test("validation evidence starts expanded and remains manually collapsible", asy
   expect(screen.queryByText(/below-random years remain visible/)).not.toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Sensitivity: Mean Spearman Rank Correlation" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Historical Backtests: Lift vs Random" })).toBeInTheDocument();
-  expect(screen.getByText(/higher share of succeeding valid Sales Invoice value/)).toBeInTheDocument();
+  expect(screen.getAllByText(/same-size random selection/).length).toBeGreaterThan(0);
   expect(screen.getByRole("heading", { name: "Historical later-period confirmations" })).toBeInTheDocument();
   expect(screen.getAllByText("2024-12-31")).toHaveLength(2);
   expect(screen.getAllByText("2025-12-31").length).toBeGreaterThan(0);
@@ -248,7 +253,7 @@ test("validation evidence starts expanded and remains manually collapsible", asy
   expect(screen.getByText("92.41%")).toBeInTheDocument();
   expect(screen.getByText("83")).toBeInTheDocument();
   expect(screen.getByText("Pending")).toBeInTheDocument();
-  expect(screen.getByText(/not accuracy claims for the pending 2026 forecast/)).toBeInTheDocument();
+  expect(screen.getByText(/Historical Macro F1:.*not pending-forecast accuracy/)).toBeInTheDocument();
 });
 
 test("CRITIC influence shows ten rows per page without changing saved results", async () => {
