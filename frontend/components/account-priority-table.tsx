@@ -43,10 +43,12 @@ export function AccountPriorityTable({ initialGroup = "" }: { initialGroup?: Pri
     catch (reason) { setExportError(reason instanceof Error ? reason.message : "Export failed."); }
   };
   const historic = params.get("eligibility") !== "ranked";
+  const studyScope = params.get("prediction_scope") === "study";
   const advancedCount = ["primary_business_type", "account_status", "predicted_future_transaction_class", "rfm_component", "rfm_score", "settlement_range"].filter(key => params.get(key)).length + (historic ? 1 : 0);
   const reset = () => { const next = new URLSearchParams(); next.set("eligibility", "ranked"); if (params.get("returnTo")) next.set("returnTo", params.get("returnTo")!); window.history.replaceState(null, "", "/accounts?" + next); };
   return <section className="data-section account-priority-section">
     <ContextReturn value={params.get("returnTo")} />
+    {studyScope && <p className="native-note">Final study classifications{data?.prediction_reference_date ? ` as of ${data.prediction_reference_date}` : ""}; scores, ranks, and Priority Groups remain from the current published run.</p>}
     <div className="table-toolbar">
       <label className="search-field"><Search size={17} /><input aria-label="Search accounts" value={params.get("search") ?? ""} onChange={event => set("search", event.target.value)} placeholder="Search account name" /></label>
       {select("Priority Group", "priority_group", ["High", "Medium", "Low"])}
@@ -54,8 +56,8 @@ export function AccountPriorityTable({ initialGroup = "" }: { initialGroup?: Pri
       <details className="account-more-filters"><summary>More Filters{advancedCount ? ` (${advancedCount} active)` : ""}</summary><div className="native-filter-bar">
         {select("Primary business type", "primary_business_type", options.primary_business_type ?? [])}
         {select("Current status", "account_status", options.account_status ?? [])}
-        <label className="native-filter">Ranking status<select aria-label="Ranking status" value={params.get("eligibility") ?? "ranked"} onChange={event => set("eligibility", event.target.value)}><option value="all">All historical B2B accounts</option><option value="ranked">Ranked</option><option value="not_ranked">Not ranked</option></select></label>
-        {select("Operational 12-Month SI Class", "predicted_future_transaction_class", ["With Future Sales", "With No Future Sales"])}
+        <label className="native-filter">Ranking status<select aria-label="Ranking status" value={params.get("eligibility") ?? "ranked"} onChange={event => set("eligibility", event.target.value)}><option value="all">{studyScope ? "All study accounts" : "All historical B2B accounts"}</option><option value="ranked">Ranked</option><option value="not_ranked">Not ranked</option></select></label>
+        {select(studyScope ? "Study 12-Month SI Class" : "Operational 12-Month SI Class", "predicted_future_transaction_class", ["With Future Sales", "With No Future Sales"])}
         {select("RFM component", "rfm_component", ["Recency", "Frequency", "Monetary"], "Any R/F/M")}
         {select("RFM component score", "rfm_score", ["1", "2", "3", "4", "5"])}
         {select("Average settlement days", "settlement_range", settlementRanges)}

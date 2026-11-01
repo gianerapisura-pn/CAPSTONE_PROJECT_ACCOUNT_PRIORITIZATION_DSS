@@ -107,6 +107,8 @@ export interface AccountDecisionRow {
 }
 
 export interface AccountListResponse {
+  prediction_scope?: "operational" | "study";
+  prediction_reference_date?: string | null;
   filter_options?: Record<string, string[]>;
   items: AccountDecisionRow[];
   total: number;

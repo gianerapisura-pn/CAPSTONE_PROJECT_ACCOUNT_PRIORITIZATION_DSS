@@ -407,7 +407,8 @@ def filter_current_account_rows(rows, search="", priority_group=None,
                                 predicted_future_transaction_class=None, eligibility=None,
                                 business_category=None, primary_business_type=None,
                                 account_status=None, rfm_component=None, rfm_score=None,
-                                settlement_range=None, sort_by="rank", sort_direction="asc"):
+                                settlement_range=None, sort_by="rank", sort_direction="asc",
+                                prediction_scope="operational"):
     query = search.strip().casefold()
     rows = [x for x in rows if not query or query in x["account"].casefold()]
     if priority_group:

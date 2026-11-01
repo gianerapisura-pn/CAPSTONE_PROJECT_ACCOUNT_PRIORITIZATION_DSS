@@ -1,5 +1,5 @@
 export const settlementRanges = ["Below 30", "30-<60", "60-<90", "90-<120", "120+"];
-export const accountFilterKeys = ["search", "priority_group", "business_category", "primary_business_type", "account_status", "eligibility", "predicted_future_transaction_class", "rfm_component", "rfm_score", "settlement_range", "sort_by", "sort_direction"] as const;
+export const accountFilterKeys = ["search", "priority_group", "business_category", "primary_business_type", "account_status", "eligibility", "predicted_future_transaction_class", "prediction_scope", "rfm_component", "rfm_score", "settlement_range", "sort_by", "sort_direction"] as const;
 export type AccountFilterKey = typeof accountFilterKeys[number];
 export type AccountFilters = Partial<Record<AccountFilterKey, string>>;
 
@@ -14,13 +14,13 @@ const filterLabels: Record<string, string> = {
 
 export function accountFilterSummary(filters: Record<string, string | undefined>) {
   return Object.entries(filters).filter(([key, value]) => filterLabels[key] && value).map(([key, value]) => {
-    const population = value === "ranked" ? "Currently ranked accounts" : value === "not_ranked" ? "Historical accounts without a current rank" : "All historical B2B accounts";
+    const population = value === "ranked" ? "Currently ranked accounts" : value === "not_ranked" ? "Historical accounts without a current rank" : filters.prediction_scope === "study" ? "Study accounts (all ranking statuses)" : "All historical B2B accounts";
     return filterLabels[key] + ": " + (key === "eligibility" ? population : value);
   }).join("; ");
 }
 
 export function accountFilterEntries(filters: AccountFilters) {
-  return Object.entries(filters).filter(([key, value]) => filterLabels[key] && value).map(([key, value]) => ({ key, value, label: filterLabels[key], text: key === "eligibility" ? (value === "ranked" ? "Currently ranked" : value === "not_ranked" ? "Historical, not ranked" : "All historical B2B") : value }));
+  return Object.entries(filters).filter(([key, value]) => filterLabels[key] && value).map(([key, value]) => ({ key, value, label: filterLabels[key], text: key === "eligibility" ? (value === "ranked" ? "Currently ranked" : value === "not_ranked" ? "Historical, not ranked" : filters.prediction_scope === "study" ? "Study accounts (all ranking statuses)" : "All historical B2B") : value }));
 }
 export function accountApiQuery(params: URLSearchParams) {
   const api = new URLSearchParams();

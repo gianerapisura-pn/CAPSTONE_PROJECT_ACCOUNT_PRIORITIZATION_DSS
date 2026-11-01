@@ -45,6 +45,8 @@ vi.mock("@/lib/use-api", () => ({
     if (search) filtered = filtered.filter(row => row.account.toLowerCase().includes(search));
     const group = params.get("priority_group");
     if (group) filtered = filtered.filter(row => row.priority_group === group);
+    const predicted = params.get("predicted_future_transaction_class");
+    if (predicted) filtered = filtered.filter(row => row.predicted_future_transaction_class === predicted);
     const eligibility = params.get("eligibility");
     if (eligibility === "ranked") filtered = filtered.filter(row => row.is_ranked);
     if (eligibility === "not_ranked") filtered = filtered.filter(row => !row.is_ranked);
@@ -68,6 +70,20 @@ test("search and priority filters operate on the unified API account data", asyn
   await user.selectOptions(screen.getByLabelText("Priority Group"), "High");
   expect(screen.getByText("ALPHA")).toBeInTheDocument();
   expect(screen.queryByText("BETA")).not.toBeInTheDocument();
+});
+
+test("study-class drilldown has the selected class and a persistent return button", async () => {
+  const user = userEvent.setup();
+  const params = new URLSearchParams({ eligibility: "all", prediction_scope: "study", predicted_future_transaction_class: "With No Future Sales", returnTo: "/analytics/predictive#study-classes" });
+  window.history.replaceState(null, "", "/accounts?" + params);
+  render(<AccountPriorityTable />);
+  expect(screen.getByText("BETA")).toBeInTheDocument();
+  expect(screen.queryByText("ALPHA")).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Back to With Future Sales" })).toHaveAttribute("href", "/analytics/predictive#study-classes");
+  expect(screen.getByLabelText("Study 12-Month SI Class")).toHaveValue("With No Future Sales");
+  expect(screen.getByRole("link", { name: "BETA" })).toHaveAttribute("href", expect.stringContaining("prediction_scope=study"));
+  await user.click(screen.getByRole("button", { name: "Reset" }));
+  expect(screen.getByRole("link", { name: "Back to With Future Sales" })).toHaveAttribute("href", "/analytics/predictive#study-classes");
 });
 
 test("dashboard group initializes the API filter without reranking", () => {

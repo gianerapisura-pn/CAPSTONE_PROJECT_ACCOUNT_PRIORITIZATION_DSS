@@ -148,6 +148,23 @@ def _latest_or_404(db):
     return run
 
 
+def _account_population(db, run, filters):
+    rows = current_account_rows(db, run)
+    if filters.prediction_scope != "study":
+        return rows
+    study = final_study_prediction_payload(db)
+    if study.get("status") != "Validated":
+        raise HTTPException(409, "Verified study classifications are unavailable.")
+    predictions = study["predictions"]
+    if not predictions or not set(predictions).issubset({row["account"] for row in rows}):
+        raise HTTPException(409, "The current account snapshot cannot display the complete study population.")
+    # The study class is frozen; current published scores and ranks are copied unchanged.
+    return [{**row, "predicted_future_transaction_class": predictions[row["account"]],
+             "model_version": study["model_version"], "prediction_scope": "study",
+             "prediction_reference_date": study["forecast_origin"]}
+            for row in rows if row["account"] in predictions]
+
+
 def _safe(value):
     return "'" + value if isinstance(value, str) and value[:1] in {"=", "+", "-", "@"} else value
 
@@ -800,7 +817,7 @@ def accounts(search: str = "", priority_group: str | None = None,
              user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db),
              filters: AccountFilters = Depends(read_account_filters)):
     run = _latest_or_404(db)
-    population = current_account_rows(db, run)
+    population = _account_population(db, run, filters)
     options = validate_snapshot_filters(population, filters)
     rows = filter_current_account_rows(population, **filters.model_dump())
     page = min(page, max(1, (len(rows) + page_size - 1) // page_size))
@@ -810,7 +827,8 @@ def accounts(search: str = "", priority_group: str | None = None,
             "page_size": page_size, "analysis_run_id": run.analysis_run_id,
             "analysis_reference_date": reference.isoformat() if reference else None,
             "updated_at": run.completed_at.isoformat() if run.completed_at else None,
-            "filter_options": options}
+            "filter_options": options, "prediction_scope": filters.prediction_scope,
+            "prediction_reference_date": population[0].get("prediction_reference_date") if population else None}
 
 
 @app.get("/accounts/{account_key}")
@@ -822,7 +840,7 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
     if not account:
         raise HTTPException(404, "Account not found.")
     run = _latest_or_404(db)
-    account_rows = current_account_rows(db, run)
+    account_rows = _account_population(db, run, filters)
     position = next((index for index, row in enumerate(account_rows)
                      if row["account_key"] == account.account_key), None)
     if position is None:
@@ -1050,6 +1068,8 @@ def export(dataset: str, format: str, search: str = "", priority_group: str | No
         raise HTTPException(403, "Administrator permission is required.")
     run, payload = _latest_or_404(db), None
     payload = run_payload(db, run)
+    if dataset == "priorities" and filters.prediction_scope == "study":
+        payload["accounts"] = _account_population(db, run, filters)
     validate_snapshot_filters(payload["accounts"], filters)
     sources = {
         "priorities": filter_current_account_rows(payload["accounts"], **filters.model_dump()),

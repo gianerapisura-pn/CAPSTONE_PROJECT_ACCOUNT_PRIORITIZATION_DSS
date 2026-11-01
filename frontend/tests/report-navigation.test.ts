@@ -26,3 +26,13 @@ test("stale report settings have safe internal defaults and unsupported account 
   expect(savedReportHref("https://evil.example")).toBeNull();
   expect(savedReportHref("/reports?tab=account-insights")).toBe("/reports?tab=account-insights");
 });
+
+test("study-class drilldown keeps the safe return while forwarding only API filters", () => {
+  const origin = "/analytics/predictive#study-classes";
+  const params = new URLSearchParams(accountsHref({ eligibility: "all", prediction_scope: "study", predicted_future_transaction_class: "With No Future Sales" }, origin).split("?")[1]);
+  expect(safeReportReturn(params.get("returnTo"))).toEqual({ href: origin, label: "Back to With Future Sales" });
+  expect(accountApiQuery(params).get("prediction_scope")).toBe("study");
+  expect(accountApiQuery(params).has("returnTo")).toBe(false);
+  expect(accountQueryIssue(params)).toBe("");
+  for (const bad of [origin + "?next=https://evil.test", "/analytics/predictive#other", "//evil.test/analytics/predictive#study-classes"]) expect(safeReportReturn(bad)).toBeNull();
+});

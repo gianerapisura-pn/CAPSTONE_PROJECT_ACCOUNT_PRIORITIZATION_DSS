@@ -187,6 +187,8 @@ class AccountDecisionRowResponse(BaseModel):
 
 
 class AccountListResponse(BaseModel):
+    prediction_scope: str = "operational"
+    prediction_reference_date: str | None = None
     filter_options: dict[str, list[str]] = Field(default_factory=dict)
     items: list[AccountDecisionRowResponse]
     total: int

@@ -41,6 +41,7 @@ export function reportHref(state: ReportLocation): string {
   return "/reports?" + params;
 }
 export function safeReportReturn(value: string | null | undefined): { href: string; label: string } | null {
+  if (value === "/analytics/predictive#study-classes") return { href: value, label: "Back to With Future Sales" };
   if (!value || value.length > 4000 || !value.startsWith("/reports?") || value.includes("#")) return null;
   const params = new URLSearchParams(value.slice(9));
   if (!reportTabs.includes(params.get("tab") as ReportTab)) return null;

@@ -9,6 +9,7 @@ class AccountFilters(BaseModel):
     search: str = Field(default="", max_length=200)
     priority_group: Literal["High", "Medium", "Low"] | None = None
     predicted_future_transaction_class: Literal["With Future Sales", "With No Future Sales"] | None = None
+    prediction_scope: Literal["operational", "study"] = "operational"
     eligibility: Literal["ranked", "not_ranked", "all"] | None = None
     business_category: str | None = Field(default=None, min_length=1, max_length=200)
     primary_business_type: str | None = Field(default=None, min_length=1, max_length=200)
