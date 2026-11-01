@@ -446,8 +446,14 @@ def filter_current_account_rows(rows, search="", priority_group=None,
 
 def run_payload(db, run):
     def payloads(model):
-        return [x.payload for x in db.scalars(select(model).where(
-            model.analysis_run_id == run.analysis_run_id)).all()]
+        records = db.scalars(select(model).where(
+            model.analysis_run_id == run.analysis_run_id)).all()
+        if model in (RFMResult, SettlementResult):
+            # One collation-independent order for the complete API and export datasets.
+            records.sort(key=lambda row: (
+                row.payload["account"].casefold(), row.payload["account"], str(row.account_key),
+            ))
+        return [row.payload for row in records]
     priorities = sorted(
         payloads(AccountPriorityResult),
         key=lambda x: (x["priority_rank"], x["account"]),
