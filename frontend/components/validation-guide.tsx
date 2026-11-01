@@ -178,7 +178,7 @@ export const validationContexts: Record<keyof typeof validationGuides, string> =
 
 export function ValidationGuide({ topic, contextVisible = true }: { topic: keyof typeof validationGuides; contextVisible?: boolean }) {
   const [title, purpose, reading, meaning] = validationGuides[topic];
-  return <div className={styles.guide} data-validation-guide={topic}>
+  return <div className={styles.guide} data-validation-guide={topic} data-context-visible={contextVisible}>
     {contextVisible && <p className={styles.context}>{validationContexts[topic]}</p>}
     <details className={styles.details}>
       <summary title={`Technical details: ${title}`}><Info size={14} aria-hidden="true" />Details<span className={styles.srOnly}>: {title}</span></summary>

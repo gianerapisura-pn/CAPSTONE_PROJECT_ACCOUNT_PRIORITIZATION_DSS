@@ -32,7 +32,6 @@ const navGroups = [
 ];
 
 const adminRoutePrefixes = ["/import", "/runs", "/settings"];
-const analyticalRoutePrefixes = ["/analytics/rfm", "/analytics/settlement", "/analytics/predictive", "/analytics/sensitivity"];
 
 export function ProtectedShell({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut } = useAuth();
@@ -40,7 +39,7 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(() => analyticalRoutePrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`)));
+  const [advancedOpen, setAdvancedOpen] = useState(true);
   const restrictedRoute = user?.role === "management" && adminRoutePrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
   useEffect(() => { if (!loading && !user) router.replace(`/login?next=${encodeURIComponent(pathname)}`) }, [loading, pathname, router, user]);
   if (loading || !user) return <div className="auth-loading"><div className="brand-mark"><Boxes /></div><span>Securing your workspace...</span></div>;

@@ -42,14 +42,18 @@ test("management navigation includes the shared analytical workflow", async () =
   expect(screen.getByRole("link", { name: "Account Prioritization" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Detailed Analytics" })).toBeInTheDocument();
   const toggle = screen.getByRole("button", { name: "Advanced Analysis" });
-  await user.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
   for (const link of ["RFM", "Settlement", "With Future Sales", "Sensitivity"]) {
     expect(screen.getByRole("link", { name: link })).toBeInTheDocument();
   }
   expect(screen.queryByRole("link", { name: "Methodology & Governance" })).not.toBeInTheDocument();
+  await user.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await user.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
 });
 
-test("administrator advanced navigation is collapsed by default and retains every route", async () => {
+test("administrator advanced navigation starts expanded and retains the working arrow", async () => {
   authState.role = "administrator";
   const user = userEvent.setup();
   render(<ProtectedShell><div>Administrator content</div></ProtectedShell>);
@@ -61,13 +65,26 @@ test("administrator advanced navigation is collapsed by default and retains ever
     expect(screen.getByRole("link", { name: link })).toBeInTheDocument();
   }
   const toggle = screen.getByRole("button", { name: "Advanced Analysis" });
-  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(toggle.querySelector("svg")).not.toBeNull();
   expect(screen.getByRole("link", { name: "Methodology & Governance" })).toBeInTheDocument();
 
+  await user.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByRole("link", { name: "RFM" })).not.toBeInTheDocument();
   await user.click(toggle);
   expect(toggle).toHaveAttribute("aria-expanded", "true");
   for (const link of ["RFM", "Settlement", "With Future Sales", "Sensitivity"]) {
     expect(screen.getByRole("link", { name: link })).toBeInTheDocument();
+  }
+});
+
+test.each(["/dashboard", "/accounts", "/reports", "/analytics/rfm", "/analytics/settlement"])("advanced routes are visible on initial load of %s", path => {
+  authState.path = path;
+  render(<ProtectedShell><div>Content</div></ProtectedShell>);
+  expect(screen.getByRole("button", { name: "Advanced Analysis" })).toHaveAttribute("aria-expanded", "true");
+  for (const name of ["RFM", "Settlement", "With Future Sales", "Sensitivity"]) {
+    expect(screen.getByRole("link", { name })).toBeInTheDocument();
   }
 });
 
