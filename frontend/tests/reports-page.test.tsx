@@ -82,6 +82,8 @@ test("native reporting has exactly three views and does not require Power BI", (
   expect(screen.getByRole("heading", { name: "Annual Valid Sales Invoice Sales" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Priority Group Counts" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Top 10 Ranked Accounts" })).toBeInTheDocument();
+  expect(screen.queryByText("Open a top account by name")).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /#1 ALPHA/ })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Refresh reports" })).toBeInTheDocument();
   expect(screen.getByText("2030-06-01")).toBeInTheDocument();
   expect(screen.getByText("run-12345678")).toBeInTheDocument();
@@ -302,11 +304,8 @@ test("historical checks and boundary observations have independent ten-row pages
 test("overview drilldowns use only displayed dimensions while retaining other-tab return context", async () => {
   window.history.replaceState(null, "", "/reports?tab=management-overview&business_category=Corporate&priority_group=High&rfm_component=Frequency&rfm_score=5&settlement_range=30-%3C60&primary_business_type=Commercial&eligibility=not_ranked");
   render(<ReportsPage />);
-  const user = userEvent.setup();
-  await user.click(screen.getByText("Open a top account by name"));
-  const account = screen.getByRole("link", { name: /#1 ALPHA/ });
   const group = screen.getByRole("link", { name: "Review selected Priority Group" });
-  for (const link of [account, group]) {
+  for (const link of [group]) {
     const query = new URL(link.getAttribute("href")!, "http://localhost").searchParams;
     expect(query.get("eligibility")).toBe("ranked");
     expect(query.get("business_category")).toBe("Corporate");
@@ -335,8 +334,7 @@ test("filtered highest-ranked chart states its subset and preserves original ran
   expect(chart).toHaveTextContent("Showing 1 of 1 matching account, at most ten");
   expect(chart).toHaveTextContent("Original published ranks and Final Priority Scores are unchanged");
   expect(screen.queryByRole("heading", { name: "Top 10 Ranked Accounts" })).not.toBeInTheDocument();
-  await user.click(screen.getByText("Open a top account by name"));
-  expect(screen.getByRole("link", { name: /#2 GAMMA/ })).toBeInTheDocument();
+  expect(screen.queryByText("Open a top account by name")).not.toBeInTheDocument();
   expect(screen.getByRole("region", { name: "Priority Group Counts" })).toHaveTextContent("other groups remain visible for comparison");
 });
 

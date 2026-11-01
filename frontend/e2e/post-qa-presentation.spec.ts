@@ -234,11 +234,13 @@ test("filtered ranks, historical context, and distinct RFM series remain clear a
     const top = page.getByRole("region", { name: "Highest-Ranked Accounts Matching Your Filters" });
     await expect(top).toContainText("Showing 10 of 27 matching accounts");
     await expect(top).toContainText("no new ranking is calculated");
-    await page.getByText("Open a top account by name").click();
-    await expect(page.getByRole("link", { name: new RegExp("#" + medium.priority_rank + " " + medium.account.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) })).toBeVisible();
+    await expect(page.getByText("Open a top account by name")).toHaveCount(0);
+    await expect(top.getByText(medium.account, { exact: true })).toBeVisible();
     const comparison = page.getByRole("region", { name: "Priority Group Counts" });
     await expect(comparison).toContainText("other groups remain visible for comparison");
     await top.screenshot({ path: test.info().outputPath(width + "-filtered-top.png") });
+    await top.locator(".recharts-bar-rectangle path").first().click();
+    await expect(page).toHaveURL(url => url.pathname === `/accounts/${medium.account_key}`);
     const params = new URLSearchParams({ tab: "account-insights", eligibility: "not_ranked", business_category: closed.business_category! });
     await page.goto("/reports?" + params);
     const composition = page.getByRole("region", { name: "Business Composition" });
