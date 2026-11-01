@@ -72,6 +72,24 @@ vi.mock("@/lib/use-api", () => ({
 import ReportsPage from "@/app/(protected)/reports/page";
 import { approvedPowerBiEmbedUrl, approvedPowerBiReportUrl } from "@/lib/power-bi-links";
 
+test("validation tables and charts include visible plain-language guides without changing other views", async () => {
+  const { container } = render(<ReportsPage />);
+  expect(container.querySelector("[data-validation-guide]")).toBeNull();
+  await userEvent.click(screen.getByRole("tab", { name: "Analytics Validation" }));
+  expect(screen.getByRole("heading", { name: "What these checks tell us" })).toBeVisible();
+  expect(screen.queryByText(/challenger/i)).not.toBeInTheDocument();
+  for (const table of container.querySelectorAll("table")) {
+    expect(table.closest("section, details")?.querySelector("[data-validation-guide]")).not.toBeNull();
+  }
+  for (const chart of container.querySelectorAll(".native-chart")) {
+    expect(chart.querySelector("[data-validation-guide]")).not.toBeNull();
+  }
+  expect(screen.getByText(/0.01 means one percentage point/)).toBeVisible();
+  expect(screen.getAllByText(/not twice as many buyers/)).toHaveLength(2);
+  expect(screen.getByText("0.7649")).toBeInTheDocument();
+  expect(screen.getByText("92.41%")).toBeInTheDocument();
+});
+
 afterEach(() => { authState.role = "management"; insightsAccounts = accounts; influenceRows = []; supplementalRows = []; vi.restoreAllMocks(); });
 
 test("native reporting has exactly three views and does not require Power BI", () => {
