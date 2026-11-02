@@ -6,6 +6,8 @@
     "test": "playwright test -c playwright.config.cjs"
   },
   "devDependencies": {
-    "@playwright/test": "1.62.1"
+    "@playwright/test": "1.62.1",
+    "csv-parse": "6.1.0",
+    "exceljs": "4.4.0"
   }
 }
