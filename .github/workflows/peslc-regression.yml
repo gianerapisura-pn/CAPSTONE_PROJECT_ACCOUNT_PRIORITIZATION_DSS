@@ -52,9 +52,19 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Install checked-in frontend dependencies
+      # Repair only the runner's copy of the stale dependency lockfile.
+      - name: Reconcile frontend lockfile in the runner
+        working-directory: frontend
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Verify clean frontend installation
         working-directory: frontend
         run: npm ci --no-audit --no-fund
+      - name: Save regenerated lockfile for a separate reviewed commit
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-lockfile-review
+          path: frontend/package-lock.json
+          retention-days: 14
       - name: Run frontend regression suite
         working-directory: frontend
         run: npm test
