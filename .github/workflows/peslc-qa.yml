@@ -1,0 +1,38 @@
+
+name: PESLC production read-only QA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-smoke:
+    name: Authenticated production read-only checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out approved repository files
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Playwright dependencies
+        working-directory: qa
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium browser
+        working-directory: qa
+        run: npx playwright install --with-deps chromium
+
+      - name: Run read-only browser checks
+        working-directory: qa
+        env:
+          PESLC_WEB_URL: https://peslc-dss-academic-web.vercel.app
+          PESLC_QA_EMAIL: ${{ secrets.PESLC_QA_EMAIL }}
+          PESLC_QA_PASSWORD: ${{ secrets.PESLC_QA_PASSWORD }}
+        run: npx playwright test -c playwright.config.cjs
