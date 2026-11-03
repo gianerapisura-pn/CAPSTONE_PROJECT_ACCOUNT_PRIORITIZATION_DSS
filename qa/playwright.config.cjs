@@ -7,6 +7,7 @@ testMatch: [
   '**/production.spec.cjs',
   '**/export_parity.spec.cjs',
   '**/extended_reports.spec.cjs',
+  '**/extra_interactions.spec.cjs',
 ],
   timeout: 120_000,
   retries: 0,
