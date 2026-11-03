@@ -2,7 +2,12 @@ const { defineConfig } = require('@playwright/test');
 
 module.exports = defineConfig({
   testDir: '.',
-  testMatch: ['**/production.spec.cjs', '**/export_parity.spec.cjs'],
+  
+testMatch: [
+  '**/production.spec.cjs',
+  '**/export_parity.spec.cjs',
+  '**/extended_reports.spec.cjs',
+],
   timeout: 120_000,
   retries: 0,
   workers: 1,
