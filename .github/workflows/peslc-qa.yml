@@ -35,4 +35,6 @@ jobs:
           PESLC_WEB_URL: https://peslc-dss-academic-web.vercel.app
           PESLC_QA_EMAIL: ${{ secrets.PESLC_QA_EMAIL }}
           PESLC_QA_PASSWORD: ${{ secrets.PESLC_QA_PASSWORD }}
+          PESLC_MANAGEMENT_QA_EMAIL: ${{ secrets.PESLC_MANAGEMENT_QA_EMAIL }}
+          PESLC_MANAGEMENT_QA_PASSWORD: ${{ secrets.PESLC_MANAGEMENT_QA_PASSWORD }}
         run: npx playwright test -c playwright.config.cjs
