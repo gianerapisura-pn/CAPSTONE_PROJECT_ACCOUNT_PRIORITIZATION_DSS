@@ -52,8 +52,8 @@ test('tab keyboard navigation and account-insights filter controls', async ({ pa
   await page.keyboard.press('ArrowRight');
   const insightsTab = page.getByRole('tab', { name: 'Account & Prioritization Insights', exact: true });
   await expect(insightsTab).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('heading', { name: 'RFM Score Distribution' })).toBeVisible();
-  await page.getByRole('combobox', { name: 'RFM component' }).selectOption('Recency');
+  await expect(page.getByRole('heading', { name: 'RFM Score Distribution' })).toBeVisible();  
+  await page.getByRole('combobox', { name: 'RFM component', exact: true }).selectOption('Recency');
   await page.getByRole('combobox', { name: 'RFM component score' }).selectOption('5');
   await expect(page.getByRole('link', { name: 'View accounts matching RFM selection' }))
     .toHaveAttribute('href', /rfm_score=5/);
