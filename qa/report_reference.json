@@ -1,0 +1,65 @@
+{
+  "source_file": "PESLC_FINAL_ANALYTICS/01_DATA/09_POWER_BI/annual_baseline.csv",
+  "analysis_reference_date": "2025-12-31",
+  "annual_baselines": [
+    {
+      "year": 2017,
+      "sales_php": 22685859.51,
+      "transacting_b2b": 31
+    },
+    {
+      "year": 2018,
+      "sales_php": 28128062.85,
+      "transacting_b2b": 30
+    },
+    {
+      "year": 2019,
+      "sales_php": 25104956.78,
+      "transacting_b2b": 23
+    },
+    {
+      "year": 2020,
+      "sales_php": 7422135.75,
+      "transacting_b2b": 11
+    },
+    {
+      "year": 2021,
+      "sales_php": 17072550.270000003,
+      "transacting_b2b": 9
+    },
+    {
+      "year": 2022,
+      "sales_php": 16803717.739999995,
+      "transacting_b2b": 11
+    },
+    {
+      "year": 2023,
+      "sales_php": 20244551.54,
+      "transacting_b2b": 14
+    },
+    {
+      "year": 2024,
+      "sales_php": 21069452.09,
+      "transacting_b2b": 11
+    },
+    {
+      "year": 2025,
+      "sales_php": 8923088.4,
+      "transacting_b2b": 9
+    }
+  ],
+  "critic_weights": {
+    "recency": 0.3611623465698158,
+    "frequency": 0.23172179091738482,
+    "monetary": 0.12298946506730102,
+    "settlement": 0.28412639744549834
+  },
+  "ranked_accounts": 83,
+  "historical_b2b_accounts": 84,
+  "study_with_future_sales": 10,
+  "study_with_no_future_sales": 73,
+  "sensitivity_iterations": 400,
+  "sensitivity_account_scenarios": 33200,
+  "backtest_cutoffs": 7,
+  "note": "Source figures copied only from approved analytical ZIP; no production/browser PASS inferred."
+}
