@@ -11,6 +11,7 @@ on:
         options:
           - all
           - write-denials
+          - export-visibility
 
 permissions:
   contents: read
@@ -49,6 +50,8 @@ jobs:
         run: |
           if [ "$PESLC_QA_SUITE" = "write-denials" ]; then
             npx playwright test -c playwright.config.cjs production_denials.spec.cjs
+          elif [ "$PESLC_QA_SUITE" = "export-visibility" ]; then
+            npx playwright test -c playwright.config.cjs production_export_visibility.spec.cjs
           else
             npx playwright test -c playwright.config.cjs
           fi

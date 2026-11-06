@@ -9,6 +9,7 @@ testMatch: [
   '**/extended_reports.spec.cjs',
   '**/extra_interactions.spec.cjs',
   '**/production_denials.spec.cjs',
+  '**/production_export_visibility.spec.cjs',
 ],
   timeout: 120_000,
   retries: 0,
