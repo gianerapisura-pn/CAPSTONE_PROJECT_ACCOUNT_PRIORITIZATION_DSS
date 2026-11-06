@@ -3,6 +3,14 @@ name: PESLC production non-mutating QA
 
 on:
   workflow_dispatch:
+    inputs:
+      suite:
+        description: Non-mutating checks to execute
+        type: choice
+        default: all
+        options:
+          - all
+          - write-denials
 
 permissions:
   contents: read
@@ -37,4 +45,10 @@ jobs:
           PESLC_QA_PASSWORD: ${{ secrets.PESLC_QA_PASSWORD }}
           PESLC_MANAGEMENT_QA_EMAIL: ${{ secrets.PESLC_MANAGEMENT_QA_EMAIL }}
           PESLC_MANAGEMENT_QA_PASSWORD: ${{ secrets.PESLC_MANAGEMENT_QA_PASSWORD }}
-        run: npx playwright test -c playwright.config.cjs
+          PESLC_QA_SUITE: ${{ inputs.suite }}
+        run: |
+          if [ "$PESLC_QA_SUITE" = "write-denials" ]; then
+            npx playwright test -c playwright.config.cjs production_denials.spec.cjs
+          else
+            npx playwright test -c playwright.config.cjs
+          fi
