@@ -5,13 +5,16 @@ import RfmPage from "@/app/(protected)/analytics/rfm/page";
 import SettlementPage from "@/app/(protected)/analytics/settlement/page";
 import { downloadExport } from "@/lib/api";
 
+const {roleState}=vi.hoisted(() => ({roleState:{role:"administrator"}}));
+vi.mock("@/components/auth-provider", () => ({useAuth: () => ({user:{role:roleState.role}})}));
+
 vi.mock("@/lib/api", () => ({ downloadExport: vi.fn() }));
 let runId = "first-publication";
 const rows = Array.from({ length: 23 }, (_, index) => ({ account: `${index % 2 ? "account" : "ACCOUNT"} ${index + 1}`, recency_days: 140, frequency: 4, monetary: 1000, r_score: 5, f_score: 4, m_score: 3, rfm_mean_score: 4, settlement_invoice_count: 2, average_settlement_days: 12.5, final_collection_days_max: 20 }))
   .sort((a, b) => a.account.toLowerCase() < b.account.toLowerCase() ? -1 : a.account.toLowerCase() > b.account.toLowerCase() ? 1 : 0);
 let items = rows;
 vi.mock("@/lib/use-api", () => ({ useApi: () => ({ data: { analysis_run_id: runId, analysis_reference_date: "2030-12-31", items }, loading: false, error: "", reload: vi.fn() }) }));
-beforeEach(() => { items = rows; runId = "first-publication"; vi.clearAllMocks(); });
+beforeEach(() => { roleState.role="administrator"; items = rows; runId = "first-publication"; vi.clearAllMocks(); });
 
 for (const [name, Component, path, file] of [
   ["RFM", RfmPage, "/exports/rfm.csv", "peslc-rfm.csv"],
@@ -57,5 +60,13 @@ for (const [name, Component, path, file] of [
     render(<Component />);
     expect(screen.getByText("No successful analysis yet")).toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: `${name} pagination` })).not.toBeInTheDocument();
+  });
+
+  test(`${name} keeps Management evidence visible without an unauthorized export action`, () => {
+    roleState.role="management";
+    render(<Component />);
+    expect(screen.queryByRole("button", {name:"Export"})).not.toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(document.querySelectorAll("tbody tr")).toHaveLength(10);
   });
 }
