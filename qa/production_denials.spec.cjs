@@ -32,6 +32,9 @@ async function publishedFingerprint(request, auth) {
 }
 
 test('production Management denies nine mutation routes; safe administrator controls cannot write', async ({ browser, request, baseURL }) => {
+  // Eighteen HTTPS probes plus a preservation read after each exceed the
+  // default two minutes on the hosted backend. Keep every original assertion.
+  test.setTimeout(240000);
   const context = await browser.newContext({ baseURL });
   const page = await context.newPage();
   try {
