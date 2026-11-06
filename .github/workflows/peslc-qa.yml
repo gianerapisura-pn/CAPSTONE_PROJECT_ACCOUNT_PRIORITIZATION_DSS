@@ -1,5 +1,5 @@
 
-name: PESLC production read-only QA
+name: PESLC production non-mutating QA
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   browser-smoke:
-    name: Authenticated production read-only checks
+    name: Authenticated production non-mutating checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -29,7 +29,7 @@ jobs:
         working-directory: qa
         run: npx playwright install --with-deps chromium
 
-      - name: Run read-only browser checks
+      - name: Run non-mutating browser checks
         working-directory: qa
         env:
           PESLC_WEB_URL: https://peslc-dss-academic-web.vercel.app

@@ -24,7 +24,10 @@ jobs:
           persist-credentials: false
 
       - name: Copy isolated QA test into development checkout
-        run: cp qa-overlay/qa/test_management_mutation_denial_local.py backend/tests/test_management_mutation_denial_local.py
+        run: |
+          cp qa-overlay/qa/test_management_mutation_denial_local.py backend/tests/test_management_mutation_denial_local.py
+          cp qa-overlay/qa/test_production_probe_safety.py backend/tests/test_production_probe_safety.py
+          cp qa-overlay/qa/production_denial_probes.json backend/tests/production_denial_probes.json
 
       - uses: actions/setup-python@v6
         with:
@@ -32,16 +35,29 @@ jobs:
       - name: Install checked-in backend dependencies
         working-directory: backend
         run: python -m pip install -r requirements.txt
+      - name: Prepare disposable synthetic role-parity publication
+        working-directory: backend
+        env:
+          APP_ENV: test
+          DEMO_MODE: 'false'
+          SUPABASE_URL: ''
+          SUPABASE_SERVICE_ROLE_KEY: ''
+          OMP_NUM_THREADS: '1'
+          PYTHONPATH: .
+        run: python ../qa-overlay/qa/prepare_role_parity_fixture.py "$RUNNER_TEMP/peslc-review.sqlite3"
       - name: Run isolated regression tests
         working-directory: backend
         env:
           APP_ENV: test
           DEMO_MODE: 'false'
           PYTHONWARNINGS: default
+          PESLC_QA_REVIEW_DATABASE_PATH: ${{ runner.temp }}/peslc-review.sqlite3
+          OMP_NUM_THREADS: '1'
         run: |
-          python -m pytest -q \
+          python -m pytest -v --junitxml="$RUNNER_TEMP/backend-regression.xml" \
             tests/test_auth.py \
             tests/test_management_mutation_denial_local.py \
+            tests/test_production_probe_safety.py \
             tests/test_import_future.py \
             tests/test_future_publication_integration.py \
             tests/test_import_validation.py \
@@ -49,7 +65,13 @@ jobs:
             tests/test_cli_publication.py \
             tests/test_verified_role_parity.py \
             tests/test_persistence.py
-
+      - name: Save backend test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-regression-results
+          path: ${{ runner.temp }}/backend-regression.xml
+          retention-days: 14
 
   frontend:
     name: Frontend tests, types and lint
