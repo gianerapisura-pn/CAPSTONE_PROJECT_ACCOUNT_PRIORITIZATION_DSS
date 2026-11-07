@@ -41,6 +41,10 @@ export function reportHref(state: ReportLocation): string {
   return "/reports?" + params;
 }
 export function safeReportReturn(value: string | null | undefined): { href: string; label: string } | null {
+  if (value) {
+    const match = value.match(/^\/analytics\/(rfm|settlement)(?:\?page=([1-9]\d{0,5}))?$/);
+    if (match) return { href: value, label: match[1] === "rfm" ? "Back to RFM" : "Back to Settlement" };
+  }
   if (value === "/analytics/predictive#study-classes") return { href: value, label: "Back to With Future Sales" };
   if (!value || value.length > 4000 || !value.startsWith("/reports?") || value.includes("#")) return null;
   const params = new URLSearchParams(value.slice(9));

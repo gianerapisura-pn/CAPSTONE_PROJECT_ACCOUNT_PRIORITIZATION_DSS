@@ -91,8 +91,8 @@ test("validation tables and charts include visible plain-language guides without
   }
   expect(screen.getByText(/0.01 means one percentage point/)).not.toBeVisible();
   expect(screen.getAllByText(/not twice as many buyers/)).toHaveLength(2);
-  expect(screen.getByText("0.7649")).toBeInTheDocument();
-  expect(screen.getByText("92.41%")).toBeInTheDocument();
+  expect(screen.queryByText("0.7649")).not.toBeInTheDocument();
+  expect(screen.queryByText("92.41%")).not.toBeInTheDocument();
 });
 
 afterEach(() => { authState.role = "management"; insightsAccounts = accounts; influenceRows = []; supplementalRows = []; vi.restoreAllMocks(); });
@@ -237,23 +237,23 @@ test("validation evidence starts expanded and remains manually collapsible", asy
   expect(screen.getByRole("heading", { name: "Model Benchmark: Mean Macro F1" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Development observations by cutoff year" })).toBeInTheDocument();
   expect(screen.getByText("Development class evidence is unavailable for this registered model.")).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Historical lookback comparison" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Historical lookback comparison" })).not.toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Prescriptive robustness and historical usefulness" })).toBeInTheDocument();
   expect(screen.queryByText(/Stage 4 Extra Trees horizon screen/)).not.toBeInTheDocument();
   expect(screen.queryByText(/below-random years remain visible/)).not.toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Sensitivity: Mean Spearman Rank Correlation" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Historical Backtests: Lift vs Random" })).toBeInTheDocument();
   expect(screen.getAllByText(/same-size random selection/).length).toBeGreaterThan(0);
-  expect(screen.getByRole("heading", { name: "Historical later-period confirmations" })).toBeInTheDocument();
-  expect(screen.getAllByText("2024-12-31")).toHaveLength(2);
+  expect(screen.queryByRole("heading", { name: "Historical later-period confirmations" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", {name:"CatBoost chronological evaluation, 2020-2022"})).not.toBeInTheDocument();
   expect(screen.getAllByText("2025-12-31").length).toBeGreaterThan(0);
-  expect(screen.getByText("5 / 74")).toBeInTheDocument();
-  expect(screen.getByText("9 / 70")).toBeInTheDocument();
-  expect(screen.getByText("0.7649")).toBeInTheDocument();
-  expect(screen.getByText("92.41%")).toBeInTheDocument();
+  expect(screen.queryByText("5 / 74")).not.toBeInTheDocument();
+  expect(screen.queryByText("9 / 70")).not.toBeInTheDocument();
+  expect(screen.queryByText("0.7649")).not.toBeInTheDocument();
+  expect(screen.queryByText("92.41%")).not.toBeInTheDocument();
   expect(screen.getByText("83")).toBeInTheDocument();
-  expect(screen.getByText("Pending")).toBeInTheDocument();
-  expect(screen.getByText(/Historical Macro F1:.*not pending-forecast accuracy/)).toBeInTheDocument();
+  expect(screen.queryByText("Study outcome monitoring")).not.toBeInTheDocument();
+  expect(screen.getByText(/Predictions are not verified future sales/)).toBeInTheDocument();
 });
 
 test("CRITIC influence shows ten rows per page without changing saved results", async () => {
@@ -265,6 +265,8 @@ test("CRITIC influence shows ten rows per page without changing saved results", 
   const panel = screen.getByText("Leave-one-account-out CRITIC influence (23)").closest("details")!;
   const scope = within(panel);
   const bodyRows = () => panel.querySelectorAll("tbody tr");
+  expect(scope.queryByRole("columnheader",{name:"Recomputed weights"})).not.toBeInTheDocument();
+  expect(scope.getByRole("columnheader",{name:"Temporarily omitted account"})).toBeInTheDocument();
   expect(bodyRows()).toHaveLength(10);
   expect(scope.getByText("Showing 1-10 of 23")).toBeInTheDocument();
   expect(scope.getByRole("button", { name: "Previous influence page" })).toBeDisabled();

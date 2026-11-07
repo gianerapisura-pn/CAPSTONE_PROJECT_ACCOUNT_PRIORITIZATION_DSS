@@ -63,8 +63,9 @@ def test_descriptive_account_order_is_global_stable_and_shared_with_exports(data
                     response = client.get(f'/analytics/{dataset}')
                     assert response.status_code == 200
                     rows = response.json()['items']
-                    assert rows == ordered
-                    assert [row for start in range(0, len(rows), 10) for row in rows[start:start + 10]] == ordered
+                    assert rows == [{**payload, 'account_key': key} for key, payload in expected]
+                    assert [{k: v for k, v in row.items() if k != 'account_key'} for row in rows] == ordered
+                    assert [row for start in range(0, len(rows), 10) for row in rows[start:start + 10]] == [{**payload, 'account_key': key} for key, payload in expected]
                     assert [len(rows[start:start + 10]) for start in range(0, len(rows), 10)] == [10, 10, 3]
                 for format in ['csv', 'xlsx']:
                     exported = client.get(f'/exports/{dataset}.{format}')

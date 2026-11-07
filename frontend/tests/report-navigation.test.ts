@@ -1,6 +1,12 @@
 import { accountApiQuery, accountQueryIssue, accountsHref } from "@/lib/account-filters";
 import { readReportLocation, reportHref, safeReportReturn, savedReportHref } from "@/lib/report-navigation";
 
+test("descriptive returns preserve their page and reject other query parameters",()=>{
+  expect(safeReportReturn("/analytics/rfm?page=3")).toEqual({href:"/analytics/rfm?page=3",label:"Back to RFM"});
+  expect(safeReportReturn("/analytics/settlement?page=2")?.label).toBe("Back to Settlement");
+  for(const value of ["/analytics/rfm?page=0","/analytics/rfm?next=//evil.test","/analytics/settlement?page=2&next=x","//evil.test/analytics/rfm"]) expect(safeReportReturn(value)).toBeNull();
+});
+
 test("report round trips encode selections and keep UI metadata out of strict API filters", () => {
   const state = readReportLocation(new URLSearchParams({ tab: "account-insights", section: "business-composition", business_category: "Construction & Engineering", priority_group: "High", type_search: "Pump", types_open: "1", type_page: "2" }));
   const origin = reportHref(state);

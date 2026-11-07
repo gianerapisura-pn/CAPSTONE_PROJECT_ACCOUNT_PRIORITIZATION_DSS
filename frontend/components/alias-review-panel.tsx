@@ -19,6 +19,7 @@ export function AliasReviewPanel() {
       reload();
     } finally { setBusy(null); }
   }
+  if (!loading && !error && !data?.length) return null;
   return <section className="data-section">
     <div className="section-heading"><h2><Link2/>Account alias review</h2><span>Review record only</span></div><p className="fine-print">This review register is currently non-transformative: decisions are audited but are not applied by ETL. Historical and future imported labels remain unchanged, and no fuzzy match is merged automatically.</p>
     {loading && <div className="table-empty">Loading alias candidates...</div>}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Save, Users } from "lucide-react";
+
 import { useState } from "react";
 import { PageState } from "@/components/page-state";
 import { apiFetch } from "@/lib/api";
@@ -23,7 +23,7 @@ type AccountContext = {
 };
 type Queue = { items: AccountContext[]; total: number; publication_note: string };
 
-function ContextRow({ item, onSaved }: { item: AccountContext; onSaved: () => Promise<void> }) {
+function ContextEditor({ item, onSaved, onCancel }: { item: AccountContext; onSaved: () => Promise<void>; onCancel: () => void }) {
   const [value, setValue] = useState(item);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -54,29 +54,26 @@ function ContextRow({ item, onSaved }: { item: AccountContext; onSaved: () => Pr
       setMessage(reason instanceof Error ? reason.message : "Context verification failed.");
     } finally { setBusy(false); }
   }
-  return <tr>
-    <td><strong>{item.account}</strong>{message && <small className="block">{message}</small>}</td>
-    <td><select aria-label={`${item.account} entity type`} value={value.entity_type ?? ""} onChange={event => setEntityType(event.target.value)}><option value="">Select</option>{ENTITY_TYPES.map(option => <option key={option}>{option}</option>)}</select></td>
-    <td><input aria-label={`${item.account} business category`} value={value.business_category ?? ""} onChange={event => update("business_category", event.target.value)} /></td>
-    <td><input aria-label={`${item.account} primary business type`} value={value.primary_business_type ?? ""} onChange={event => update("primary_business_type", event.target.value)} /></td>
-    <td><select aria-label={`${item.account} account status`} value={value.account_status ?? ""} onChange={event => update("account_status", event.target.value)}><option value="">Pending</option>{ACCOUNT_STATUSES.map(option => <option key={option}>{option}</option>)}</select></td>
-    <td><select aria-label={`${item.account} verification type`} value={value.verification_type ?? ""} onChange={event => update("verification_type", event.target.value)}><option value="">Pending</option><option>Client confirmation</option></select></td>
-    <td><input aria-label={`${item.account} verification date`} type="date" value={value.verification_date ?? ""} onChange={event => update("verification_date", event.target.value)} /></td>
-    <td><input aria-label={`${item.account} last verified`} type="date" value={value.last_verified ?? ""} onChange={event => update("last_verified", event.target.value)} /></td>
-    <td><input aria-label={`${item.account} verification basis`} value={value.verification_basis ?? ""} onChange={event => update("verification_basis", event.target.value)} /></td>
-    <td><input aria-label={`${item.account} B2B eligible`} type="checkbox" checked={value.b2b_priority_eligible} disabled={value.entity_type === "Individual/Personal"} onChange={event => update("b2b_priority_eligible", event.target.checked)} /></td>
-    <td><button className="icon-button" title="Save verified context" aria-label={`Save ${item.account} context`} disabled={busy} onClick={save}><Save /></button></td>
-  </tr>;
+  return <form className="context-editor" onSubmit={event => {event.preventDefault(); void save();}}><h3><strong>{item.account}</strong></h3><div className="context-fields"><label>Entity type<select required aria-label={`${item.account} entity type`} value={value.entity_type ?? ""} onChange={event => setEntityType(event.target.value)}><option value="">Select</option>{ENTITY_TYPES.map(option => <option key={option}>{option}</option>)}</select></label><label>Business category<input required aria-label={`${item.account} business category`} value={value.business_category ?? ""} onChange={event => update("business_category", event.target.value)} /></label><label>Primary business type<input required aria-label={`${item.account} primary business type`} value={value.primary_business_type ?? ""} onChange={event => update("primary_business_type", event.target.value)} /></label><label>Account status<select required={value.b2b_priority_eligible} aria-label={`${item.account} account status`} value={value.account_status ?? ""} onChange={event => update("account_status", event.target.value)}><option value="">Pending</option>{ACCOUNT_STATUSES.map(option => <option key={option}>{option}</option>)}</select></label><label>Verification type<select required={value.b2b_priority_eligible} aria-label={`${item.account} verification type`} value={value.verification_type ?? ""} onChange={event => update("verification_type", event.target.value)}><option value="">Pending</option><option>Client confirmation</option></select></label><label>Verification date<input required={value.b2b_priority_eligible} aria-label={`${item.account} verification date`} type="date" value={value.verification_date ?? ""} onChange={event => update("verification_date", event.target.value)} /></label><label>Last verified<input required={value.b2b_priority_eligible} aria-label={`${item.account} last verified`} type="date" value={value.last_verified ?? ""} onChange={event => update("last_verified", event.target.value)} /></label><label>Verification basis<input required={value.b2b_priority_eligible} aria-label={`${item.account} verification basis`} value={value.verification_basis ?? ""} onChange={event => update("verification_basis", event.target.value)} /></label><label>Verified B2B eligibility<input aria-label={`${item.account} B2B eligible`} type="checkbox" checked={value.b2b_priority_eligible} disabled={value.entity_type === "Individual/Personal"} onChange={event => update("b2b_priority_eligible", event.target.checked)} /></label></div><div className="page-actions"><button className="button primary" type="submit" disabled={busy}>Save verified information</button><button className="button secondary" type="button" disabled={busy} onClick={onCancel}>Cancel</button></div>{message && <p role="status">{message}</p>}</form>;
 }
 
 export function AccountContextPanel() {
   const [scope, setScope] = useState<"pending" | "all">("pending");
+  const [search, setSearch] = useState("");
+  const [notice, setNotice] = useState("");
+  const [selected, setSelected] = useState<AccountContext | null>(null);
   const { data, error, loading, reload } = useApi<Queue>(`/account-context?status=${scope}`);
+  const items = data?.items.filter(item => item.account.toLocaleLowerCase().includes(search.toLocaleLowerCase())) ?? [];
   return <section className="data-section">
-    <div className="section-heading"><div><span className="eyebrow">Data stewardship</span><h2>Account context</h2></div><div className="page-actions"><button className={`button ${scope === "pending" ? "primary" : "secondary"}`} onClick={() => setScope("pending")}>Pending</button><button className={`button ${scope === "all" ? "primary" : "secondary"}`} onClick={() => setScope("all")}>All</button><Users /></div></div>
-    <p>New identities remain excluded until a data custodian verifies their context. Names are never used to infer eligibility.</p>
-    <PageState loading={loading} error={error} onRetry={reload}>
-      {data && <>{data.items.length === 0 ? <p>No account identities match this view.</p> : <div className="table-wrap"><table><thead><tr><th>Account</th><th>Entity type</th><th>Business category</th><th>Primary business type</th><th>Current status</th><th>Verification type</th><th>Verification date</th><th>Last verified</th><th>Verification basis</th><th>B2B</th><th aria-label="Save" /></tr></thead><tbody>{data.items.map(item => <ContextRow key={item.account_key} item={item} onSaved={reload} />)}</tbody></table></div>}<p>{data.publication_note}</p></>}
-    </PageState>
+    <div className="section-heading"><h2>Account Information Management</h2><div className="page-actions">{(["pending", "all"] as const).map(view => <button key={view} className={`button ${scope === view ? "primary" : "secondary"}`} aria-pressed={scope === view} onClick={() => { setScope(view); setSelected(null); }}>{view === "all" ? "All" : "Pending"}</button>)}</div></div>
+    <p>Review and maintain client-confirmed account information before new analytical results are published.</p>
+    {notice&&<p role="status">{notice}</p>}
+    <p className="fine-print">PESLC representatives confirm the business facts; administrators record them. Names do not determine B2B eligibility.</p>
+    <PageState loading={loading} error={error} onRetry={reload}>{data && <>
+      {!selected && <>{data.items.length > 0 && <label className="context-search">Find an account<input type="search" value={search} onChange={event => setSearch(event.target.value)} /></label>}
+      {!data.items.length ? <p className="fine-print">{scope === "pending" ? "No account information currently requires verification." : "No accounts are available."}</p> : <div className="context-account-list">{items.map(item => <button className="context-account-choice" key={item.account_key} onClick={() => setSelected(item)}><strong>{item.account}</strong><span>{item.account_status || "Status awaiting confirmation"} / {item.verification_status}</span><span>Edit account information</span></button>)}{!items.length && <p>No accounts match your search.</p>}</div>}</>}
+      {selected && <ContextEditor key={selected.account_key} item={selected} onSaved={async()=>{await reload();setSelected(null);setNotice("Saved. Publish a new analytics run when ready.");}} onCancel={() => setSelected(null)} />}
+      <p className="fine-print">{data.publication_note}</p>
+    </>}</PageState>
   </section>;
 }

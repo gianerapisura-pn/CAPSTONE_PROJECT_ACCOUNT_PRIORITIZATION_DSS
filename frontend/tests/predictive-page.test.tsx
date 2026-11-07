@@ -58,6 +58,8 @@ test("predictive page separates fixed study evidence from operational scoring", 
     expect(url.searchParams.get("eligibility")).toBe("all");
     expect(url.searchParams.get("returnTo")).toBe("/analytics/predictive#study-classes");
   }
+  for(const label of ["Model SHA-256","Model version","Monitoring","catboost_stage8","model-hash","Pending outcome maturity"]) expect(screen.queryByText(label)).not.toBeInTheDocument();
+  expect(screen.getByText("The displayed classes are forecasts, not verified future sales outcomes.")).toBeInTheDocument();
   expect(screen.getByText("Operational scoring")).toBeInTheDocument();
   expect(screen.getByText("2026-09-21")).toBeInTheDocument();
   expect(screen.getByText(/never changes Final Priority Score/i)).toBeInTheDocument();

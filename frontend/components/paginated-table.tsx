@@ -3,10 +3,10 @@
 import { useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-export function PaginatedTable<Row>({ rows, label, children }: {
-  rows: Row[]; label: string; children: (visible: Row[], start: number) => ReactNode;
+export function PaginatedTable<Row>({ rows, label, children, initialPage = 1 }: {
+  rows: Row[]; label: string; children: (visible: Row[], start: number) => ReactNode; initialPage?: number;
 }) {
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(initialPage);
   const pageSize = 10;
   const pages = Math.max(1, Math.ceil(rows.length / pageSize));
   const currentPage = Math.min(page, pages);

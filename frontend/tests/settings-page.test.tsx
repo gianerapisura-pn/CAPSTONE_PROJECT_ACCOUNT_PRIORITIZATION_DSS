@@ -2,8 +2,9 @@ import { render, screen } from "@testing-library/react";
 import { vi } from "vitest";
 import SettingsPage from "@/app/(protected)/settings/page";
 
+const authState=vi.hoisted(()=>({role:"administrator"}));
 vi.mock("@/components/auth-provider", () => ({
-  useAuth: () => ({ user: { role: "administrator" } }),
+  useAuth: () => ({ user: { role: authState.role } }),
 }));
 
 vi.mock("@/lib/use-api", () => ({
@@ -27,14 +28,20 @@ vi.mock("@/lib/use-api", () => ({
   },
 }));
 
-test("settings displays settlement and real registered Macro F1 contracts", () => {
+test("settings retains methodology while removing ordinary technical configuration clutter", () => {
   render(<SettingsPage />);
   expect(screen.getByRole("heading", { name: "Historical Settlement Duration" })).toBeInTheDocument();
   expect(screen.getByText(
     "Observed SI-to-final-valid-CR duration using only cutoff-known, reconciled, nonnegative evidence.",
   )).toBeInTheDocument();
-  expect(screen.getByText("Historical Macro F1")).toBeInTheDocument();
-  expect(screen.getByText("0.7997")).toBeInTheDocument();
-  expect(screen.getByText("Future Macro F1")).toBeInTheDocument();
-  expect(screen.getByText("Not yet measurable")).toBeInTheDocument();
+  for(const label of ["Future Macro F1","Future outcomes checked","2025 study outcome check","Artifact SHA-256","Effective analytics configuration","Not flagged","catboost_stage8"]) expect(screen.queryByText(label)).not.toBeInTheDocument();
+  expect(screen.getByRole("link",{name:/Required Source File Columns/})).toHaveAttribute("href","/import");
+  expect(screen.getByText("No account information currently requires verification.")).toBeInTheDocument();
+  expect(screen.queryByRole("heading",{name:/Account alias review/i})).not.toBeInTheDocument();
+  expect(screen.getByText("Recheck completed prediction windows")).toBeInTheDocument();
+});
+
+test("management retains read-only methodology without administrator maintenance editors",()=>{
+ authState.role="management";
+ try{render(<SettingsPage/>);expect(screen.getByRole("heading",{name:"Historical Settlement Duration"})).toBeInTheDocument();expect(screen.queryByRole("heading",{name:"Account Information Management"})).not.toBeInTheDocument();expect(screen.queryByText("Recheck completed prediction windows")).not.toBeInTheDocument();expect(screen.queryByRole("link",{name:/Required Source File Columns/})).not.toBeInTheDocument();}finally{authState.role="administrator";}
 });

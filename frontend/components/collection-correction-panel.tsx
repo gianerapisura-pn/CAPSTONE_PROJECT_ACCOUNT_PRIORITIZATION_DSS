@@ -59,6 +59,7 @@ export function CollectionCorrectionPanel() {
     }
   }
 
+  if (!loading && !error && !data?.length && view === "pending") return <details className="maintenance-action"><summary>Collection correction history</summary><button className="button secondary" onClick={() => setView("resolved")}>View resolved corrections</button></details>;
   return <section className="data-section">
     <div className="section-heading">
       <h2><CheckCircle2 />Collection correction review</h2>

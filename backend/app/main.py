@@ -922,12 +922,19 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
     }
 
 
+def _descriptive_navigation_rows(db, run, model):
+    # Response-only identifiers from the persisted result relationship; no name inference.
+    records = db.scalars(select(model).where(model.analysis_run_id == run.analysis_run_id)).all()
+    records.sort(key=lambda row: (row.payload["account"].casefold(), row.payload["account"], str(row.account_key)))
+    return [{**row.payload, "account_key": row.account_key} for row in records]
+
+
 @app.get("/analytics/rfm")
 def rfm(user: AuthenticatedUser = Depends(require_analytical_reader), db: Session = Depends(get_db)):
     run = _latest_or_404(db)
     return {"analysis_run_id": run.analysis_run_id,
             "analysis_reference_date": serialize_run(run)["analysis_reference_date"],
-            "items": run_payload(db, run)["rfm"]}
+            "items": _descriptive_navigation_rows(db, run, RFMResult)}
 
 
 @app.get("/analytics/settlement")
@@ -935,7 +942,7 @@ def settlement(user: AuthenticatedUser = Depends(require_analytical_reader), db:
     run = _latest_or_404(db)
     return {"analysis_run_id": run.analysis_run_id,
             "analysis_reference_date": serialize_run(run)["analysis_reference_date"],
-            "items": run_payload(db, run)["settlement"]}
+            "items": _descriptive_navigation_rows(db, run, SettlementResult)}
 
 
 @app.get("/analytics/predictive")

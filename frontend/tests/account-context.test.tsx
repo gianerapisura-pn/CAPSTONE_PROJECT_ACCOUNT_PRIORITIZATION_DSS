@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { AccountContextPanel } from "@/components/account-context-panel";
+import { apiFetch } from "@/lib/api";
 
 const useApi = vi.fn((path: string) => ({
   data: { items: [{
@@ -19,6 +20,7 @@ vi.mock("@/lib/api", () => ({ apiFetch: vi.fn() }));
 test("context admin uses canonical taxonomy, controlled status, provenance, and pending/all views", async () => {
   const user = userEvent.setup();
   render(<AccountContextPanel />);
+  await user.click(screen.getByRole("button", {name: /Edit account information/}));
   expect(screen.getByRole("option", { name: "Company" })).toBeInTheDocument();
   expect(screen.getByRole("option", { name: "Condominium Association" })).toBeInTheDocument();
   expect(screen.getByRole("option", { name: "Client-Confirmed Active" })).toBeInTheDocument();
@@ -28,4 +30,22 @@ test("context admin uses canonical taxonomy, controlled status, provenance, and 
   expect(screen.getByLabelText("ROD DE GUIA verification basis")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "All" }));
   expect(useApi).toHaveBeenLastCalledWith("/account-context?status=all");
+});
+
+test("account selection edits only the existing contract; cancel discards changes and save does not publish",async()=>{
+  vi.mocked(apiFetch).mockReset();
+  vi.mocked(apiFetch).mockResolvedValue({});
+  const user=userEvent.setup();
+  render(<AccountContextPanel/>);
+  expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button",{name:/Edit account information/}));
+  await user.type(screen.getByLabelText("ROD DE GUIA verification basis"),"Unsaved note");
+  await user.click(screen.getByRole("button",{name:"Cancel"}));
+  expect(apiFetch).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button",{name:/Edit account information/}));
+  expect(screen.getByLabelText("ROD DE GUIA verification basis")).toHaveValue("");
+  await user.click(screen.getByRole("button",{name:"Save verified information"}));
+  expect(apiFetch).toHaveBeenCalledTimes(1);
+  expect(apiFetch).toHaveBeenCalledWith("/account-context/a063",expect.objectContaining({method:"PATCH"}));
+  expect(screen.getByRole("status")).toHaveTextContent("Publish a new analytics run when ready");
 });
