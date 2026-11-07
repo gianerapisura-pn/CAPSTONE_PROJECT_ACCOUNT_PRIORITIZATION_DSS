@@ -1,4 +1,4 @@
-import { accountApiQuery, accountQueryIssue, accountsHref } from "@/lib/account-filters";
+import { accountApiQuery, accountQueryIssue, accountDetailFocus, accountsHref } from "@/lib/account-filters";
 import { readReportLocation, reportHref, safeReportReturn, savedReportHref } from "@/lib/report-navigation";
 
 test("descriptive returns preserve their page and reject other query parameters",()=>{
@@ -41,4 +41,21 @@ test("study-class drilldown keeps the safe return while forwarding only API filt
   expect(accountApiQuery(params).has("returnTo")).toBe(false);
   expect(accountQueryIssue(params)).toBe("");
   for (const bad of [origin + "?next=https://evil.test", "/analytics/predictive#other", "//evil.test/analytics/predictive#study-classes"]) expect(safeReportReturn(bad)).toBeNull();
+});
+
+
+test("account focus is allowlisted UI metadata and never becomes an API filter",()=>{
+ for(const value of ["rfm","settlement","priority"]){
+  const params=new URLSearchParams({focus:value,eligibility:"all",page:"2",returnTo:"/analytics/rfm?page=2"});
+  expect(accountDetailFocus(params)).toBe(value);
+  expect(accountQueryIssue(params)).toBe("");
+  expect(accountApiQuery(params).toString()).toBe("eligibility=all&page=2");
+ }
+ for(const query of ["focus=unknown","focus=javascript:alert(1)","focus=__proto__","focus=rfm&focus=settlement","focus="]){
+  const params=new URLSearchParams(query);
+  expect(accountDetailFocus(params)).toBeNull();
+  expect(accountApiQuery(params).has("focus")).toBe(false);
+  expect(accountQueryIssue(params)).toBe("");
+ }
+ expect(accountQueryIssue(new URLSearchParams("focus=rfm&unauthorized_filter=x"))).toContain("unsupported");
 });

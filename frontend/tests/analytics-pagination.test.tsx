@@ -84,6 +84,7 @@ for(const [name,Component,route] of [["RFM",RfmPage,"rfm"],["settlement",Settlem
   expect(url.pathname).toBe(`/accounts/${rows[10].account_key}`);
   expect(url.searchParams.get("returnTo")).toBe(`/analytics/${route}?page=2`);
   expect(url.searchParams.get("eligibility")).toBe("all");
+  expect(url.searchParams.get("focus")).toBe(route);
   expect(screen.queryByRole("columnheader",{name:"Account explanation"})).not.toBeInTheDocument();
  });
 }

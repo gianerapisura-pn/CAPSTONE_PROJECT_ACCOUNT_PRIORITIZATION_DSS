@@ -27,8 +27,13 @@ export function accountApiQuery(params: URLSearchParams) {
   for (const [key, value] of params) if ((accountFilterKeys as readonly string[]).includes(key) || key === "page" || key === "page_size") api.append(key, value);
   return api;
 }
+export function accountDetailFocus(params: URLSearchParams): "rfm" | "settlement" | "priority" | null {
+  const values = params.getAll("focus");
+  const value = values[0];
+  return values.length === 1 && (value === "rfm" || value === "settlement" || value === "priority") ? value : null;
+}
 export function accountQueryIssue(params: URLSearchParams) {
-  return [...params.keys()].some(key => key !== "returnTo" && key !== "viaList" && !(accountFilterKeys as readonly string[]).includes(key) && key !== "page" && key !== "page_size") ? "This link contains an unsupported account filter. Reset filters to continue." : "";
+  return [...params.keys()].some(key => key !== "returnTo" && key !== "viaList" && key !== "focus" && !(accountFilterKeys as readonly string[]).includes(key) && key !== "page" && key !== "page_size") ? "This link contains an unsupported account filter. Reset filters to continue." : "";
 }
 export function accountsHref(filters: AccountFilters = {}, origin?: string) {
   const params = new URLSearchParams({ eligibility: "ranked" });

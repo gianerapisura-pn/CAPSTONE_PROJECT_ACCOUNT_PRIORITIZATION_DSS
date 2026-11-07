@@ -58,6 +58,7 @@ test("search and priority filters operate on the unified API account data", asyn
   const user = userEvent.setup();
   render(<AccountPriorityTable />);
   expect(screen.getByText("ALPHA")).toBeInTheDocument();
+  expect(screen.getByRole("link", {name:"ALPHA"})).toHaveAttribute("href",expect.stringContaining("focus=priority"));
   expect(screen.queryByText("ROSTRAM PROTECTIVE SYSTEM METIER COMPANY")).not.toBeInTheDocument();
   expect(screen.getByText("Analysis reference")).toBeInTheDocument();
   expect(screen.getByText("2030-06-10")).toBeInTheDocument();

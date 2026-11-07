@@ -111,3 +111,51 @@ for(const role of ["administrator","management"] as const){
     expect(errors).toEqual([]);
   });
 }
+
+
+for(const role of ["administrator","management"] as const){
+ test(`${role} account focus preserves source, filtered navigation and analytical boundaries`,async({page},testInfo)=>{
+  const user={id:"00000000-0000-4000-8000-000000000001",aud:"authenticated",role:"authenticated",email:"qa@local.invalid",app_metadata:{},user_metadata:{},created_at:"2025-01-01T00:00:00Z"};
+  const encode=(v:object)=>Buffer.from(JSON.stringify(v)).toString("base64url");
+  const token=`${encode({alg:"HS256",typ:"JWT"})}.${encode({sub:user.id,exp:Math.floor(Date.now()/1000)+3600,role:"authenticated"})}.isolated-test-signature`;
+  await page.route("https://ocroshaikrfzvwtpbqzs.supabase.co/auth/v1/**",route=>route.fulfill({json:user}));
+  await page.route(/^http:\/\/127\.0\.0\.1:(8010|8077)\//,async route=>{
+   const url=new URL(route.request().url());url.port="8077";
+   const response=await route.fetch({url:url.href,headers:{...route.request().headers(),"x-qa-role":role}});await route.fulfill({response});
+  });
+  await page.addInitScript(({user,token})=>localStorage.setItem("sb-ocroshaikrfzvwtpbqzs-auth-token",JSON.stringify({access_token:token,refresh_token:"isolated-test",expires_at:Math.floor(Date.now()/1000)+3600,expires_in:3600,token_type:"bearer",user})),{user,token});
+  const errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));
+  page.on("request",request=>{
+   const url=new URL(request.url());
+   if(url.port==="8010"&&url.pathname.startsWith("/accounts"))for(const key of ["focus","returnTo","viaList"])if(url.searchParams.has(key))errors.push(`UI metadata reached API: ${key}`);
+  });
+  for(const width of [1366,390]){
+   await page.setViewportSize({width,height:900});
+   for(const source of ["rfm","settlement"]){
+    await page.goto(`/analytics/${source}?page=2`);await expect(page.getByText("Showing 11-20 of 84")).toBeVisible();
+    const link=page.locator("tbody td:first-child a").first();expect(new URL((await link.getAttribute("href"))!,"http://local.test").searchParams.get("focus")).toBe(source);
+    await link.click();const target=page.locator(`#account-${source}`);await expect(target).toBeFocused();
+    const top=(await target.boundingBox())!.y;expect(top).toBeGreaterThanOrEqual(68);expect(top).toBeLessThan(250);
+    await expect(page.getByText(/independently of RFM\/Settlement table ordering/)).toHaveCount(1);
+    await expect(page.getByRole("link",{name:"View matching accounts"})).toHaveCount(0);
+    await page.screenshot({path:testInfo.outputPath(`${role}-${source}-${width}.png`)});
+    await page.getByRole("link",{name:"Next Account",exact:true}).click();await expect(target).toBeFocused();
+    expect(new URL(page.url()).searchParams.get("focus")).toBe(source);
+    await page.getByRole("link",{name:source==="rfm"?"Back to RFM":"Back to Settlement",exact:true}).click();
+    await expect(page.getByText("Showing 11-20 of 84")).toBeVisible();
+   }
+  }
+  await page.goto("/accounts?eligibility=ranked&priority_group=High&page=2");
+  await expect(page.locator("tbody tr").first()).toBeVisible();
+  const priorLink=page.locator("tbody td:first-child a").first();const detailPath=(await priorLink.getAttribute("href"))!;
+  await priorLink.click();await expect(page.locator("#account-priority")).toBeFocused();
+  await page.getByRole("link",{name:"Back to Filtered Accounts",exact:true}).click();
+  const back=new URL(page.url());expect(back.searchParams.get("page")).toBe("2");expect(back.searchParams.get("priority_group")).toBe("High");expect(back.searchParams.has("focus")).toBe(false);
+  const direct=new URL(detailPath,"http://local.test").pathname;
+  for(const suffix of ["","?focus=unsupported","?focus=rfm&focus=settlement"]){
+   await page.goto(direct+suffix);await expect(page.locator("#account-priority")).toBeVisible();
+   expect(await page.evaluate(()=>document.activeElement?.id)).not.toMatch(/^account-(rfm|settlement|priority)$/);
+  }
+  expect(errors).toEqual([]);
+ });
+}

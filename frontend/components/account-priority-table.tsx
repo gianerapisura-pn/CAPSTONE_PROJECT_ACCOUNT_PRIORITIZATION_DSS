@@ -20,7 +20,7 @@ export function AccountPriorityTable({ initialGroup = "" }: { initialGroup?: Pri
   if (!params.has("priority_group") && initialGroup) params.set("priority_group", initialGroup);
   const [exportError, setExportError] = useState("");
   const apiParams = accountApiQuery(params);
-  const detailParams = new URLSearchParams(params); detailParams.set("viaList", "1");
+  const detailParams = new URLSearchParams(params); detailParams.set("viaList", "1"); detailParams.set("focus", "priority");
   if (!apiParams.has("page_size")) apiParams.set("page_size", "10");
   const { data, error, loading, reload } = useApi<AccountListResponse>("/accounts?" + apiParams);
   const pages = Math.max(1, Math.ceil((data?.total ?? 0) / (data?.page_size ?? 10)));

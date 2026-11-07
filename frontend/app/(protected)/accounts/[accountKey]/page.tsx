@@ -3,8 +3,9 @@
 import { ArrowLeft, ArrowRight, Activity, Calculator, Clock3, Info, ReceiptText, Scale } from "lucide-react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { accountsHref, accountDetailHref, accountApiQuery, accountQueryIssue } from "@/lib/account-filters";
+import { Suspense, useEffect, useRef } from "react";
+import { accountsHref, accountDetailHref, accountApiQuery, accountQueryIssue, accountDetailFocus } from "@/lib/account-filters";
+import { safeReportReturn } from "@/lib/report-navigation";
 import { ContextReturn } from "@/components/context-return";
 import { Badge, PageHeader, PageState } from "@/components/page-state";
 import { ResultValue } from "@/components/result-explanation";
@@ -51,25 +52,41 @@ function AccountDetailsContent() {
   const query = useSearchParams().toString();
   const params = new URLSearchParams(query);
   const apiQuery = accountApiQuery(params).toString();
-  const listQuery = new URLSearchParams(params); listQuery.delete("viaList");
+  const listQuery = new URLSearchParams(params); listQuery.delete("viaList"); listQuery.delete("focus");
   const key = decodeURIComponent(String(useParams().accountKey));
   const { data, error, loading, reload } = useApi<Detail>(`/accounts/${encodeURIComponent(key)}${apiQuery ? `?${apiQuery}` : ""}`);
   const d = data?.decision;
   const p = data?.priority;
   const rfm = data?.rfm;
+  const focus = accountDetailFocus(params);
+  const queryIssue = accountQueryIssue(params);
+  const destination = safeReportReturn(params.get("returnTo"));
+  const directDescriptiveReturn = params.get("viaList") !== "1" && destination && /^\/analytics\/(rfm|settlement)(?:\?|$)/.test(destination.href);
+  const appliedFocus = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focus) { appliedFocus.current = null; return; }
+    if (loading || error || queryIssue || !data || data.account_key !== key) return;
+    const request = `${key}:${focus}`;
+    if (appliedFocus.current === request) return;
+    const section = document.getElementById(`account-${focus}`);
+    if (!section) return;
+    appliedFocus.current = request;
+    section.focus({ preventScroll: true });
+    section.scrollIntoView({ behavior: "auto", block: "start" });
+  }, [data, error, loading, key, focus, queryIssue]);
   return <div className="page-stack">
-    <div className="context-return"><Link className="back-link" href={listQuery.size ? `/accounts?${listQuery}` : "/accounts"}><ArrowLeft size={16} />{params.get("returnTo") && params.get("viaList") !== "1" ? "View matching accounts" : "Back to Filtered Accounts"}</Link><ContextReturn value={params.get("returnTo")} /></div>
+    <div className="context-return">{directDescriptiveReturn ? <Link className="back-link" href={destination.href}><ArrowLeft size={16} />{destination.label}</Link> : <><Link className="back-link" href={listQuery.size ? `/accounts?${listQuery}` : "/accounts"}><ArrowLeft size={16} />{destination && params.get("viaList") !== "1" ? "View matching accounts" : "Back to Filtered Accounts"}</Link><ContextReturn value={params.get("returnTo")} /></>}</div>
     {data && <nav className="account-detail-nav" aria-label="Account navigation">
       {data.navigation?.previous ? <Link className="back-link" href={accountDetailHref(data.navigation.previous.account_key, query)} title={data.navigation.previous.account}><ArrowLeft size={16} />Previous Account</Link> : <span className="back-link" aria-disabled="true"><ArrowLeft size={16} />Previous Account</span>}
       {data.navigation?.next ? <Link className="back-link" href={accountDetailHref(data.navigation.next.account_key, query)} title={data.navigation.next.account}>Next Account<ArrowRight size={16} /></Link> : <span className="back-link" aria-disabled="true">Next Account<ArrowRight size={16} /></span>}
     </nav>}
-    <p className="fine-print">Previous and Next follow the published account list with the current filters and sort order.</p>
+    <p className="fine-print">Previous and Next follow the published account list with the current filters and sort order, independently of RFM/Settlement table ordering.</p>
     <PageHeader eyebrow="Account evidence" title={data?.account || "Account details"} description="Saved analytical summaries from the latest successful run, with a separately labeled current source ledger." />
-    <PageState loading={loading} error={accountQueryIssue(params) || error} onRetry={reload} empty={!loading && !error && !data}>
+    <PageState loading={loading} error={queryIssue || error} onRetry={reload} empty={!loading && !error && !data}>
       <>{data && d && <>
         <section className="account-identity"><span><ResultValue metric="provenance" row={d}>{String(data.context.business_category ?? "Pending category")}</ResultValue></span><span><ResultValue metric="provenance" row={d}>{String(data.context.primary_business_type ?? "Pending business type")}</ResultValue></span><span><ResultValue metric="status" row={d}>{String(data.context.account_status ?? "Pending status")}</ResultValue></span></section>
         {!d.is_ranked && <div className="method-note"><Info /><div><strong>Historical account - Not currently ranked.</strong><span>{d.ranking_unavailable_reason || d.mcs_eligibility_reason}</span></div></div>}
-        <section className="account-hero">
+        <section id="account-priority" className="account-hero account-focus-target" tabIndex={-1} aria-label="Current prioritization">
           <div><span>Current rank</span><strong><ResultValue metric="rank" row={d}>{p ? `#${p.priority_rank}` : "Not ranked"}</ResultValue></strong></div>
           <div><span>Priority Group</span><ResultValue metric="group" row={d}><Badge tone={p?.priority_group || "neutral"}>{p?.priority_group || "Not applicable"}</Badge></ResultValue></div>
           <div><span>Final Priority Score</span><strong><ResultValue metric="fps" row={p}>{fixed(p?.final_priority_score)}</ResultValue></strong></div>
@@ -107,8 +124,8 @@ function AccountDetailsContent() {
             <p className="fine-print">The displayed classes are forecasts, not verified future sales outcomes. They do not determine the Final Priority Score.</p>
           </div>
         <section className="detail-grid">
-          <div className="data-section">
-            <div className="section-heading"><h2><Calculator />Historical RFM profile</h2><span>Cumulative descriptive history</span></div><p className="fine-print">Saved values at the analysis reference. Frequency counts distinct logical invoices; Monetary sums their invoice amounts. Recency measures days from the latest eligible invoice to the reference. Relative scores use cohort quantiles, preserve ties and give constant criteria score 3.</p>
+          <div id="account-rfm" className="data-section account-focus-target" tabIndex={-1} role="region" aria-labelledby="account-rfm-heading">
+            <div className="section-heading"><h2 id="account-rfm-heading"><Calculator />Historical RFM profile</h2><span>Cumulative descriptive history</span></div><p className="fine-print">Saved values at the analysis reference. Frequency counts distinct logical invoices; Monetary sums their invoice amounts. Recency measures days from the latest eligible invoice to the reference. Relative scores use cohort quantiles, preserve ties and give constant criteria score 3.</p>
             <dl className="method-facts">
               <div><dt>Recency</dt><dd><ResultValue metric="recency" row={d}>{rfm?.recency_days ?? "N/A"} days</ResultValue> / score <ResultValue metric="rfm_score">{rfm?.r_score ?? "N/A"}</ResultValue></dd></div>
               <div><dt>Frequency</dt><dd><ResultValue metric="rfm_frequency">{rfm?.frequency ?? "N/A"} invoices</ResultValue> / score <ResultValue metric="rfm_score">{rfm?.f_score ?? "N/A"}</ResultValue></dd></div>
@@ -118,8 +135,8 @@ function AccountDetailsContent() {
             {rfm && [rfm.r_score,rfm.f_score,rfm.m_score,rfm.rfm_mean_score].every(value=>typeof value === "number") && <p className="saved-calculation">RFM Mean = ({rfm.r_score} + {rfm.f_score} + {rfm.m_score}) / 3 = {Number(rfm.rfm_mean_score).toFixed(2)}</p>}
             <p className="fine-print">Historical RFM Mean is descriptive only. It is not the four-criterion CRITIC/MCS Final Priority Score.</p>
           </div>
-          <div className="data-section">
-            <div className="section-heading"><h2><Clock3 />Historical Settlement Duration</h2><span>Saved descriptive evidence</span></div>
+          <div id="account-settlement" className="data-section account-focus-target" tabIndex={-1} role="region" aria-labelledby="account-settlement-heading">
+            <div className="section-heading"><h2 id="account-settlement-heading"><Clock3 />Historical Settlement Duration</h2><span>Saved descriptive evidence</span></div>
             <dl className="method-facts">
               <div><dt>Average Settlement Days</dt><dd><ResultValue metric="settlement" row={d}>{d.average_settlement_days == null ? "N/A" : `${d.average_settlement_days.toFixed(1)} days`}</ResultValue></dd></div>
               <div><dt>Eligible invoices</dt><dd><ResultValue metric="settlement_count">{data.settlement?.settlement_invoice_count ?? d.settlement_invoice_count ?? "Unavailable"}</ResultValue></dd></div>
