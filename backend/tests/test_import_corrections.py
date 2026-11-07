@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import AuthenticatedUser
 
 from app.db.models import (
-    Base, CollectionCorrectionReview, ImportBatch, InvoiceGroupRecord,
+    Base, CollectionCorrectionReview, ImportBatch, InvoiceGroupRecord, AuditLog, RawSourceRow, AnalyticsRun,
 )
 from app.services.import_workflow import _persist_raw_rows, resolve_collection_correction
 
@@ -106,7 +106,14 @@ def test_audited_resolution_selects_one_collection_version_and_reconstructs(db):
     add_batch(db, "00000000-0000-4000-8000-000000000009", frame())
     add_batch(db, "00000000-0000-4000-8000-000000000010", frame(**{"CR AMOUNT": "90"}))
     review = db.scalar(select(CollectionCorrectionReview))
+    source_ids = set(db.scalars(select(RawSourceRow.raw_source_row_id)).all())
+    published_before = [(r.analysis_run_id, r.status) for r in db.scalars(select(AnalyticsRun)).all()]
     selected = review.raw_source_row_ids[-1]
+    for candidate, reason in [("not-a-candidate", "Verified receipt."), (selected, "   ")]:
+        with pytest.raises(HTTPException) as invalid:
+            resolve_collection_correction(db, AuthenticatedUser("qa", "administrator"), review.collection_correction_review_id, candidate, reason)
+        assert invalid.value.status_code == 422
+        assert review.status == "pending"
     resolve_collection_correction(
         db,
         AuthenticatedUser(
@@ -124,6 +131,11 @@ def test_audited_resolution_selects_one_collection_version_and_reconstructs(db):
     assert row.conflicting_invoice is False
     assert float(row.total_cr_amount) == 90.0
     assert row.rfm_eligible is True
+    assert set(db.scalars(select(RawSourceRow.raw_source_row_id)).all()) == source_ids
+    assert [(r.analysis_run_id, r.status) for r in db.scalars(select(AnalyticsRun)).all()] == published_before
+    audit_record = db.scalars(select(AuditLog).where(AuditLog.action == "collection_correction_resolved")).one()
+    assert audit_record is not None
+    assert review.resolved_at is not None and review.resolved_by is not None
     with pytest.raises(HTTPException) as error:
         resolve_collection_correction(
             db,

@@ -19,7 +19,7 @@ for(const role of ["administrator","management"] as const){
       await expect(page.locator("tbody tr")).toHaveCount(10);
       await expect(page.getByRole("button",{name:"Export",exact:true})).toHaveCount(role==="administrator"?1:0);
       await page.getByRole("button",{name:`Next ${route==="rfm"?"RFM":"settlement"} page`}).click();
-      const explanation=page.getByRole("link",{name:"View Account Explanation"}).first();
+      const explanation=page.locator("tbody td:first-child a").first();
       const target=await explanation.getAttribute("href");
       expect(target).toMatch(/^\/accounts\/[a-f0-9-]+\?/);
       await explanation.click();
@@ -45,10 +45,39 @@ for(const role of ["administrator","management"] as const){
       await page.getByRole("button",{name:/Edit account information/}).click();
       await expect(page.getByRole("button",{name:"Save verified information"})).toBeVisible();
       await page.getByRole("button",{name:"Cancel",exact:true}).click();
+      await expect(page.getByText(/Collection correction/i)).toHaveCount(0);
       await page.goto("/import");
       await expect(page.locator(".source-field-grid details")).toHaveCount(10);
       await page.locator(".source-field-grid summary").filter({hasText:/^EWT$/}).click();
       await expect(page.getByText(/blank is not zero/)).toBeVisible();
+      await expect(page.getByText(/Collection records require review/)).toHaveCount(0);
+      const candidate=(id:string,amount:string)=>({raw_source_row_id:id,import_batch_id:"isolated-batch",source_sheet:"CSV",source_row_number:id==="row-1"?2:3,account_name:"Isolated correction evidence",si_no:"SI-1",si_date:"2026-01-01",si_amount:"100",cr_no:"CR-1",cr_date:"2026-01-10",cr_amount:amount,ewt:"0",payment_mode:"Bank",payment_status:"Fully Paid"});
+      let correctionState="error";
+      const review={collection_correction_review_id:"isolated-review",status:"pending",selected_raw_source_row_id:null as string|null,reason:null as string|null,candidates:[candidate("row-1","100"),candidate("row-2","90")]};
+      await page.route("**/collection-corrections?status=all",route=>correctionState==="error"?route.fulfill({status:500,json:{detail:"Isolated test failure"}}):route.fulfill({json:[review]}));
+      await page.route("**/collection-corrections/isolated-review/resolve",async route=>{
+        expect(route.request().postDataJSON()).toEqual({selected_raw_source_row_id:"row-2",reason:"Verified isolated source receipt."});
+        review.status="resolved";review.selected_raw_source_row_id="row-2";review.reason="Verified isolated source receipt.";
+        await route.fulfill({json:{status:"resolved",analytics_publication_required:true}});
+      });
+      await page.reload();
+      await expect(page.locator(".correction-status[role=alert]")).toContainText("Collection corrections could not be checked");
+      correctionState="pending";
+      await page.getByRole("button",{name:"Retry",exact:true}).click();
+      await expect(page.getByText(/Collection records require review/)).toBeVisible();
+      await page.getByRole("button",{name:"Review corrections"}).click();
+      await expect(page.getByRole("button",{name:"Resolve correction"})).toBeDisabled();
+      await page.getByRole("radio").nth(1).check();
+      await page.getByRole("textbox",{name:"Resolution reason"}).fill("Verified isolated source receipt.");
+      await page.getByRole("button",{name:"Resolve correction"}).click();
+      await expect(page.getByText(/explicit analytics rerun is required/)).toBeVisible();
+      await page.getByRole("button",{name:/Resolved \(1\)/}).click();
+      await expect(page.getByText("Resolution reason: Verified isolated source receipt.")).toBeVisible();
+      await expect(page.getByRole("radio").first()).toBeDisabled();
+      await page.getByRole("button",{name:"Close correction review"}).click();
+      await expect(page.getByRole("button",{name:"View correction history"})).toBeVisible();
+      await page.unroute("**/collection-corrections?status=all");
+      await page.unroute("**/collection-corrections/isolated-review/resolve");
       await page.goto("/import/history");
       await expect(page.getByRole("columnheader",{name:"Batch details"})).toBeVisible();
       await expect(page.getByRole("columnheader",{name:"Issues",exact:true})).toHaveCount(0);
@@ -67,6 +96,15 @@ for(const role of ["administrator","management"] as const){
       for(const path of ["/analytics/rfm","/analytics/settlement","/analytics/predictive","/settings"]){
         await page.goto(path);if(role==="management"&&path==="/settings") await expect(page.getByRole("alert").getByText("Administrator access required")).toBeVisible();else await expect(page.locator("main h1")).toBeVisible();
         expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+      }
+      if(role==="administrator"){
+        await page.goto("/settings");await page.getByRole("button",{name:"All",exact:true}).click();
+        await page.getByLabel("Find an account").fill("ROSTRAM");await page.getByRole("button",{name:/Edit account information/}).click();
+        const form=page.locator(".context-editor");await expect(form).toBeVisible();
+        expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);
+        const inset=await page.locator(".context-body").evaluate(el=>parseFloat(getComputedStyle(el).paddingLeft));expect(inset).toBeGreaterThanOrEqual(16);
+        await page.screenshot({path:testInfo.outputPath(`context-editor-${viewport.width}.png`),fullPage:true});
+        await page.getByRole("button",{name:"Cancel",exact:true}).click();
       }
       await page.goto("/analytics/rfm");await expect(page.getByRole("table")).toBeVisible();await page.screenshot({path:testInfo.outputPath(`${role}-${viewport.width}.png`),fullPage:true});
     }

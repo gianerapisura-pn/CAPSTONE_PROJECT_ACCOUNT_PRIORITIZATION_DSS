@@ -9,6 +9,7 @@ vi.mock("@/components/auth-provider", () => ({
 
 vi.mock("@/lib/use-api", () => ({
   useApi: (path: string) => {
+    if (path.startsWith("/collection-corrections")) return {data:[{collection_correction_review_id:"review-1",status:"pending",candidates:[],selected_raw_source_row_id:null,reason:null}],error:"",loading:false,reload:vi.fn()};
     if (path.startsWith("/audit-log")) return { data: { items: [], total: 0, page: 1, total_pages: 1, page_size: 10 }, error: "", loading: false, reload: vi.fn() };
     if (path === "/settings/methodology") return { data: {
       source_schema: ["ACCOUNT NAMES"], analytics_config: { target_horizon_months: 12 },
@@ -38,6 +39,9 @@ test("settings retains methodology while removing ordinary technical configurati
   expect(screen.getByRole("link",{name:/Required Source File Columns/})).toHaveAttribute("href","/import");
   expect(screen.getByText("No account information currently requires verification.")).toBeInTheDocument();
   expect(screen.queryByRole("heading",{name:/Account alias review/i})).not.toBeInTheDocument();
+  expect(screen.queryByText(/Collection correction/i)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button",{name:"Review corrections"})).not.toBeInTheDocument();
+  expect(screen.queryByText(/Collection records require review/)).not.toBeInTheDocument();
   expect(screen.getByText("Recheck completed prediction windows")).toBeInTheDocument();
 });
 

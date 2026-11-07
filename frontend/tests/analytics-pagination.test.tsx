@@ -69,17 +69,21 @@ for (const [name, Component, path, file] of [
     render(<Component />);
     expect(screen.queryByRole("button", {name:"Export"})).not.toBeInTheDocument();
     expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader",{name:"Account explanation"})).not.toBeInTheDocument();
+    expect(screen.getByRole("link",{name:rows[0].account})).toHaveClass("account-drilldown");
     expect(document.querySelectorAll("tbody tr")).toHaveLength(10);
   });
 }
 
-test("descriptive links use returned stable keys and retain the originating pagination",async()=>{
- render(<RfmPage/>);
- await userEvent.click(screen.getByRole("button",{name:"Next RFM page"}));
- const link=screen.getAllByRole("link",{name:"View Account Explanation"})[0];
- const url=new URL(link.getAttribute("href")!,"https://example.test");
- expect(url.pathname).toBe(`/accounts/${rows[10].account_key}`);
- expect(url.searchParams.get("returnTo")).toBe("/analytics/rfm?page=2");
- expect(url.searchParams.get("eligibility")).toBe("all");
- expect(screen.queryByRole("columnheader",{name:"R Score"})).not.toBeInTheDocument();
-});
+for(const [name,Component,route] of [["RFM",RfmPage,"rfm"],["settlement",SettlementPage,"settlement"]] as const){
+ test(`${name} account-name links use stable keys and retain originating pagination`,async()=>{
+  render(<Component/>);
+  await userEvent.click(screen.getByRole("button",{name:`Next ${name} page`}));
+  const link=screen.getByRole("link",{name:rows[10].account});
+  const url=new URL(link.getAttribute("href")!,"https://example.test");
+  expect(url.pathname).toBe(`/accounts/${rows[10].account_key}`);
+  expect(url.searchParams.get("returnTo")).toBe(`/analytics/${route}?page=2`);
+  expect(url.searchParams.get("eligibility")).toBe("all");
+  expect(screen.queryByRole("columnheader",{name:"Account explanation"})).not.toBeInTheDocument();
+ });
+}

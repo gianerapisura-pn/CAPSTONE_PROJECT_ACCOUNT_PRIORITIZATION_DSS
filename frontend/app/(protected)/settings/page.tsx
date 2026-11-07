@@ -5,7 +5,6 @@ import Link from "next/link";
 import { PageHeader, PageState } from "@/components/page-state";
 import { AliasReviewPanel } from "@/components/alias-review-panel";
 import { AccountContextPanel } from "@/components/account-context-panel";
-import { CollectionCorrectionPanel } from "@/components/collection-correction-panel";
 import { AuditLogPanel } from "@/components/audit-log-panel";
 import { useAuth } from "@/components/auth-provider";
 import { apiFetch } from "@/lib/api";
@@ -32,6 +31,6 @@ export default function SettingsPage(){
    {data&&<><section className="methodology-grid"><article><span><Database/></span><h2>Analysis reference</h2><p>{data.analysis_reference_date}</p></article><article><span><BrainCircuit/></span><h2>With Future Sales</h2><p>{data.predictive}</p></article><article><span><BookOpen/></span><h2>RFM</h2><p>{data.rfm}</p></article><article><span><Database/></span><h2>Historical Settlement Duration</h2><p>{data.settlement}</p></article><article><span><Scale/></span><h2>CRITIC and MCS</h2><p>{data.mcs}</p></article><article><span><SlidersHorizontal/></span><h2>Priority grouping</h2><p>{data.priority_groups}</p></article><article><span><GitBranch/></span><h2>Future data</h2><p>{data.future_data_rule}</p></article></section>
    {user?.role==="administrator"&&<p><Link className="text-link" href="/import">Prepare a source file: Required Source File Columns and import templates</Link></p>}</>}
   </PageState>
-  {user?.role==="administrator"&&<><AccountContextPanel/><CollectionCorrectionPanel/><AliasReviewPanel/><details className="maintenance-action"><summary>Administrator maintenance and audit</summary><ModelGovernancePanel/><AuditLogPanel/></details></>}
+  {user?.role==="administrator"&&<><AccountContextPanel/><AliasReviewPanel/><details className="maintenance-action"><summary>Administrator maintenance and audit</summary><ModelGovernancePanel/><AuditLogPanel/></details></>}
  </div>;
 }

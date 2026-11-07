@@ -30,8 +30,9 @@ type Review = {
 };
 
 export function CollectionCorrectionPanel() {
+  const [open, setOpen] = useState(false);
   const [view, setView] = useState<"pending" | "resolved">("pending");
-  const { data, error, loading, reload } = useApi<Review[]>(`/collection-corrections?status=${view}`);
+  const { data, error, loading, reload } = useApi<Review[]>("/collection-corrections?status=all");
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -59,19 +60,27 @@ export function CollectionCorrectionPanel() {
     }
   }
 
-  if (!loading && !error && !data?.length && view === "pending") return <details className="maintenance-action"><summary>Collection correction history</summary><button className="button secondary" onClick={() => setView("resolved")}>View resolved corrections</button></details>;
-  return <section className="data-section">
+  const pending = data?.filter(row => row.status === "pending") ?? [];
+  const resolved = data?.filter(row => row.status === "resolved") ?? [];
+  const notice = publishedNotice && <p role="status" className="fine-print">Resolution updates reconstructed source evidence, but an explicit analytics rerun is required to publish a new decision result.</p>;
+  if (loading) return <p role="status" className="correction-status">Checking collection corrections...</p>;
+  if (error) return <div role="alert" className="correction-status form-error">Collection corrections could not be checked. {error} <button className="button secondary" onClick={reload}><RefreshCw size={16} />Retry</button></div>;
+  if (!pending.length && !resolved.length) return notice || null;
+  return <div className="correction-workflow">
+    {notice}
+    {!open ? <div className="correction-status">
+      {pending.length > 0 && <><span role="status">Collection records require review. {pending.length} pending.</span><button className="button secondary" onClick={() => {setView("pending"); setOpen(true);}}>Review corrections</button></>}
+      {resolved.length > 0 && <button className="button secondary" onClick={() => {setView("resolved"); setOpen(true);}}>View correction history</button>}
+    </div> : <section className="data-section" aria-label="Collection correction review">
     <div className="section-heading">
       <h2><CheckCircle2 />Collection correction review</h2>
-      <label>Show <select aria-label="Correction review status" value={view} onChange={event => setView(event.target.value as "pending" | "resolved")}><option value="pending">Pending</option><option value="resolved">Resolved</option></select></label>
+      <div className="page-actions"><button className="button secondary" aria-pressed={view === "pending"} onClick={() => setView("pending")}>Pending ({pending.length})</button><button className="button secondary" aria-pressed={view === "resolved"} onClick={() => setView("resolved")}>Resolved ({resolved.length})</button><button className="button secondary" onClick={() => setOpen(false)}>Close correction review</button></div>
     </div>
+    <div className="correction-body">
     <p className="fine-print">Resolution updates reconstructed source evidence. Publish a new analytics run to update decisions.</p>
-    {publishedNotice && <p role="status" className="fine-print">Resolution updates reconstructed source evidence, but an explicit analytics rerun is required to publish a new decision result.</p>}
     {actionError && <p role="alert" className="form-error">{actionError}</p>}
-    {loading && <p className="table-empty">Loading correction reviews...</p>}
-    {error && <p className="table-empty">{error} <button className="button secondary" onClick={reload}><RefreshCw size={16} />Retry</button></p>}
-    {!loading && !error && !data?.length && <p className="table-empty">No {view} collection corrections.</p>}
-    {data?.map(review => {
+    {!(view === "pending" ? pending : resolved).length && <p>No {view} collection corrections.</p>}
+    {(view === "pending" ? pending : resolved).map(review => {
       const id = review.collection_correction_review_id;
       return <div className="correction-review" key={id}>
         <fieldset disabled={review.status !== "pending" || busy === id}>
@@ -94,5 +103,6 @@ export function CollectionCorrectionPanel() {
         </fieldset>
       </div>;
     })}
-  </section>;
+    </div></section>}
+  </div>;
 }

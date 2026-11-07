@@ -6,6 +6,8 @@ import { ImportPanel } from "@/components/import-panel";
 
 vi.mock("@/lib/api", () => ({ downloadExport: vi.fn(), apiFetch: vi.fn() }));
 
+vi.mock("@/lib/use-api", () => ({useApi: () => ({data:[],loading:false,error:"",reload:vi.fn()})}));
+
 const apiFetchMock = vi.mocked(apiFetch);
 const basePreview = {
   import_batch_id: "b1",

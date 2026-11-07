@@ -11,7 +11,7 @@ test("empty maintenance queues do not render oversized alias or correction panel
  expect(screen.queryByRole("heading",{name:/alias review/i})).not.toBeInTheDocument();
  expect(screen.queryByRole("heading",{name:/collection correction review/i})).not.toBeInTheDocument();
  expect(screen.queryByRole("table")).not.toBeInTheDocument();
- expect(screen.getByText("Collection correction history").tagName).toBe("SUMMARY");
+ expect(screen.queryByText("View correction history")).not.toBeInTheDocument();
 });
 
 test("a real alias review remains visible without automatically merging identities",()=>{
