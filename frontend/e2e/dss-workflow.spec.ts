@@ -51,7 +51,8 @@ test("demo administrator imports future data and reaches updated decision output
   await page.getByRole("tab", { name: "Account & Prioritization Insights" }).click();
   await expect(page.getByRole("heading", { name: "RFM Score Distribution" })).toBeVisible();
   await page.getByRole("tab", { name: "Analytics Validation" }).click();
-  await page.getByText("Model selection and historical classification evidence").click();
+  const modelEvidence = page.locator("details").filter({ has: page.locator("summary").filter({ hasText: /^Model selection and historical classification evidence$/ }) });
+  await expect(modelEvidence).toHaveAttribute("open", "");
   await expect(page.getByRole("heading", { name: "Prediction Horizon Comparison" })).toBeVisible();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "CSV" }).first().click();
