@@ -96,3 +96,51 @@ test("management direct access to an administrator route is denied before page c
   expect(screen.queryByText("Restricted import content")).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Return to Overview" })).toHaveAttribute("href", "/dashboard");
 });
+
+
+test.each([
+  ["/import", "Import Data"],
+  ["/import/history", "Import History"],
+  ["/import/history/batch-123", "Import History"],
+  ["/accounts/account-123", "Account Prioritization"],
+  ["/analytics/rfm", "RFM"],
+  ["/dashboard", "Overview"],
+])("only the most specific navigation item is active on %s", (path, name) => {
+  authState.role = "administrator";
+  authState.path = path;
+  render(<ProtectedShell><div>Content</div></ProtectedShell>);
+  const navigation = screen.getByRole("navigation", { name: "Primary navigation" });
+  expect(navigation.querySelectorAll("a.active")).toHaveLength(1);
+  expect(screen.getByRole("link", { name })).toHaveAttribute("aria-current", "page");
+  expect(navigation.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+});
+
+test("import highlight follows navigation in the existing shell", () => {
+  authState.role = "administrator";
+  authState.path = "/import";
+  const { rerender } = render(<ProtectedShell><div>Content</div></ProtectedShell>);
+  expect(screen.getByRole("link", { name: "Import Data" })).toHaveClass("active");
+  authState.path = "/import/history";
+  rerender(<ProtectedShell><div>Content</div></ProtectedShell>);
+  expect(screen.getByRole("link", { name: "Import History" })).toHaveClass("active");
+  expect(screen.getByRole("link", { name: "Import Data" })).not.toHaveClass("active");
+  authState.path = "/import";
+  rerender(<ProtectedShell><div>Content</div></ProtectedShell>);
+  expect(screen.getByRole("link", { name: "Import History" })).not.toHaveClass("active");
+  expect(screen.getByRole("link", { name: "Import Data" })).toHaveClass("active");
+});
+
+test("similar route names do not activate unrelated navigation", () => {
+  authState.role = "administrator";
+  authState.path = "/imported";
+  render(<ProtectedShell><div>Content</div></ProtectedShell>);
+  expect(screen.getByRole("navigation").querySelectorAll("a.active")).toHaveLength(0);
+});
+
+test("management cannot open import history or see its navigation", () => {
+  authState.path = "/import/history";
+  render(<ProtectedShell><div>Restricted history</div></ProtectedShell>);
+  expect(screen.getByRole("alert")).toHaveTextContent("Administrator access required");
+  expect(screen.queryByText("Restricted history")).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Import History" })).not.toBeInTheDocument();
+});

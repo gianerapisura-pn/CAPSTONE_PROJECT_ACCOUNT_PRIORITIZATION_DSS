@@ -177,3 +177,5 @@
 @media(max-width:700px){.context-body,.correction-body{padding-right:16px;padding-left:16px}.table-instruction{padding-right:16px;padding-left:16px}}
 
 .account-focus-target{scroll-margin-top:90px}.account-focus-target:focus{outline:2px solid var(--green);outline-offset:4px}
+
+.run-actions{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;min-width:0}.analysis-reference-field{display:grid;gap:6px;min-width:0;font-size:12px;font-weight:600;color:var(--muted)}.analysis-reference-field input{min-height:38px;max-width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:white;color:var(--ink)}.page-header:has(.run-actions){flex-wrap:wrap}.header-actions:has(.run-actions){flex-shrink:1;min-width:0;max-width:100%}

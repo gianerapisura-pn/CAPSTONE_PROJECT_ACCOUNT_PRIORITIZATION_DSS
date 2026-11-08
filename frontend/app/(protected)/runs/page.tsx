@@ -69,11 +69,11 @@ export default function RunsPage() {
   }
 
   return <div className="page-stack">
-    <PageHeader eyebrow="Immutable publication history" title="Analytics runs" description="Every run retains its explicit reference date, evidence dates, configuration, warnings, and CRITIC weights." actions={<>
-      <label>Analysis reference<input type="date" value={referenceDate} onChange={event => setReferenceDate(event.target.value)} /></label>
+    <PageHeader eyebrow="Immutable publication history" title="Analytics runs" description="Every run retains its explicit reference date, evidence dates, configuration, warnings, and CRITIC weights." actions={<div className="run-actions">
+      <label className="analysis-reference-field"><span>Analysis reference</span><input type="date" value={referenceDate} onChange={event => setReferenceDate(event.target.value)} /></label>
       <button className="button secondary" disabled={running || !referenceDate} onClick={openCoverage}>Record SI coverage</button>
       <button className="button primary" disabled={running || !referenceDate} onClick={run}>{running ? <RefreshCw className="spin" /> : <Play size={17} />}Run analytics</button>
-    </>} />
+    </div>} />
     {actionError && <div className="form-error" role="alert">{actionError}</div>}
     {message && <div className="state-inline success-state" role="status">{message}</div>}
     {showCoverage && <section className="data-section coverage-run-form"><div className="section-heading"><h2>Confirm Sales Invoice coverage through {referenceDate}</h2></div>

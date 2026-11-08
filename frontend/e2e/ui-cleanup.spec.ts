@@ -160,3 +160,52 @@ for(const role of ["administrator","management"] as const){
   expect(errors).toEqual([]);
  });
 }
+
+
+for (const role of ["administrator", "management"] as const) {
+  test(`${role} import navigation and run reference formatting`, async ({ page }) => {
+    const user = { id: "00000000-0000-4000-8000-000000000001", aud: "authenticated", role: "authenticated", email: "qa@local.invalid", app_metadata: {}, user_metadata: {}, created_at: "2025-01-01T00:00:00Z" };
+    const encode = (v: object) => Buffer.from(JSON.stringify(v)).toString("base64url");
+    const token = `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ sub: user.id, exp: Math.floor(Date.now()/1000)+3600, role: "authenticated" })}.isolated-test-signature`;
+    await page.route("https://ocroshaikrfzvwtpbqzs.supabase.co/auth/v1/**", route => route.fulfill({ json: user }));
+    await page.route(/^http:\/\/127\.0\.0\.1:(8010|8077)\//, route => {
+      const path = new URL(route.request().url()).pathname;
+      return route.fulfill({ json: path === "/auth/me" ? { role, display_name: "Isolated UI reviewer" } : [] });
+    });
+    await page.addInitScript(({user, token}) => localStorage.setItem("sb-ocroshaikrfzvwtpbqzs-auth-token", JSON.stringify({ access_token: token, refresh_token: "isolated-test", expires_at: Math.floor(Date.now()/1000)+3600, expires_in: 3600, token_type: "bearer", user })), {user, token});
+    for (const width of [1366, 768, 390]) {
+      await page.setViewportSize({width, height: 900});
+      if (role === "administrator") {
+        await page.goto("/import");
+        if (width < 860) await page.getByRole("button", {name: "Open navigation"}).click();
+        const nav = page.getByRole("navigation", {name: "Primary navigation"});
+        await expect(nav.locator("a.active")).toHaveText("Import Data");
+        await page.getByRole("link", {name: "Import History", exact: true}).click();
+        await expect(page).toHaveURL(/\/import\/history$/);
+        if (width < 860) await page.getByRole("button", {name: "Open navigation"}).click();
+        await expect(nav.locator("a.active")).toHaveCount(1);
+        await expect(nav.locator('a[aria-current="page"]')).toHaveText("Import History");
+        await page.getByRole("link", {name: "Import Data", exact: true}).click();
+        await expect(page).toHaveURL(/\/import$/);
+        await expect(nav.locator("a.active")).toHaveText("Import Data");
+        await page.goto("/runs");
+        const field = page.getByLabel("Analysis reference", {exact: true});
+        await field.fill("2025-12-31");
+        await expect(page.getByRole("button", {name: "Run analytics", exact: true})).toBeEnabled();
+        const labelBox = await page.locator(".analysis-reference-field span").boundingBox();
+        const inputBox = await field.boundingBox();
+        expect(inputBox!.y - (labelBox!.y + labelBox!.height)).toBeGreaterThanOrEqual(5);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+        await field.fill("");
+        await expect(page.getByRole("button", {name: "Run analytics", exact: true})).toBeDisabled();
+      } else {
+        for (const path of ["/import", "/import/history", "/runs"]) {
+          await page.goto(path);
+          await expect(page.getByRole("alert")).toContainText("Administrator access required");
+          await expect(page.getByRole("link", {name: "Import Data", exact: true})).toHaveCount(0);
+          await expect(page.getByRole("link", {name: "Import History", exact: true})).toHaveCount(0);
+        }
+      }
+    }
+  });
+}

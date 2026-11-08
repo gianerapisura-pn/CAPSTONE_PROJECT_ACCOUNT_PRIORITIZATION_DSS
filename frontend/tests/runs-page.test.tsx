@@ -63,5 +63,9 @@ test("administrator records dated SI coverage separately before rerunning", asyn
   await user.type(screen.getByLabelText("Confirmation date"), "2026-01-02");
   await user.click(screen.getByRole("button", { name: "Record evidence" }));
   expect(await screen.findByText(/analysis has not run yet/i)).toBeInTheDocument();
-  expect(fetchMock).toHaveBeenCalledWith("/si-coverage", expect.objectContaining({ method: "POST" }));
+  expect(fetchMock).toHaveBeenCalledWith("/si-coverage", expect.objectContaining({
+    method: "POST",
+    body: JSON.stringify({ complete_through: "2025-12-31", evidence_type: "Client confirmation", evidence_reference: "Client email ref 123", evidence_basis: "Confirmed no additional valid SI", confirmed_on: "2026-01-02", source_batch_id: "batch-1" }),
+  }));
+  expect(fetchMock).not.toHaveBeenCalledWith("/analytics/run", expect.anything());
 });

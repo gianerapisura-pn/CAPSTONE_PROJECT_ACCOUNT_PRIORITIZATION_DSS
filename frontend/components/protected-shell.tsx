@@ -43,17 +43,21 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
   const restrictedRoute = user?.role === "management" && adminRoutePrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
   useEffect(() => { if (!loading && !user) router.replace(`/login?next=${encodeURIComponent(pathname)}`) }, [loading, pathname, router, user]);
   if (loading || !user) return <div className="auth-loading"><div className="brand-mark"><Boxes /></div><span>Securing your workspace...</span></div>;
+  const visibleGroups = navGroups.filter(group => !group.admin || user.role === "administrator");
+  const activeHref = visibleGroups.flatMap(group => group.items)
+    .filter(item => pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`)))
+    .reduce<string | undefined>((best, item) => !best || item.href.length > best.length ? item.href : best, undefined);
   return <div className="app-shell">
     <aside className={`sidebar ${mobileOpen ? "open" : ""}`}>
       <div className="sidebar-brand"><div className="brand-mark"><Boxes /></div><div><strong>PESLC</strong><span>Account Priority DSS</span></div><button className="icon-button mobile-close" aria-label="Close navigation" onClick={() => setMobileOpen(false)}><X /></button></div>
       {user.demo && <div className="demo-banner"><ShieldCheck size={16} /><span>Demo environment</span></div>}
-      <nav aria-label="Primary navigation">{navGroups.filter(group => !group.admin || user.role === "administrator").map(group => <div className={`nav-group ${group.detail ? "analysis-detail" : ""}`} key={group.label}>
+      <nav aria-label="Primary navigation">{visibleGroups.map(group => <div className={`nav-group ${group.detail ? "analysis-detail" : ""}`} key={group.label}>
         {group.detail
           ? <button className="nav-group-toggle" type="button" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen(open => !open)}><span>{group.label}</span><ChevronDown className={advancedOpen ? "open" : ""} size={15} /></button>
           : <span className="nav-group-label">{group.label}</span>}
         {(!group.detail || advancedOpen) && group.items.map(item => {
-          const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
-          return <Link key={item.href} href={item.href} className={active ? "active" : ""} onClick={event => { setMobileOpen(false); if (item.href === "/reports" && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { try { const saved = savedReportHref(sessionStorage.getItem(reportStorageKey)); if (saved) { event.preventDefault(); router.push(saved); } } catch { /* A plain report link works without session storage. */ } } }}><item.icon size={18} /><span>{item.label}</span></Link>;
+          const active = item.href === activeHref;
+          return <Link key={item.href} href={item.href} className={active ? "active" : ""} aria-current={active ? "page" : undefined} onClick={event => { setMobileOpen(false); if (item.href === "/reports" && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) { try { const saved = savedReportHref(sessionStorage.getItem(reportStorageKey)); if (saved) { event.preventDefault(); router.push(saved); } } catch { /* A plain report link works without session storage. */ } } }}><item.icon size={18} /><span>{item.label}</span></Link>;
         })}
       </div>)}</nav>
       <div className="sidebar-foot"><span>Methodology version</span><strong>2026.09-final-locked</strong></div>
