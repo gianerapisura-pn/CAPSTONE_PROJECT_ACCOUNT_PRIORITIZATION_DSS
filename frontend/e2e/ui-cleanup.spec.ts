@@ -150,6 +150,7 @@ for(const role of ["administrator","management"] as const){
   const priorLink=page.locator(".decision-table tbody td:nth-child(2) a").first();const detailPath=(await priorLink.getAttribute("href"))!;
   await priorLink.click();await expect(page.locator("#account-priority")).toBeFocused();
   await page.getByRole("link",{name:"Back to Filtered Accounts",exact:true}).click();
+  await expect(page).toHaveURL(url=>url.pathname === "/accounts");
   const back=new URL(page.url());expect(back.searchParams.get("page")).toBe("2");expect(back.searchParams.get("priority_group")).toBe("High");expect(back.searchParams.has("focus")).toBe(false);
   const direct=new URL(detailPath,"http://local.test").pathname;
   for(const suffix of ["","?focus=unsupported","?focus=rfm&focus=settlement"]){
