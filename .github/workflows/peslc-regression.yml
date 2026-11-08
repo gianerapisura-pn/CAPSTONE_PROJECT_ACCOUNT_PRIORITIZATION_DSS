@@ -6,6 +6,9 @@ on:
 permissions:
   contents: read
 
+env:
+  APPROVED_APPLICATION_SHA: 194ccba7284660660ac584b7fef7b7de9b4a6721
+
 jobs:
   backend:
     name: Synthetic imports, publication and role checks
@@ -14,14 +17,24 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: progress-future-import-model-monitoring-20261026
+          ref: ${{ env.APPROVED_APPLICATION_SHA }}
           persist-credentials: false   
+      - name: Verify approved application revision
+        run: |
+          application_sha=$(git rev-parse HEAD)
+          echo "Application SHA: $application_sha"
+          test "$application_sha" = "$APPROVED_APPLICATION_SHA"
       - name: Check out QA-only test files
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.sha }}
           path: qa-overlay
           persist-credentials: false
+      - name: Verify triggering QA revision
+        run: |
+          qa_sha=$(git -C qa-overlay rev-parse HEAD)
+          echo "QA overlay SHA: $qa_sha"
+          test "$qa_sha" = "$GITHUB_SHA"
 
       - name: Copy isolated QA test into development checkout
         run: |
@@ -80,26 +93,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: progress-future-import-model-monitoring-20261026
+          ref: ${{ env.APPROVED_APPLICATION_SHA }}
           persist-credentials: false
+      - name: Verify approved application revision
+        run: |
+          application_sha=$(git rev-parse HEAD)
+          echo "Application SHA: $application_sha"
+          test "$application_sha" = "$APPROVED_APPLICATION_SHA"
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      # Repair only the runner's copy of the stale dependency lockfile.
-      - name: Reconcile frontend lockfile in the runner
-        working-directory: frontend
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
       - name: Verify clean frontend installation
         working-directory: frontend
         run: npm ci --no-audit --no-fund
-      - name: Save regenerated lockfile for a separate reviewed commit
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-lockfile-review
-          path: frontend/package-lock.json
-          retention-days: 14
       - name: Run frontend regression suite
         working-directory: frontend
         run: npm test
@@ -117,13 +125,23 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: progress-future-import-model-monitoring-20261026
+          ref: ${{ env.APPROVED_APPLICATION_SHA }}
           persist-credentials: false
+      - name: Verify approved application revision
+        run: |
+          application_sha=$(git rev-parse HEAD)
+          echo "Application SHA: $application_sha"
+          test "$application_sha" = "$APPROVED_APPLICATION_SHA"
       - uses: actions/checkout@v5
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.sha }}
           path: qa-overlay
           persist-credentials: false
+      - name: Verify triggering QA revision
+        run: |
+          qa_sha=$(git -C qa-overlay rev-parse HEAD)
+          echo "QA overlay SHA: $qa_sha"
+          test "$qa_sha" = "$GITHUB_SHA"
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
@@ -155,4 +173,5 @@ jobs:
         with:
           name: native-browser-results
           path: ${{ runner.temp }}/peslc-native-browser-results
+          if-no-files-found: error
           retention-days: 14

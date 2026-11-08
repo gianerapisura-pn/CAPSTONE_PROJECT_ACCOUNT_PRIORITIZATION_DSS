@@ -14,6 +14,10 @@ export default defineConfig({
   timeout: 180_000,
   expect: { timeout: 30_000 },
   outputDir: path.join(temporary, "peslc-native-browser-results"),
+  reporter: [
+    ["dot"],
+    ["junit", { outputFile: path.join(temporary, "peslc-native-browser-results", "results.xml") }],
+  ],
   use: { baseURL: origin, trace: "retain-on-failure", screenshot: "only-on-failure" },
   webServer: [
     {
