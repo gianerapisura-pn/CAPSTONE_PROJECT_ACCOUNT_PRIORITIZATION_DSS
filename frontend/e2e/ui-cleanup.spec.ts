@@ -201,7 +201,7 @@ for (const role of ["administrator", "management"] as const) {
       } else {
         for (const path of ["/import", "/import/history", "/runs"]) {
           await page.goto(path);
-          await expect(page.getByRole("alert")).toContainText("Administrator access required");
+          await expect(page.locator("main").getByRole("alert")).toContainText("Administrator access required");
           await expect(page.getByRole("link", {name: "Import Data", exact: true})).toHaveCount(0);
           await expect(page.getByRole("link", {name: "Import History", exact: true})).toHaveCount(0);
         }
