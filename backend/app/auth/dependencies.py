@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 
 import httpx
 import jwt
 from fastapi import Depends, Header, HTTPException, status
 from jwt import PyJWKClient
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings, validate_runtime_configuration
 from app.db.models import UserProfile
@@ -26,6 +28,16 @@ DEMO_ADMIN_USER_ID = "00000000-0000-4000-8000-000000000001"
 DEMO_MANAGEMENT_USER_ID = "00000000-0000-4000-8000-000000000002"
 
 
+@lru_cache(maxsize=4)
+def _jwks_client(supabase_url: str) -> PyJWKClient:
+    # Cache public key sets only, never tokens, claims, or database roles.
+    # PyJWT refreshes expired sets and retries an unknown key ID on rotation.
+    return PyJWKClient(
+        f"{supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json",
+        cache_jwk_set=True, lifespan=300, cache_keys=False,
+    )
+
+
 def _verify_supabase_token(token: str) -> dict:
     settings = get_settings()
     try:
@@ -38,7 +50,7 @@ def _verify_supabase_token(token: str) -> dict:
             )
             response.raise_for_status()
             return response.json()
-        jwks = PyJWKClient(f"{settings.supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json")
+        jwks = _jwks_client(settings.supabase_url)
         key = jwks.get_signing_key_from_jwt(token).key
         return jwt.decode(
             token,
@@ -56,6 +68,12 @@ async def require_user(
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> AuthenticatedUser:
+    # Token verification and the synchronous SQLAlchemy session must not block
+    # the event loop while other page requests are waiting for their data.
+    return await run_in_threadpool(_authenticated_user, authorization, db)
+
+
+def _authenticated_user(authorization: str | None, db: Session) -> AuthenticatedUser:
     settings = get_settings()
     if settings.demo_mode:
         validate_runtime_configuration(settings)

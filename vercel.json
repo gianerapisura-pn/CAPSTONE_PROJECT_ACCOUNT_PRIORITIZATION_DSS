@@ -14,7 +14,7 @@
         { "source": "/api/:path(.*)?", "destination": "/:path" }
       ],
       "functions": {
-        "app/main.py": { "maxDuration": 300 }
+        "app/main.py": { "maxDuration": 300, "regions": ["sin1"] }
       }
     }
   },

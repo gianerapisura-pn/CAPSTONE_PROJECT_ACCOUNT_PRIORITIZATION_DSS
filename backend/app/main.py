@@ -649,7 +649,9 @@ def latest_analytics(user: AuthenticatedUser = Depends(require_admin),
 @app.get("/dashboard")
 def dashboard(user: AuthenticatedUser = Depends(require_user), db: Session = Depends(get_db)):
     run, payload = _latest_or_404(db), None
-    payload = run_payload(db, run)
+    payload = run_payload(db, run, sections={
+        "priorities", "accounts", "context_metrics", "business_baselines", "sensitivity",
+    })
     priorities, accounts = payload["priorities"], payload["accounts"]
     classes = ("With Future Sales", "With No Future Sales")
     return {
@@ -681,7 +683,7 @@ def dashboard(user: AuthenticatedUser = Depends(require_user), db: Session = Dep
 def native_overview(user: AuthenticatedUser = Depends(require_user),
                     db: Session = Depends(get_db)):
     run = _latest_or_404(db)
-    payload = run_payload(db, run)
+    payload = run_payload(db, run, sections={"accounts", "context_metrics", "business_baselines"})
     accounts = payload["accounts"]
     return {
         "run": serialize_run(run),
@@ -698,7 +700,7 @@ def native_overview(user: AuthenticatedUser = Depends(require_user),
 def native_insights(user: AuthenticatedUser = Depends(require_user),
                     db: Session = Depends(get_db)):
     run = _latest_or_404(db)
-    payload = run_payload(db, run)
+    payload = run_payload(db, run, sections={"accounts"})
     return {"run": serialize_run(run), "accounts": payload["accounts"],
             "critic_weights": run.critic_weights or {}}
 
@@ -733,7 +735,9 @@ def _selected_confusion_summary(benchmarks: list[dict],
 def native_validation(user: AuthenticatedUser = Depends(require_user),
                       db: Session = Depends(get_db)):
     run = _latest_or_404(db)
-    payload = run_payload(db, run)
+    payload = run_payload(db, run, sections={
+        "sensitivity", "priorities", "critic_influence", "backtest",
+    })
     model = active_model_version(db)
     locked_study_model = bool(model and model.model_version == MODEL_VERSION
                               and model.artifact_hash == MODEL_ARTIFACT_SHA256)
@@ -806,7 +810,7 @@ def native_validation(user: AuthenticatedUser = Depends(require_user),
 @app.get("/accounts/priorities", response_model=list[AccountPriorityResponse])
 def account_priorities(user: AuthenticatedUser = Depends(require_user),
                        db: Session = Depends(get_db)):
-    return run_payload(db, _latest_or_404(db))["priorities"]
+    return run_payload(db, _latest_or_404(db), sections={"priorities"})["priorities"]
 
 
 @app.get("/accounts", response_model=AccountListResponse)
@@ -949,7 +953,7 @@ def settlement(user: AuthenticatedUser = Depends(require_analytical_reader), db:
 def predictive(user: AuthenticatedUser = Depends(require_analytical_reader), db: Session = Depends(get_db)):
     run = latest_successful_run(db)
     operational = (
-        run_payload(db, run)["predictive"]
+        run_payload(db, run, sections={"predictive"})["predictive"]
         if run is not None
         else asdict(unavailable_prediction(DEFAULT_ANALYTICS_CONFIG))
     )
@@ -970,7 +974,7 @@ def sensitivity(account_key: str | None = None,
                 user: AuthenticatedUser = Depends(require_analytical_reader),
                 db: Session = Depends(get_db)):
     run, payload = _latest_or_404(db), None
-    payload = run_payload(db, run)
+    payload = run_payload(db, run, sections={"sensitivity", "critic_influence"})
     details = []
     if account_key:
         details = [x.payload for x in db.scalars(select(SensitivityScenarioRecord).where(

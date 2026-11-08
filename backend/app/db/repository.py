@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pandas as pd
-from sqlalchemy import desc, select
+from sqlalchemy import and_, desc, select
 
 from app.db.models import (
     AccountContextSnapshot, AccountPriorityResult, AnalyticsRun, AuditLog,
@@ -272,34 +272,34 @@ def _iso(value):
 
 
 def current_account_rows(db, run):
-    context = {
-        row.account_key: row
-        for row in db.scalars(select(AccountContextSnapshot).where(
-            AccountContextSnapshot.analysis_run_id == run.analysis_run_id
-        )).all()
-    }
-    rfm_rows = db.scalars(select(RFMResult).where(
-        RFMResult.analysis_run_id == run.analysis_run_id)).all()
-    settlement = {x.account_key: x.payload for x in db.scalars(
-        select(SettlementResult).where(
-            SettlementResult.analysis_run_id == run.analysis_run_id
-        )).all()}
-    priorities = {x.account_key: x.payload for x in db.scalars(
-        select(AccountPriorityResult).where(
-            AccountPriorityResult.analysis_run_id == run.analysis_run_id
-        )).all()}
+    # All four tables are unique by (run, account). Join on both identifiers so
+    # one round trip preserves the run snapshot and optional decision evidence.
+    account_rows = db.execute(
+        select(RFMResult, AccountContextSnapshot,
+               SettlementResult.payload, AccountPriorityResult.payload)
+        .join(AccountContextSnapshot, and_(
+            AccountContextSnapshot.analysis_run_id == RFMResult.analysis_run_id,
+            AccountContextSnapshot.account_key == RFMResult.account_key,
+        ))
+        .outerjoin(SettlementResult, and_(
+            SettlementResult.analysis_run_id == RFMResult.analysis_run_id,
+            SettlementResult.account_key == RFMResult.account_key,
+        ))
+        .outerjoin(AccountPriorityResult, and_(
+            AccountPriorityResult.analysis_run_id == RFMResult.analysis_run_id,
+            AccountPriorityResult.account_key == RFMResult.account_key,
+        ))
+        .where(RFMResult.analysis_run_id == run.analysis_run_id)
+    ).all()
     model = db.scalar(select(ModelRun).where(ModelRun.analysis_run_id == run.analysis_run_id))
     predictive = model.payload if model else {}
     predictions = predictive.get("predictions") or {}
     reference = run.analysis_reference_date or run.cutoff_date
     result = []
-    for record in rfm_rows:
-        account = context.get(record.account_key)
-        if account is None:
-            continue
+    for record, account, settlement_payload, priority_payload in account_rows:
         rfm = dict(record.payload)
-        settled = settlement.get(record.account_key, {})
-        priority = priorities.get(record.account_key, {})
+        settled = settlement_payload or {}
+        priority = priority_payload or {}
         criteria_complete = settled.get("average_settlement_days") is not None
         mcs_eligible = account.current_actionable and criteria_complete
         if account.account_status == CLIENT_CONFIRMED_CLOSED:
@@ -445,7 +445,12 @@ def filter_current_account_rows(rows, search="", priority_group=None,
                   reverse=sort_direction == "desc") + sorted(missing, key=lambda x: x["account"].casefold())
 
 
-def run_payload(db, run):
+def run_payload(db, run, *, sections: set[str] | None = None):
+    """Read only requested sections from one persisted successful run.
+
+    Omitting sections preserves the complete detail/export contract. No result
+    cache is used: each request still resolves the latest published run.
+    """
     def payloads(model):
         records = db.scalars(select(model).where(
             model.analysis_run_id == run.analysis_run_id)).all()
@@ -455,26 +460,30 @@ def run_payload(db, run):
                 row.payload["account"].casefold(), row.payload["account"], str(row.account_key),
             ))
         return [row.payload for row in records]
-    priorities = sorted(
-        payloads(AccountPriorityResult),
-        key=lambda x: (x["priority_rank"], x["account"]),
-    )
-    model = db.scalar(select(ModelRun).where(ModelRun.analysis_run_id == run.analysis_run_id))
-    backtest = db.scalar(select(RankingBacktestRecord).where(
-        RankingBacktestRecord.analysis_run_id == run.analysis_run_id))
-    baselines = [x.payload for x in db.scalars(select(BusinessBaselineRecord).where(
-        BusinessBaselineRecord.analysis_run_id == run.analysis_run_id)
-        .order_by(BusinessBaselineRecord.year)).all()]
+    def single_payload(model):
+        row = db.scalar(select(model).where(model.analysis_run_id == run.analysis_run_id))
+        return row.payload if row else {}
+
+    loaders = {
+        "accounts": lambda: current_account_rows(db, run),
+        "priorities": lambda: sorted(payloads(AccountPriorityResult),
+                                     key=lambda x: (x["priority_rank"], x["account"])),
+        "rfm": lambda: payloads(RFMResult),
+        "settlement": lambda: payloads(SettlementResult),
+        "predictive": lambda: single_payload(ModelRun),
+        "sensitivity": lambda: payloads(SensitivitySummaryRecord),
+        "critic_influence": lambda: payloads(CriticInfluenceRecord),
+        "backtest": lambda: single_payload(RankingBacktestRecord),
+        "business_baselines": lambda: [x.payload for x in db.scalars(
+            select(BusinessBaselineRecord).where(
+                BusinessBaselineRecord.analysis_run_id == run.analysis_run_id
+            ).order_by(BusinessBaselineRecord.year)).all()],
+        "context_metrics": lambda: run.context_metrics or {},
+    }
+    if sections is not None and sections - loaders.keys():
+        raise ValueError("Unknown analytical payload section.")
     return {
         **serialize_run(run),
-        "accounts": current_account_rows(db, run),
-        "priorities": priorities,
-        "rfm": payloads(RFMResult),
-        "settlement": payloads(SettlementResult),
-        "predictive": model.payload if model else {},
-        "sensitivity": payloads(SensitivitySummaryRecord),
-        "critic_influence": payloads(CriticInfluenceRecord),
-        "backtest": backtest.payload if backtest else {},
-        "business_baselines": baselines,
-        "context_metrics": run.context_metrics or {},
+        **{name: load() for name, load in loaders.items()
+           if sections is None or name in sections},
     }
