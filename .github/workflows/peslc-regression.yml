@@ -109,3 +109,50 @@ jobs:
       - name: Lint check
         working-directory: frontend
         run: npm run lint
+
+  browser:
+    name: Synthetic browser import and publication
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: progress-future-import-model-monitoring-20261026
+          persist-credentials: false
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+          path: qa-overlay
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install checked-in backend dependencies
+        working-directory: backend
+        run: python -m pip install -r requirements.txt
+      - name: Install locked frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+      - name: Install browser runtime
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run existing synthetic browser workflow
+        working-directory: frontend
+        env:
+          OMP_NUM_THREADS: '1'
+          OPENBLAS_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+          NODE_OPTIONS: --max-old-space-size=2048
+        run: npx playwright test --config ../qa-overlay/qa/playwright-native.config.ts
+      - name: Retain synthetic browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-browser-results
+          path: ${{ runner.temp }}/peslc-native-browser-results
+          retention-days: 14
