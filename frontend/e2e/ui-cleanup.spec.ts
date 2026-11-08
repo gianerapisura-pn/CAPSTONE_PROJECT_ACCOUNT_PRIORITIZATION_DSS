@@ -147,7 +147,7 @@ for(const role of ["administrator","management"] as const){
   }
   await page.goto("/accounts?eligibility=ranked&priority_group=High&page=2");
   await expect(page.locator("tbody tr").first()).toBeVisible();
-  const priorLink=page.locator("tbody td:first-child a").first();const detailPath=(await priorLink.getAttribute("href"))!;
+  const priorLink=page.locator(".decision-table tbody td:nth-child(2) a").first();const detailPath=(await priorLink.getAttribute("href"))!;
   await priorLink.click();await expect(page.locator("#account-priority")).toBeFocused();
   await page.getByRole("link",{name:"Back to Filtered Accounts",exact:true}).click();
   const back=new URL(page.url());expect(back.searchParams.get("page")).toBe("2");expect(back.searchParams.get("priority_group")).toBe("High");expect(back.searchParams.has("focus")).toBe(false);
