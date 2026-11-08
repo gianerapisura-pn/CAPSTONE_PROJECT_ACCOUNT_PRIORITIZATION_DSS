@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 env:
-  APPROVED_APPLICATION_SHA: 194ccba7284660660ac584b7fef7b7de9b4a6721
+  APPROVED_APPLICATION_SHA: d732b35e93e5988473871971359d88fd3a0eb1f8
 
 jobs:
   backend:
@@ -69,6 +69,7 @@ jobs:
         run: |
           python -m pytest -v --junitxml="$RUNNER_TEMP/backend-regression.xml" \
             tests/test_auth.py \
+            tests/test_page_loading.py \
             tests/test_management_mutation_denial_local.py \
             tests/test_production_probe_safety.py \
             tests/test_import_future.py \
