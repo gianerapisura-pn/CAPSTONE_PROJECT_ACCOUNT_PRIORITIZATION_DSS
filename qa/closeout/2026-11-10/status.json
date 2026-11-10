@@ -1,0 +1,41 @@
+{
+  "as_of_ph": "2026-11-10",
+  "scope": "sanitized closeout reconciliation; no new system test execution",
+  "approved_application_sha": "d732b35e93e5988473871971359d88fd3a0eb1f8",
+  "qa_parent_sha": "dd932e781407e51a071dea1a5c5addf92aa54636",
+  "areas": [
+    {
+      "item": "deployed-staging continuity",
+      "status": "BLOCKED / NOT EXECUTED",
+      "isolated_full_size_result": "PASS retained; not repeated"
+    },
+    {
+      "item": "tracker reconciliation",
+      "status": "WRITE BLOCKED",
+      "reason": "HTTP 403 PERMISSION_DENIED",
+      "readback_unchanged": true
+    },
+    {
+      "item": "researcher decisions and change approvals",
+      "status": "PENDING HUMAN REVIEW",
+      "researcher_decisions_pending": 6,
+      "case_change_reviews_pending": 6
+    },
+    {
+      "item": "historical UAT build",
+      "investigation": "COMPLETE for available records",
+      "build_status": "UNVERIFIED"
+    },
+    {
+      "item": "actual 2026 outcomes",
+      "status": "NOT YET ELIGIBLE",
+      "requires": "completed window and verified complete SI coverage through 2026-12-31"
+    },
+    {
+      "item": "manual timing comparison",
+      "status": "NOT EXECUTED / CONDITIONAL",
+      "actual_observations": 0
+    }
+  ],
+  "interpretation": "No aggregate failed-test count or universal system PASS is inferred."
+}

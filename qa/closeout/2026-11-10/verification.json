@@ -1,0 +1,33 @@
+{
+  "date_ph": "2026-11-10",
+  "record_type": "sanitized reconciliation record; not a new test execution log",
+  "inventory": {
+    "peslc_development_branches": 0,
+    "web_deployments": 17,
+    "web_targets": "all production",
+    "separate_api_project_deployments": 0
+  },
+  "tracker": {
+    "write_attempts_rejected": 2,
+    "http_status": 403,
+    "error_code": "PERMISSION_DENIED",
+    "post_attempt_readback_unchanged": true,
+    "raw_responses_edited": false,
+    "human_decisions_entered": false
+  },
+  "historical_build": {
+    "conclusion": "UNVERIFIED; no authentic session-to-build binding found in inspected records",
+    "later_release_substituted": false
+  },
+  "preservation": {
+    "manuscript_edited": false,
+    "application_source_edited": false,
+    "workflows_edited": false,
+    "deployment_or_database_changed": false,
+    "original_responses_edited": false,
+    "historical_results_rewritten": false
+  },
+  "new_system_tests_executed": 0,
+  "new_system_test_passes": 0,
+  "limits": "A denied tracker write is an access error, not a failed DSS regression. Environment inventory alone is not a staging continuity test."
+}
