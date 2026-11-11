@@ -317,7 +317,9 @@ def test_private_revised_later_confirmation_and_existing_database_sync(monkeypat
         )).all():
             row.payload = {**row.payload, "source_package_sha256": STUDY_PREDECESSOR_PACKAGE_SHA256}
         db.execute(delete(lifecycle.PredictiveBenchmarkRecord).where(
-            lifecycle.PredictiveBenchmarkRecord.benchmark_scope == "supplemental_validation_context"
+            lifecycle.PredictiveBenchmarkRecord.benchmark_scope.in_({
+                "supplemental_validation_context", "selected_confusion_matrix",
+            })
         ))
         core_benchmark_ids = {
             row.predictive_model_benchmark_id for row in db.scalars(select(lifecycle.PredictiveBenchmarkRecord)).all()
@@ -362,9 +364,11 @@ def test_private_revised_later_confirmation_and_existing_database_sync(monkeypat
         first = sync_revised_package_evidence(db, PACKAGE)
         db.commit()
         later_ids = {row.id for row in db.scalars(select(PredictiveOOPEvaluation))}
+        assert len(later_ids) == 4
         # Identical evidence from a previously approved package retains its provenance.
         for row in db.scalars(select(PredictiveOOPEvaluation)):
-            row.payload = {**row.payload, "source_package_sha256": PREVIOUS_FILTERED_PACKAGE_SHA256}
+            if row.payload.get("source_package_sha256") == FINAL_PACKAGE_SHA256:
+                row.payload = {**row.payload, "source_package_sha256": PREVIOUS_FILTERED_PACKAGE_SHA256}
         for row in db.scalars(select(PrescriptiveValidationEvidence)):
             row.source_package_hash = PREVIOUS_FILTERED_PACKAGE_SHA256
         for row in db.scalars(select(lifecycle.PredictiveBenchmarkRecord).where(
@@ -380,13 +384,16 @@ def test_private_revised_later_confirmation_and_existing_database_sync(monkeypat
         assert core_benchmark_ids.issubset({
             row.predictive_model_benchmark_id for row in db.scalars(select(lifecycle.PredictiveBenchmarkRecord)).all()
         })
+        assert len(db.scalars(select(lifecycle.PredictiveBenchmarkRecord).where(
+            lifecycle.PredictiveBenchmarkRecord.benchmark_scope == "selected_confusion_matrix"
+        )).all()) == 6
         assert {row.predictive_study_prediction_id for row in db.scalars(select(PredictiveStudyPrediction))} == study_ids
         assert {row.source_package_hash for row in db.scalars(select(PredictiveStudyPrediction))} == {
             STUDY_PREDECESSOR_PACKAGE_SHA256
         }
         assert {row.id for row in db.scalars(select(PredictiveOOPEvaluation))} == later_ids
-        assert {row.payload["source_package_sha256"] for row in db.scalars(select(PredictiveOOPEvaluation))} == {
-            PREVIOUS_FILTERED_PACKAGE_SHA256
+        assert {row.payload.get("source_package_sha256") for row in db.scalars(select(PredictiveOOPEvaluation))} == {
+            None, PREVIOUS_FILTERED_PACKAGE_SHA256
         }
         assert db.scalar(select(func.count()).select_from(AuditLog)) == 1
         assert final_study_prediction_payload(db)["class_counts"] == {

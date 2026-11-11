@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from collections import Counter
 from datetime import date
 from hashlib import sha256
 from io import BytesIO
@@ -587,12 +588,18 @@ def _unchanged_development_evidence(db: Session, record: PredictiveModelVersion,
         {key: value for key, value in row.payload.items() if key != "source_package_sha256"}
         for row in benchmarks
     ]
-    core_unchanged = sorted(actual_benchmarks, key=str) == sorted(expected_benchmarks, key=str)
-    complete_unchanged = sorted(actual_benchmarks, key=str) == sorted(
-        expected_benchmarks + additional, key=str
-    )
-    if (len(horizons) != 3 or not (core_unchanged or complete_unchanged) or
-            sorted([row.payload for row in horizons], key=str) != sorted(expected_horizons, key=str) or
+    def canonical_counts(items):
+        return Counter(json.dumps(row, sort_keys=True) for row in items)
+
+    base_benchmarks = [row for row in expected_benchmarks
+                       if row["source_member"] != "confusion_matrices.csv"]
+    compatible = any(canonical_counts(actual_benchmarks) == canonical_counts(expected)
+                     for expected in (
+                         base_benchmarks, expected_benchmarks,
+                         base_benchmarks + additional, expected_benchmarks + additional,
+                     ))
+    if (len(horizons) != 3 or not compatible or
+            canonical_counts([row.payload for row in horizons]) != canonical_counts(expected_horizons) or
             any(row.payload.get("source_package_sha256") not in (
                 FINAL_PACKAGE_SHA256, PREVIOUS_FILTERED_PACKAGE_SHA256,
                 PRIOR_ACTIVE_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256
@@ -606,6 +613,23 @@ def _append_missing_validation_context(db: Session, record: PredictiveModelVersi
     existing = db.scalars(select(PredictiveBenchmarkRecord).where(
         PredictiveBenchmarkRecord.predictive_model_version_id == record.predictive_model_version_id
     )).all()
+    if not any(row.payload.get("source_member") == "confusion_matrices.csv" for row in existing):
+        matrices = read_package_csv(
+            content, "01_DATA/05_PREDICTIVE/05_BENCHMARK/confusion_matrices.csv"
+        )
+        selected = matrices.loc[matrices["family"] == "CatBoost"]
+        if (len(selected) != 6 or set(selected["outer_year"].astype(int)) != {2020, 2021, 2022}
+                or set(selected["actual_class"]) != {"With Future Sales", "With No Future Sales"}
+                or selected.groupby("outer_year").size().ne(2).any()):
+            raise ValueError("Locked CatBoost confusion evidence is incomplete.")
+        for source in _rows(selected):
+            db.add(PredictiveBenchmarkRecord(
+                predictive_model_version_id=record.predictive_model_version_id,
+                benchmark_scope="selected_confusion_matrix",
+                model_name="CatBoost",
+                payload={"source_member": "confusion_matrices.csv",
+                         "source_package_sha256": FINAL_PACKAGE_SHA256, **source},
+            ))
     if any(row.benchmark_scope == "supplemental_validation_context" for row in existing):
         return
     for source in _additional_validation_rows(content):
@@ -637,24 +661,27 @@ def sync_revised_package_evidence(db: Session, package_path: str | Path,
     old_rows = db.scalars(select(PredictiveOOPEvaluation).where(
         PredictiveOOPEvaluation.predictive_model_version_id == record.predictive_model_version_id
     )).all()
+    accepted_hashes = {FINAL_PACKAGE_SHA256, PREVIOUS_FILTERED_PACKAGE_SHA256}
+    current_rows = [row for row in old_rows
+                    if row.payload.get("source_package_sha256") in accepted_hashes]
+    historical_rows = [row for row in old_rows if row not in current_rows]
     current = (
-        len(old_rows) == len(later)
-        and {row.payload.get("cutoff_date") for row in old_rows}
+        len(current_rows) == len(later)
+        and {row.payload.get("cutoff_date") for row in current_rows}
         == {source["cutoff_date"] for source in later}
-        and all(row.payload.get("source_package_sha256") in {
-            FINAL_PACKAGE_SHA256, PREVIOUS_FILTERED_PACKAGE_SHA256,
-        } for row in old_rows)
     )
+    if current_rows and not current:
+        raise ValueError("Persisted current later-period evidence is incomplete or duplicated.")
     if current and any(
         row.payload != {"source_member": LATER_MEMBER,
                         "source_package_sha256": row.payload["source_package_sha256"],
                         **next(source for source in later if source["cutoff_date"] == row.payload["cutoff_date"])}
-        for row in old_rows
+        for row in current_rows
     ):
         raise ValueError("Persisted current later-period evidence differs from the verified package.")
-    if old_rows and not current:
-        by_cutoff = {row.payload.get("cutoff_date"): row.payload for row in old_rows}
-        if (len(old_rows) != 2 or set(by_cutoff) != {"2023-12-31", "2024-08-13"} or
+    if historical_rows:
+        by_cutoff = {row.payload.get("cutoff_date"): row.payload for row in historical_rows}
+        if (len(historical_rows) != 2 or set(by_cutoff) != {"2023-12-31", "2024-08-13"} or
                 by_cutoff["2023-12-31"].get("macro_f1") != LATER_EXPECTED["2023-12-31"]["macro_f1"] or
                 by_cutoff["2024-08-13"].get("period") != "2024-08-13 confirmation" or
                 by_cutoff["2024-08-13"].get("observations") != 79 or
@@ -666,9 +693,6 @@ def sync_revised_package_evidence(db: Session, package_path: str | Path,
     else:
         _append_missing_validation_context(db, record, content)
     if development_exists and not current:
-        db.execute(delete(PredictiveOOPEvaluation).where(
-            PredictiveOOPEvaluation.predictive_model_version_id == record.predictive_model_version_id
-        ))
         for source in later:
             db.add(PredictiveOOPEvaluation(
                 predictive_model_version_id=record.predictive_model_version_id,
