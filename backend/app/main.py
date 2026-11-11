@@ -52,7 +52,10 @@ from app.services.model_lifecycle import (
 from app.services.study_predictions import MODEL_ARTIFACT_SHA256, MODEL_VERSION, final_study_prediction_payload
 from app.services.prescriptive_evidence import EVIDENCE_VERSION
 from app.services.additional_validation_evidence import EVIDENCE_VERSION as ADDITIONAL_EVIDENCE_VERSION, REPORT_SCOPES
-from app.services.locked_packages import FINAL_PACKAGE_SHA256, FINAL_QA_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256
+from app.services.locked_packages import (
+    FINAL_PACKAGE_SHA256, FINAL_QA_PACKAGE_SHA256, PREVIOUS_FILTERED_PACKAGE_SHA256,
+    PREVIOUS_QA_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256,
+)
 from app.services.power_bi_refresh import (
     public_status,
 )
@@ -707,7 +710,7 @@ def native_insights(user: AuthenticatedUser = Depends(require_user),
 
 def _selected_confusion_summary(benchmarks: list[dict],
                                 allowed_hashes: set[str] | None = None) -> dict | None:
-    accepted = allowed_hashes or {FINAL_PACKAGE_SHA256}
+    accepted = allowed_hashes or {FINAL_PACKAGE_SHA256, PREVIOUS_FILTERED_PACKAGE_SHA256}
     confusion = [row for row in benchmarks
                  if row.get("source_member") == "confusion_matrices.csv"
                  and row.get("source_package_sha256") in accepted]
@@ -758,13 +761,17 @@ def native_validation(user: AuthenticatedUser = Depends(require_user),
     yearly_folds = [row for row in benchmarks
                     if row.get("source_member") == "model_folds.csv"]
     later_checks = [row for row in evidence(PredictiveOOPEvaluation)
-                    if row.get("source_package_sha256") in {FINAL_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256}]
+                    if row.get("source_package_sha256") in {
+                        FINAL_PACKAGE_SHA256, PREVIOUS_FILTERED_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256,
+                    }]
     study = final_study_prediction_payload(db) if model_id else {"status": "unavailable"}
     predecessor_verified = (
         study.get("status") == "Validated" and
         study.get("source_package_hash") == STUDY_PREDECESSOR_PACKAGE_SHA256
     )
-    accepted_hashes = {FINAL_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256}
+    accepted_hashes = {
+        FINAL_PACKAGE_SHA256, PREVIOUS_FILTERED_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256,
+    }
     if predecessor_verified:
         accepted_hashes.add(STUDY_PREDECESSOR_PACKAGE_SHA256)
     historical_error_summary = _selected_confusion_summary(benchmarks, accepted_hashes)
@@ -775,7 +782,9 @@ def native_validation(user: AuthenticatedUser = Depends(require_user),
     additional = db.scalars(select(PrescriptiveValidationEvidence).where(
         PrescriptiveValidationEvidence.evidence_version == ADDITIONAL_EVIDENCE_VERSION,
         PrescriptiveValidationEvidence.evidence_scope.in_(REPORT_SCOPES),
-        PrescriptiveValidationEvidence.source_package_hash == FINAL_QA_PACKAGE_SHA256,
+        PrescriptiveValidationEvidence.source_package_hash.in_({
+            FINAL_QA_PACKAGE_SHA256, PREVIOUS_QA_PACKAGE_SHA256,
+        }),
     )).all()
     return {
         "run": serialize_run(run),

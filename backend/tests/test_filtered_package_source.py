@@ -3,6 +3,7 @@
 from collections import Counter
 from hashlib import sha256
 import os
+import re
 
 import pytest
 
@@ -28,6 +29,7 @@ def test_active_source_has_verified_current_population():
 
     assert len(rows) == 291
     assert Counter(row.payment_status for row in rows) == {"Fully Paid": 291}
+    assert all(re.fullmatch(r"\d+", row.cr_no) for row in rows)
     assert sum(group.rfm_eligible for group in group_invoices(rows)) == 281
     assert len(read_package_csv(content, "account_master.csv")) == 84
     assert sha256(read_package_member(content, "03_MODEL/catboost.joblib")).hexdigest() == (

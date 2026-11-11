@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.db.models import PrescriptiveValidationEvidence
 from app.services.locked_packages import (
-    FINAL_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256,
+    FINAL_PACKAGE_SHA256, PREVIOUS_FILTERED_PACKAGE_SHA256,
+    PRIOR_ACTIVE_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256,
     read_package_csv, verified_package,
 )
 
@@ -51,7 +52,8 @@ def unchanged_prescriptive_evidence(db: Session, content: bytes) -> bool:
     if not rows:
         return False
     if {row.source_package_hash for row in rows} not in (
-        {FINAL_PACKAGE_SHA256}, {PRIOR_ACTIVE_PACKAGE_SHA256}, {STUDY_PREDECESSOR_PACKAGE_SHA256}
+        {FINAL_PACKAGE_SHA256}, {PREVIOUS_FILTERED_PACKAGE_SHA256},
+        {PRIOR_ACTIVE_PACKAGE_SHA256}, {STUDY_PREDECESSOR_PACKAGE_SHA256}
     ):
         raise ValueError("Existing prescriptive evidence has unrecognized package provenance.")
     expected = []

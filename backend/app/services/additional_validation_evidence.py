@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.db.models import PrescriptiveValidationEvidence
 from app.services.locked_packages import (
-    FINAL_QA_PACKAGE_SHA256, read_package_csv, read_package_member, verified_package,
+    FINAL_QA_PACKAGE_SHA256, PREVIOUS_QA_PACKAGE_SHA256,
+    read_package_csv, read_package_member, verified_package,
 )
 
 EVIDENCE_VERSION = "study-additional-validation-v1"
@@ -90,7 +91,9 @@ def seed_additional_validation_evidence(db: Session, package_path: str | Path) -
         actual = {(row.evidence_scope, row.payload["row"]): row for row in existing}
         if (len(actual) != sum(map(len, expected.values())) or
                 any(key not in actual or actual[key].payload != payload or
-                    actual[key].source_package_hash != FINAL_QA_PACKAGE_SHA256
+                    actual[key].source_package_hash not in {
+                        FINAL_QA_PACKAGE_SHA256, PREVIOUS_QA_PACKAGE_SHA256,
+                    }
                     for scope, rows in expected.items()
                     for payload in rows for key in [(scope, payload["row"])])):
             raise ValueError("Existing additional study evidence differs from the verified package.")

@@ -46,6 +46,7 @@ from app.db.repository import audit
 from app.etl.invoices import InvoiceGroup
 from app.services.locked_packages import (
     FINAL_PACKAGE_SHA256,
+    PREVIOUS_FILTERED_PACKAGE_SHA256,
     PRIOR_ACTIVE_PACKAGE_SHA256,
     STUDY_PREDECESSOR_PACKAGE_SHA256,
     read_package_csv,
@@ -593,7 +594,8 @@ def _unchanged_development_evidence(db: Session, record: PredictiveModelVersion,
     if (len(horizons) != 3 or not (core_unchanged or complete_unchanged) or
             sorted([row.payload for row in horizons], key=str) != sorted(expected_horizons, key=str) or
             any(row.payload.get("source_package_sha256") not in (
-                FINAL_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256
+                FINAL_PACKAGE_SHA256, PREVIOUS_FILTERED_PACKAGE_SHA256,
+                PRIOR_ACTIVE_PACKAGE_SHA256, STUDY_PREDECESSOR_PACKAGE_SHA256
             ) for row in benchmarks if row.payload.get("source_member") == "confusion_matrices.csv")):
         raise ValueError("Existing development evidence differs from the revised package.")
     return True
@@ -635,13 +637,17 @@ def sync_revised_package_evidence(db: Session, package_path: str | Path,
     old_rows = db.scalars(select(PredictiveOOPEvaluation).where(
         PredictiveOOPEvaluation.predictive_model_version_id == record.predictive_model_version_id
     )).all()
-    current = len(old_rows) == 2 and {
-        (row.payload.get("cutoff_date"), row.payload.get("source_package_sha256"))
-        for row in old_rows
-    } == {(source["cutoff_date"], FINAL_PACKAGE_SHA256) for source in later}
+    current = (
+        len(old_rows) == len(later)
+        and {row.payload.get("cutoff_date") for row in old_rows}
+        == {source["cutoff_date"] for source in later}
+        and all(row.payload.get("source_package_sha256") in {
+            FINAL_PACKAGE_SHA256, PREVIOUS_FILTERED_PACKAGE_SHA256,
+        } for row in old_rows)
+    )
     if current and any(
         row.payload != {"source_member": LATER_MEMBER,
-                        "source_package_sha256": FINAL_PACKAGE_SHA256,
+                        "source_package_sha256": row.payload["source_package_sha256"],
                         **next(source for source in later if source["cutoff_date"] == row.payload["cutoff_date"])}
         for row in old_rows
     ):

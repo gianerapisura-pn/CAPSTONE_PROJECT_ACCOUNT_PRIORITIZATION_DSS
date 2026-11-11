@@ -15,6 +15,7 @@ from app.db.models import (
 )
 from app.services.locked_packages import (
     FINAL_PACKAGE_SHA256,
+    PREVIOUS_FILTERED_PACKAGE_SHA256,
     PRIOR_ACTIVE_PACKAGE_SHA256,
     STUDY_PREDECESSOR_PACKAGE_SHA256,
     read_package_csv,
@@ -210,7 +211,8 @@ def seed_final_study_predictions(db: Session, package_path: str | Path) -> dict:
         }
         hashes = {row.source_package_hash for row in existing}
         if (len(existing) != 83 or actual != expected or
-                hashes not in ({FINAL_PACKAGE_SHA256}, {PRIOR_ACTIVE_PACKAGE_SHA256}, {STUDY_PREDECESSOR_PACKAGE_SHA256}) or
+                hashes not in ({FINAL_PACKAGE_SHA256}, {PREVIOUS_FILTERED_PACKAGE_SHA256},
+                               {PRIOR_ACTIVE_PACKAGE_SHA256}, {STUDY_PREDECESSOR_PACKAGE_SHA256}) or
                 any(row.model_version != MODEL_VERSION or
                     not row.source_package_member.endswith(STUDY_PREDICTION_MEMBER)
                     for row in existing)):
@@ -252,7 +254,9 @@ def revision_verified(db: Session, rows: list[PredictiveStudyPrediction]) -> boo
         AuditLog.entity_id == MODEL_VERSION,
     )).all()
     return any(
-        proof.details.get("package_sha256") in {FINAL_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256}
+        proof.details.get("package_sha256") in {
+            FINAL_PACKAGE_SHA256, PREVIOUS_FILTERED_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256,
+        }
         and proof.details.get("study_predecessor_sha256") == STUDY_PREDECESSOR_PACKAGE_SHA256
         and proof.details.get("study_snapshot_sha256") == digest
         for proof in proofs
@@ -288,7 +292,9 @@ def final_study_prediction_payload(db: Session) -> dict:
     hashes = {row.source_package_hash for row in rows}
     if len(origins) != 1 or len(starts) != 1 or len(ends) != 1 or len(hashes) != 1:
         raise ValueError("Persisted final study prediction evidence is inconsistent.")
-    if next(iter(hashes)) not in {FINAL_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256} and not revision_verified(db, rows):
+    if next(iter(hashes)) not in {
+        FINAL_PACKAGE_SHA256, PREVIOUS_FILTERED_PACKAGE_SHA256, PRIOR_ACTIVE_PACKAGE_SHA256,
+    } and not revision_verified(db, rows):
         return unavailable_payload()
     accounts = {
         row.account_key: row.standardized_account_name

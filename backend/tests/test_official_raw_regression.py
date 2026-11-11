@@ -23,6 +23,7 @@ from app.services.analytics_runner import run_account_prioritization
 from app.services.normalization_evidence import normalization_evidence
 from app.services.locked_packages import (
     FINAL_PACKAGE_SHA256,
+    PREVIOUS_FILTERED_PACKAGE_SHA256,
     read_package_csv,
     read_package_member,
     verified_package,
@@ -361,6 +362,16 @@ def test_private_revised_later_confirmation_and_existing_database_sync(monkeypat
         first = sync_revised_package_evidence(db, PACKAGE)
         db.commit()
         later_ids = {row.id for row in db.scalars(select(PredictiveOOPEvaluation))}
+        # Identical evidence from a previously approved package retains its provenance.
+        for row in db.scalars(select(PredictiveOOPEvaluation)):
+            row.payload = {**row.payload, "source_package_sha256": PREVIOUS_FILTERED_PACKAGE_SHA256}
+        for row in db.scalars(select(PrescriptiveValidationEvidence)):
+            row.source_package_hash = PREVIOUS_FILTERED_PACKAGE_SHA256
+        for row in db.scalars(select(lifecycle.PredictiveBenchmarkRecord).where(
+            lifecycle.PredictiveBenchmarkRecord.benchmark_scope == "selected_confusion_matrix"
+        )):
+            row.payload = {**row.payload, "source_package_sha256": PREVIOUS_FILTERED_PACKAGE_SHA256}
+        db.commit()
         second = sync_revised_package_evidence(db, PACKAGE)
         db.commit()
         assert first["study"]["already_seeded"] and second["study"]["already_seeded"]
@@ -374,6 +385,9 @@ def test_private_revised_later_confirmation_and_existing_database_sync(monkeypat
             STUDY_PREDECESSOR_PACKAGE_SHA256
         }
         assert {row.id for row in db.scalars(select(PredictiveOOPEvaluation))} == later_ids
+        assert {row.payload["source_package_sha256"] for row in db.scalars(select(PredictiveOOPEvaluation))} == {
+            PREVIOUS_FILTERED_PACKAGE_SHA256
+        }
         assert db.scalar(select(func.count()).select_from(AuditLog)) == 1
         assert final_study_prediction_payload(db)["class_counts"] == {
             "With Future Sales": 10, "With No Future Sales": 73,

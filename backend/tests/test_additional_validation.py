@@ -17,6 +17,7 @@ from app.services.additional_validation_evidence import (
     EVIDENCE_VERSION, seed_additional_validation_evidence,
 )
 from app.services.study_predictions import MODEL_ARTIFACT_SHA256, MODEL_VERSION
+from app.services.locked_packages import PREVIOUS_QA_PACKAGE_SHA256
 
 
 @pytest.fixture
@@ -79,10 +80,19 @@ def test_verified_part52_seed_is_idempotent_and_visible_to_both_roles(controlled
                       "ranking_bootstrap": 2}
     ids = {row.prescriptive_validation_evidence_id for row in controlled_db.scalars(select(
         PrescriptiveValidationEvidence).where(PrescriptiveValidationEvidence.evidence_version == EVIDENCE_VERSION)).all()}
+    for row in controlled_db.scalars(select(PrescriptiveValidationEvidence).where(
+        PrescriptiveValidationEvidence.evidence_version == EVIDENCE_VERSION
+    )):
+        row.source_package_hash = PREVIOUS_QA_PACKAGE_SHA256
+    controlled_db.commit()
     assert seed_additional_validation_evidence(controlled_db, package) == counts
     controlled_db.flush()
     assert ids == {row.prescriptive_validation_evidence_id for row in controlled_db.scalars(select(
         PrescriptiveValidationEvidence).where(PrescriptiveValidationEvidence.evidence_version == EVIDENCE_VERSION)).all()}
+    assert {row.source_package_hash for row in controlled_db.scalars(select(
+        PrescriptiveValidationEvidence).where(PrescriptiveValidationEvidence.evidence_version == EVIDENCE_VERSION))} == {
+            PREVIOUS_QA_PACKAGE_SHA256
+        }
     monkeypatch.setattr("app.main.active_model_version", lambda _db: SimpleNamespace(
         model_version=MODEL_VERSION, artifact_hash=MODEL_ARTIFACT_SHA256,
         predictive_model_version_id="00000000-0000-4000-8000-000000000013"))
