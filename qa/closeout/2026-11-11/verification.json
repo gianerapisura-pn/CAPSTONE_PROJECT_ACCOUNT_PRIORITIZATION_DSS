@@ -1,0 +1,202 @@
+{
+  "date": "2026-11-11",
+  "scope": "Supplied analytics source and affected application/reporting dependencies",
+  "result": "PASS",
+  "application_branch": "progress-future-import-model-monitoring-20261026",
+  "application_commit": "74aeed938f865828b02976b9f2be28b668ce2ac3",
+  "qa_branch": "qa/peslc-free-final-qa",
+  "ci_url": "https://github.com/gianerapisura-pn/CAPSTONE_PROJECT_ACCOUNT_PRIORITIZATION_DSS/actions/runs/43009715149",
+  "deployment": {
+    "id": "dpl_itipupr7bUf6ShquhLLLR2pZnw5V",
+    "state": "READY",
+    "url": "https://peslc-dss-academic-web.vercel.app",
+    "commit": "74aeed938f865828b02976b9f2be28b668ce2ac3"
+  },
+  "archives": [
+    {
+      "file": "PESLC_FINAL_ANALYTICS (1).zip",
+      "sha256": "972f91f4bf96aa735688f1a35b702b68319fcb5602356961a1e209fd2190eb65",
+      "files": 310,
+      "original_unchanged": true
+    },
+    {
+      "file": "PESLC_CONSOLIDATED_QA_UAT.zip",
+      "sha256": "a8a304e97cfb5fd6be6bbb78b130cf6744ea18415d79951cad6f654e2f043723",
+      "files": 404,
+      "original_unchanged": true
+    },
+    {
+      "file": "PESLC_FIGMA_SOURCE.zip",
+      "sha256": "950950aeb64830741bc34677709482a2d6c182b7ecad311d10cadf9ca0bd51fa",
+      "files": 125,
+      "original_unchanged": true
+    }
+  ],
+  "inventoried_files": 839,
+  "cross_package_checks": {
+    "analytical_mirror_files_identical": 310,
+    "figma_official_csvs_identical": 22,
+    "analytics_manifest_entries_verified": 309,
+    "consolidated_manifest_entries_verified": 403,
+    "figma_typescript_files_syntax_checked": 70
+  },
+  "tests": {
+    "affected_local_backend_cases": {
+      "passed": 89,
+      "failed": 0,
+      "skipped": 0
+    },
+    "final_evidence_recovery_retest": {
+      "passed": 29,
+      "failed": 0
+    },
+    "github_backend": {
+      "passed": 73,
+      "failed": 0
+    },
+    "github_frontend": {
+      "passed": 159,
+      "failed": 0,
+      "typecheck": "PASS",
+      "lint": "PASS"
+    },
+    "github_synthetic_browser": {
+      "passed": 1,
+      "failed": 0
+    },
+    "production_browser_roles": [
+      {
+        "role": "management",
+        "result": "PASS",
+        "read_pages_and_three_reports": true,
+        "account_drilldown": true,
+        "admin_boundary": true,
+        "export_boundary": true,
+        "page_errors": [],
+        "payload_sha256": "6e01932684f5b0ea9c793a0b33e81107715862080f9e344462b36168d762cb00"
+      },
+      {
+        "role": "administrator",
+        "result": "PASS",
+        "read_pages_and_three_reports": true,
+        "account_drilldown": true,
+        "admin_boundary": true,
+        "export_boundary": true,
+        "page_errors": [],
+        "payload_sha256": "6e01932684f5b0ea9c793a0b33e81107715862080f9e344462b36168d762cb00"
+      }
+    ],
+    "count_note": "Runs overlap. Counts must not be added as distinct tests."
+  },
+  "publication": {
+    "status": "COMMITTED",
+    "import_batch_id": "2e53f18e-b626-4ea6-94f5-876b2bd5e879",
+    "analysis_run_id": "92f0e23f-a15c-4ba9-be41-6f94e013792b",
+    "analysis_reference_date": "2025-12-31",
+    "source_package_sha256": "972f91f4bf96aa735688f1a35b702b68319fcb5602356961a1e209fd2190eb65",
+    "source_workbook_sha256": "e8c9e406dbd877127a642c9843576d5d7ef02c49aa1612ff7ec4706178f3a02d",
+    "prioritized_accounts": 83,
+    "historical_preservation": "PASS",
+    "all_analytical_sections_unchanged": [
+      "accounts",
+      "backtest",
+      "business_baselines",
+      "context_metrics",
+      "critic_influence",
+      "predictive",
+      "priorities",
+      "rfm",
+      "sensitivity",
+      "settlement"
+    ],
+    "critic_weights_unchanged": true
+  },
+  "current_source": {
+    "rows": 291,
+    "logical_invoices": 281,
+    "reconciled_invoices": 281,
+    "single_cr_identifier_per_current_row": true,
+    "historical_b2b_accounts": 84,
+    "ranked_accounts": 83,
+    "priority_groups": {
+      "High": 28,
+      "Medium": 27,
+      "Low": 28
+    },
+    "study_predictions": {
+      "Future Transaction": 10,
+      "No Future Transaction": 73
+    }
+  },
+  "retained_outputs": [
+    "RFM",
+    "Settlement",
+    "CatBoost artifact and predictions",
+    "CRITIC weights",
+    "FPS, ranks and Priority Groups",
+    "Sensitivity",
+    "Backtests",
+    "Annual baselines",
+    "Existing charts and tables"
+  ],
+  "reporting": {
+    "migration": "20261111110810_canonical_later_period_reporting",
+    "canonical_later_period_rows": 2,
+    "stored_historical_and_current_later_rows": 7,
+    "active_benchmark_rows": 65,
+    "reader_verification": {
+      "result": "PASS",
+      "canonical_later_period_rows": 2,
+      "raw_access_denied": true,
+      "session_read_only": true
+    },
+    "isolated_view_test": {
+      "result": "PASS",
+      "legacy_fallback": true,
+      "canonical_set_without_historical_duplicates": true,
+      "historical_rows_retained": 5,
+      "idempotent_replacement_preserves_reader_grant": true,
+      "reader_write_denied": true,
+      "security_invoker": true
+    }
+  },
+  "historical_sensitivity_preservation": {
+    "rows": 132800,
+    "fingerprint_algorithm": "MD5 over ordered per-row JSON fingerprints",
+    "before": "b06e5c1545e987390054aa2bb217691f",
+    "after": "b06e5c1545e987390054aa2bb217691f",
+    "result": "PASS"
+  },
+  "local_demo": {
+    "integrity": "ok",
+    "raw_rows": 291,
+    "invoices": 281,
+    "ranked": 83,
+    "single_cr_identifiers": true,
+    "source_hash": "e8c9e406dbd877127a642c9843576d5d7ef02c49aa1612ff7ec4706178f3a02d"
+  },
+  "boundaries": {
+    "redesign": false,
+    "model_retraining": false,
+    "existing_docs_edited": false,
+    "original_archives_edited": false,
+    "live_figma_edited": false,
+    "historical_qa_results_rewritten": false,
+    "human_uat_approvals_generated": false,
+    "google_apps_script_executed": false
+  },
+  "security_advisors": {
+    "new_findings_introduced": false,
+    "preexisting_notices_retained": [
+      "rls_enabled_no_policy",
+      "authenticated_security_definer_function_executable",
+      "auth_leaked_password_protection"
+    ]
+  },
+  "limits": [
+    "Figma ZIP received static/source-data verification; this does not certify the separately published Figma website.",
+    "Historical UAT records remain historical evidence; technical verification does not replace actual researcher decisions or historical build evidence.",
+    "Actual 2026 forecast outcome evaluation remains pending the complete outcome window and verified SI coverage.",
+    "Unaffected historical tests were retained. No new manual timing or staging workstream was executed."
+  ]
+}
