@@ -1,0 +1,189 @@
+{
+  "report_date": "2026-11-12",
+  "disposition": "COMPLETED / PASS",
+  "scope": "Deployed isolated staging continuity only",
+  "application_build": "74aeed938f865828b02976b9f2be28b668ce2ac3",
+  "deployment_id": "dpl_6gRuiGaAVvohknvgAhXnX5baGoy4",
+  "application_url": "https://peslc-dss-staging-a6nv1hxpk-gianerapisura-1117s-projects.vercel.app",
+  "execution_mode": "Automated browser and authenticated HTTP checks",
+  "baseline": {
+    "run_id": "1b18c77a-2e89-4cf6-920a-1a120353b208",
+    "reference": "2025-12-31",
+    "b2b": 84,
+    "ranked": 83
+  },
+  "after_import": {
+    "run_id": "e95f7fe4-dc5a-46ae-ae23-5255690d6661",
+    "reference": "2026-10-31",
+    "b2b": 86,
+    "ranked": 85,
+    "accounts_sha256": "d4cef2b92f16b306ea6966a67f016423b44b2c216214ee56224c208d13291f05"
+  },
+  "final": {
+    "run_id": "bb9cae86-2661-4b70-b4d0-936b09af042c",
+    "reference": "2026-10-31",
+    "b2b": 87,
+    "ranked": 86
+  },
+  "checks": [
+    {
+      "name": "administrator real UI password login",
+      "result": "PASS"
+    },
+    {
+      "name": "baseline Management Overview chart and latest run",
+      "result": "PASS",
+      "run_id": "1b18c77a-2e89-4cf6-920a-1a120353b208",
+      "reference": "2025-12-31"
+    },
+    {
+      "name": "baseline Account & Prioritization Insights chart and latest run",
+      "result": "PASS",
+      "run_id": "1b18c77a-2e89-4cf6-920a-1a120353b208",
+      "reference": "2025-12-31"
+    },
+    {
+      "name": "baseline Analytics Validation chart and latest run",
+      "result": "PASS",
+      "run_id": "1b18c77a-2e89-4cf6-920a-1a120353b208",
+      "reference": "2025-12-31"
+    },
+    {
+      "name": "Invalid fixture cannot publish; baseline retained",
+      "result": "PASS",
+      "quarantined": 1,
+      "commit_status": 422
+    },
+    {
+      "name": "Preview does not publish",
+      "result": "PASS",
+      "batch_id": "441af716-87ea-495e-ba17-fe139d94618c",
+      "rows": 4
+    },
+    {
+      "name": "administrator real UI password login",
+      "result": "PASS"
+    },
+    {
+      "name": "Preview does not publish",
+      "result": "PASS",
+      "batch_id": "03b2b015-4275-400e-84f7-900cdba4110e",
+      "rows": 4
+    },
+    {
+      "name": "Successful deployed UI import excludes unverified new account",
+      "result": "PASS",
+      "run_id": "e95f7fe4-dc5a-46ae-ae23-5255690d6661",
+      "reference": "2026-10-31",
+      "b2b": 86,
+      "ranked": 85,
+      "accounts_sha256": "d4cef2b92f16b306ea6966a67f016423b44b2c216214ee56224c208d13291f05"
+    },
+    {
+      "name": "after-import Management Overview chart and latest run",
+      "result": "PASS",
+      "run_id": "e95f7fe4-dc5a-46ae-ae23-5255690d6661",
+      "reference": "2026-10-31"
+    },
+    {
+      "name": "after-import Account & Prioritization Insights chart and latest run",
+      "result": "PASS",
+      "run_id": "e95f7fe4-dc5a-46ae-ae23-5255690d6661",
+      "reference": "2026-10-31"
+    },
+    {
+      "name": "after-import Analytics Validation chart and latest run",
+      "result": "PASS",
+      "run_id": "e95f7fe4-dc5a-46ae-ae23-5255690d6661",
+      "reference": "2026-10-31"
+    },
+    {
+      "name": "Mutable account-context change does not rewrite published run",
+      "result": "PASS"
+    },
+    {
+      "name": "Verified new account scored only after explicit publication",
+      "result": "PASS",
+      "run_id": "bb9cae86-2661-4b70-b4d0-936b09af042c",
+      "reference": "2026-10-31",
+      "b2b": 87,
+      "ranked": 86
+    },
+    {
+      "name": "Final Priority Score uses four CRITIC/MCS criteria only",
+      "result": "PASS"
+    },
+    {
+      "name": "Failed next import retains last successful publication",
+      "result": "PASS"
+    },
+    {
+      "name": "final Management Overview chart and latest run",
+      "result": "PASS",
+      "run_id": "bb9cae86-2661-4b70-b4d0-936b09af042c",
+      "reference": "2026-10-31"
+    },
+    {
+      "name": "final Account & Prioritization Insights chart and latest run",
+      "result": "PASS",
+      "run_id": "bb9cae86-2661-4b70-b4d0-936b09af042c",
+      "reference": "2026-10-31"
+    },
+    {
+      "name": "final Analytics Validation chart and latest run",
+      "result": "PASS",
+      "run_id": "bb9cae86-2661-4b70-b4d0-936b09af042c",
+      "reference": "2026-10-31"
+    },
+    {
+      "name": "Browser refresh retains latest run and selected report tab",
+      "result": "PASS"
+    },
+    {
+      "name": "management real UI password login",
+      "result": "PASS"
+    },
+    {
+      "name": "Management reads same final run; import mutation denied",
+      "result": "PASS",
+      "status": 403
+    },
+    {
+      "name": "Unauthenticated analytical read denied",
+      "result": "PASS",
+      "status": 401
+    }
+  ],
+  "invariants": {
+    "result": "PASS",
+    "environment": "DEPLOYED ISOLATED STAGING",
+    "project_ref": "ymonifjcvkxsqhabgpxp",
+    "baseline_run_id": "1b18c77a-2e89-4cf6-920a-1a120353b208",
+    "intermediate_run_id": "e95f7fe4-dc5a-46ae-ae23-5255690d6661",
+    "final_run_id": "bb9cae86-2661-4b70-b4d0-936b09af042c",
+    "baseline_payload_sha256": "f6dcae08d5f4d2c6502b3fe6afda119de268ffa5278bad322855b2a04f542e2a",
+    "baseline_immutable": true,
+    "intermediate_snapshot_immutable": true,
+    "study_predictions_immutable": true,
+    "model_artifact_unchanged": true,
+    "model_artifact_sha256": "09e4dcb0afd228a046c853d11729301dbb86d04fea9459194e22cde1ae377fb3",
+    "alpha_invoice_count": 1,
+    "alpha_frequency": 1,
+    "alpha_monetary": 120,
+    "counts": {
+      "source_rows": 295,
+      "logical_invoices": 284,
+      "successful_runs": 3,
+      "study_predictions": 83
+    },
+    "final_b2b_accounts": 87,
+    "final_ranked_accounts": 86,
+    "production_mutations": false
+  },
+  "browser_page_errors": [],
+  "private_credentials_included": false,
+  "application_source_changes": false,
+  "production_mutations": false,
+  "diagnostics": "Initial bundle configuration and two browser selector diagnostics were corrected; original attempt records retained privately. No passed historical result was rewritten.",
+  "limits": "Synthetic increment on the full study baseline; not real future-year completeness, a production import, human UAT sign-off or measured time savings."
+}
