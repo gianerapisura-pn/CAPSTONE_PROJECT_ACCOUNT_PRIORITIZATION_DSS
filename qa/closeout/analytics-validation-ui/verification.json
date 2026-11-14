@@ -1,0 +1,77 @@
+{
+  "status": "COMPLETED / PASS",
+  "application_commit": "14c81e2c0142342382f57928547ee36b87c48985",
+  "application_branch": "progress-future-import-model-monitoring-20261026",
+  "local": {
+    "affected_ui_tests": {
+      "passed": 48,
+      "failed_final": 0
+    },
+    "typecheck": "PASS",
+    "targeted_lint": "PASS",
+    "notes": [
+      "An obsolete disclosure-count assertion was updated for the requested static robustness section.",
+      "A resource-contended local attempt timed out; the same test passed on sequential retest. No product behavior was changed to suppress that timeout."
+    ]
+  },
+  "github": {
+    "run_id": 43621711401,
+    "status": "PASS",
+    "url": "https://github.com/gianerapisura-pn/CAPSTONE_PROJECT_ACCOUNT_PRIORITIZATION_DSS/actions/runs/43621711401",
+    "frontend_tests_passed": 165,
+    "backend_selected_tests_passed": 73,
+    "backend_warnings": 11,
+    "synthetic_browser_workflows_passed": 1
+  },
+  "staging": {
+    "deployment": "dpl_DvcdLJ5cELwBxpTutfv1iZWBArZP",
+    "url": "https://peslc-dss-staging-yvd4xrn92-gianerapisura-1117s-projects.vercel.app",
+    "status": "READY",
+    "browser_result": "PASS",
+    "checks": 21,
+    "page_errors": 0,
+    "roles": [
+      "administrator",
+      "management"
+    ],
+    "viewports": [
+      1366,
+      390
+    ]
+  },
+  "changes": [
+    "Always-visible annual Priority Group outcomes with standard dark heading.",
+    "Readable historical predictor-set names and hover, focus or tap explanations with registered sources and input definitions.",
+    "Three-part navigation, readable captions and headers, consistent spacing and numeric alignment.",
+    "Pointer chart focus outline removed while keyboard focus remains visible."
+  ],
+  "unchanged": [
+    "Backend, database schema and records",
+    "Source analytics package, model artifact and prediction results",
+    "CRITIC weights, FPS, ranks and Priority Groups",
+    "Manuscript, Google Docs, Forms and UAT responses"
+  ],
+  "uat": "Technical UI verification does not replace actual CLIENT-UAT-05 targeted client retest and researcher approval.",
+  "production": {
+    "deployment": "dpl_77iRC7xynuDBsEg73xwUAUVURyUK",
+    "url": "https://peslc-dss-academic-web.vercel.app",
+    "status": "READY",
+    "public_alias_deployment_verified": true,
+    "browser_result": "PASS",
+    "checks": 21,
+    "page_errors": 0,
+    "roles": [
+      "administrator",
+      "management"
+    ],
+    "viewports": [
+      1366,
+      390
+    ]
+  },
+  "browser_notes": [
+    "Original unsuccessful/interrupted browser attempts are retained locally. Harness corrections selected the actual chart surface, enabled touch support, matched previous-year counts to the registered source, and opened Analytics Validation directly. No application change was made in response to those harness issues.",
+    "Final staging checks passed after the harness corrections.",
+    "Current targeted source parity covers all 132 rows at the first historical cutoff and study-baseline year; prior full 539-row validation remains retained."
+  ]
+}
