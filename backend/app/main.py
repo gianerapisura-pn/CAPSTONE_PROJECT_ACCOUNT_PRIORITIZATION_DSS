@@ -64,6 +64,7 @@ from app.services.si_coverage import (
 )
 from app.services.publication_workflow import publish_existing_source
 from app.services.normalization_evidence import normalization_evidence
+from app.services.ranking_history import ranking_history
 
 settings = get_settings()
 
@@ -814,6 +815,20 @@ def native_validation(user: AuthenticatedUser = Depends(require_user),
             for scope in REPORT_SCOPES
         } if model_id else {},
     }
+
+
+@app.get("/reports/native/ranking-history")
+def historical_account_rankings(year: int | None = Query(None, ge=1, le=9999),
+                                search: str = Query("", max_length=150),
+                                page: int = Query(1, ge=1), page_size: int = Query(10, ge=1, le=100),
+                                user: AuthenticatedUser = Depends(require_analytical_reader),
+                                db: Session = Depends(get_db)):
+    try:
+        return ranking_history(db, year, search, page, page_size)
+    except LookupError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(503, str(exc)) from exc
 
 
 @app.get("/accounts/priorities", response_model=list[AccountPriorityResponse])
