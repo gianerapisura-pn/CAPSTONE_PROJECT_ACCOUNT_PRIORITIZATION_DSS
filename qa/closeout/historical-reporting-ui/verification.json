@@ -1,0 +1,36 @@
+{
+  "application_commit": "ccb7dcfc11d578023eaaa087f17173cd21433082",
+  "scope": "Historical report UI alignment and annual disclosure default",
+  "changed_files": [
+    "frontend/components/historical-validation.tsx",
+    "frontend/app/(protected)/reports/native-reports.css",
+    "frontend/tests/historical-validation.test.tsx"
+  ],
+  "targeted_frontend_tests": {
+    "passed": 47,
+    "failed": 0,
+    "skipped": 0
+  },
+  "typecheck": "PASS",
+  "targeted_lint": "PASS",
+  "backend_source_changed": false,
+  "database_changed": false,
+  "analytical_data_changed": false,
+  "ci_run": "https://github.com/gianerapisura-pn/CAPSTONE_PROJECT_ACCOUNT_PRIORITIZATION_DSS/actions/runs/43619370459",
+  "status": "COMPLETED / PASS",
+  "ci_status": "PASS",
+  "ci_frontend_tests": 164,
+  "ci_selected_backend_tests": 73,
+  "ci_synthetic_browser_tests": 1,
+  "staging_deployment": "dpl_EiFQvpf4DZWuZaoLSWBx9upfnLuS",
+  "staging_browser": "PASS",
+  "staging_page_errors": 0,
+  "production_deployment": "dpl_J9ErLrDPAhMxh7TX4MyGUYoJNPue",
+  "staging_checks": 19,
+  "production_browser": "PASS",
+  "production_checks": 19,
+  "production_page_errors": 0,
+  "production_url": "https://peslc-dss-academic-web.vercel.app",
+  "production_build": "READY",
+  "public_alias_verified": true
+}
