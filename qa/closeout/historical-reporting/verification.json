@@ -1,0 +1,173 @@
+{
+  "result": "PASS ? technical enhancement and release",
+  "application_branch": "progress-future-import-model-monitoring-20261026",
+  "application_commit": "ee5f3091a1a829c9e04cc156a15f9e0ec81b2345",
+  "application_commits": [
+    "05f01cd4bb2578cf196cb2f38f89bedc7b04159a",
+    "ee5f3091a1a829c9e04cc156a15f9e0ec81b2345"
+  ],
+  "production_url": "https://peslc-dss-academic-web.vercel.app",
+  "production_deployment": "dpl_89ceGGt27HPAUtoW16WX6fC7dtqd",
+  "production_state": "READY",
+  "public_alias_verified": true,
+  "staging_url": "https://peslc-dss-staging-nv902x806-gianerapisura-1117s-projects.vercel.app",
+  "staging_deployment": "dpl_LECBYKtYczrusL9JS38ktKy4vpPV",
+  "staging_state": "READY",
+  "github_ci": "https://github.com/gianerapisura-pn/CAPSTONE_PROJECT_ACCOUNT_PRIORITIZATION_DSS/actions/runs/43615263885",
+  "ci_application_commit": "ee5f3091a1a829c9e04cc156a15f9e0ec81b2345",
+  "counts": {
+    "historical_rankings": 456,
+    "fixed_2025_rankings": 83,
+    "combined_rankings": 539,
+    "transitions": 455,
+    "annual_stability_summaries": 7,
+    "annual_group_outcomes": 21,
+    "pooled_group_outcomes": 3
+  },
+  "tests": {
+    "backend_latest_results": {
+      "unique_cases": 215,
+      "passed": 215,
+      "failed": 0,
+      "skipped": 0,
+      "execution_basis": "210 passed in full run; five path-configuration failures passed after correcting the fixture path. Original full run and five-case retest retained.",
+      "files": [
+        "backend-attempt1.xml",
+        "backend-retest.xml"
+      ]
+    },
+    "frontend": {
+      "passed": 164,
+      "failed": 0,
+      "skipped": 0
+    },
+    "ci_selected_backend": {
+      "passed": 73,
+      "failed": 0,
+      "skipped": 0
+    },
+    "ci_synthetic_browser": {
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "production_build": "PASS ? final Vercel revision; initial local build also passed before the narrow-screen adjustment",
+    "staging_browser": {
+      "result": "PASS",
+      "roles": [
+        "administrator",
+        "management"
+      ],
+      "checks": 19,
+      "page_errors": 0
+    },
+    "production_browser": {
+      "result": "PASS",
+      "roles": [
+        "administrator",
+        "management"
+      ],
+      "checks": 19,
+      "page_errors": 0
+    },
+    "reporting_reader": {
+      "result": "PASS",
+      "certified_view_counts": {
+        "reporting_latest_account_priorities": 83,
+        "reporting_latest_rfm": 84,
+        "reporting_latest_settlement": 84,
+        "reporting_latest_backtest": 7
+      },
+      "raw_select": false,
+      "evidence_write": false
+    }
+  },
+  "migration": "20261114160858_allow_registered_ranking_history",
+  "production_registration": {
+    "environment": "production",
+    "project_ref": "ocroshaikrfzvwtpbqzs",
+    "registered_rows": 539,
+    "before": {
+      "counts": {
+        "analytics_runs": 5,
+        "raw_source_rows": 945,
+        "account_priority_results": 415,
+        "predictive_model_versions": 2,
+        "predictive_study_predictions": 167
+      },
+      "existing_evidence_sha256": "cef35882274f276af3e68a1475f27f2610d210d7baa2be2b8aeb7dcaebc970df"
+    },
+    "after": {
+      "counts": {
+        "analytics_runs": 5,
+        "raw_source_rows": 945,
+        "account_priority_results": 415,
+        "predictive_model_versions": 2,
+        "predictive_study_predictions": 167
+      },
+      "existing_evidence_sha256": "cef35882274f276af3e68a1475f27f2610d210d7baa2be2b8aeb7dcaebc970df"
+    },
+    "existing_results_preserved": true,
+    "idempotent": true
+  },
+  "staging_registration": {
+    "environment": "staging",
+    "project_ref": "ymonifjcvkxsqhabgpxp",
+    "registered_rows": 539,
+    "before": {
+      "counts": {
+        "analytics_runs": 3,
+        "raw_source_rows": 295,
+        "account_priority_results": 254,
+        "predictive_model_versions": 1,
+        "predictive_study_predictions": 83
+      },
+      "existing_evidence_sha256": "138ed4ba22ddc6d9be6925658a84d090704e0b9407db2703a576ce8d0f1816e8"
+    },
+    "after": {
+      "counts": {
+        "analytics_runs": 3,
+        "raw_source_rows": 295,
+        "account_priority_results": 254,
+        "predictive_model_versions": 1,
+        "predictive_study_predictions": 83
+      },
+      "existing_evidence_sha256": "138ed4ba22ddc6d9be6925658a84d090704e0b9407db2703a576ce8d0f1816e8"
+    },
+    "existing_results_preserved": true,
+    "idempotent": true
+  },
+  "local_demo_registration": {
+    "environment": "isolated local demo",
+    "registered_rows": 539,
+    "before": {
+      "analytics_runs": 1,
+      "raw_source_rows": 291,
+      "account_priority_results": 83
+    },
+    "after": {
+      "analytics_runs": 1,
+      "raw_source_rows": 291,
+      "account_priority_results": 83
+    }
+  },
+  "source_package_sha256": "972f91f4bf96aa735688f1a35b702b68319fcb5602356961a1e209fd2190eb65",
+  "source_archive_unchanged": true,
+  "model_retrained": false,
+  "existing_analytical_results_changed": false,
+  "manuscript_or_uat_records_edited": false,
+  "human_uat_acceptance": "Not performed; existing CLIENT-UAT-05 follow-up remains for actual participant and reviewer. Other human closeout items excluded.",
+  "changed_files": [
+    "backend/app/main.py",
+    "backend/app/services/ranking_history.py",
+    "backend/scripts/register_ranking_history.py",
+    "backend/tests/test_ranking_history.py",
+    "frontend/app/globals.css",
+    "frontend/components/additional-validation.tsx",
+    "frontend/components/historical-validation.tsx",
+    "frontend/tests/historical-validation.test.tsx",
+    "supabase/migrations/20261114160858_allow_registered_ranking_history.sql"
+  ]
+}
