@@ -119,3 +119,28 @@
 .validation-finding{padding:12px 0;border-top:1px solid var(--line);min-width:0}.validation-finding h3{font-size:15px;margin:0 0 8px}.validation-finding p{font-size:13px;line-height:1.65;color:var(--muted);margin:8px 0}
 .finding-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.finding-values>div{display:grid;gap:6px}.finding-values span{font-size:12px;color:var(--muted)}.finding-values strong{font-size:20px}
 @media(max-width:560px){.finding-values{grid-template-columns:1fr;gap:10px}.finding-values>div{grid-template-columns:1fr auto;align-items:center}.finding-values strong{font-size:17px}}
+
+/* Historical reporting: aligned controls and readable, consistently sized columns. */
+.history-toolbar { display: grid; grid-template-columns: minmax(210px, 280px) minmax(0, 1fr); align-items: end; gap: 16px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.history-toolbar .history-filter-field { margin: 0; }
+.annual-ranking-section .annual-ranking-table { table-layout: fixed; width: 100%; min-width: 680px; }
+.annual-ranking-table .history-account-column { width: 38%; }
+.annual-ranking-table .history-rank-column { width: 8%; }
+.annual-ranking-table .history-score-column { width: 12%; }
+.annual-ranking-table .history-group-column { width: 14%; }
+.annual-ranking-table .history-change-column { width: 28%; }
+.annual-ranking-table th, .annual-outcomes-table th { white-space: normal; line-height: 1.5; vertical-align: middle; }
+.annual-ranking-table td:first-child, .annual-ranking-table .history-change { white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+.annual-ranking-table .account-name-button { white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+.annual-ranking-table .history-number { text-align: right; font-variant-numeric: tabular-nums; }
+.annual-ranking-section .history-pagination { margin: 0; padding: 12px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.annual-outcomes-section { min-width: 0; max-width: 100%; border: 1px solid var(--line); border-radius: 8px; background: #fff; overflow: hidden; }
+.annual-outcomes-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; border: 0; background: transparent; padding: 14px 16px; text-align: left; color: var(--green-dark); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.annual-outcomes-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: -3px; }
+.history-chevron { flex: 0 0 8px; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); }
+.annual-outcomes-toggle[aria-expanded="true"] .history-chevron { transform: rotate(45deg); }
+.annual-outcomes-content { min-width: 0; padding: 0 16px 16px; border-top: 1px solid var(--line); }
+.annual-outcomes-content > .native-note { margin: 12px 0; line-height: 1.6; }
+.annual-outcomes-content .annual-outcomes-table { table-layout: fixed; width: 100%; min-width: 620px; }
+.annual-outcomes-table th:not(:first-child), .annual-outcomes-table td { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 700px) { .history-toolbar { grid-template-columns: minmax(0, 1fr); gap: 12px; } .annual-ranking-section .history-pagination { gap: 8px; } }

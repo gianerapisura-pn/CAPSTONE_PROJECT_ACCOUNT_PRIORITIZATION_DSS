@@ -73,9 +73,14 @@ test("loading, unavailable and empty states never show stale ranking rows", asyn
 test("annual groups are collapsed by default, retain exceptions and explain their denominators", async () => {
   const rows=[{year:2021,priority_group:"Low",accounts:22,buyers_group:1,purchase_incidence:1/22,next_year_sales:10207887.38,universe_sales:15780371.23,sales_capture:.6468724487668469}, {year:2022,priority_group:"High",accounts:23,buyers_group:3,purchase_incidence:3/23,next_year_sales:3331137.38,universe_sales:12234074.18,sales_capture:.2722835689067238}];
   const before=JSON.stringify(rows);
-  const {container}=render(<AnnualGroupOutcomes rows={rows}/>);
-  expect(container.querySelector("details")).not.toHaveAttribute("open");
-  await userEvent.click(screen.getByText(/View annual breakdown/));
+  render(<AnnualGroupOutcomes rows={rows}/>);
+  const toggle = screen.getByRole("button", {name:/View annual breakdown/});
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Group-outcome cutoff year")).not.toBeInTheDocument();
+  toggle.focus();
+  await userEvent.keyboard("{Enter}");
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
   expect(screen.getByText("27.23%")).toBeVisible();
   await userEvent.selectOptions(screen.getByLabelText("Group-outcome cutoff year"),"2021");
   expect(screen.getByText("64.69%")).toBeVisible();
@@ -86,4 +91,7 @@ test("annual groups are collapsed by default, retain exceptions and explain thei
   await userEvent.hover(screen.getByText("64.69%"));
   expect(await screen.findByText(/not buyer count or collected cash/)).toBeVisible();
   expect(JSON.stringify(rows)).toBe(before);
+  await userEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByRole("table")).not.toBeInTheDocument();
 });
