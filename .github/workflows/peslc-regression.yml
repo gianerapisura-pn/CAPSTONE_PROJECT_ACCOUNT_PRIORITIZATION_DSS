@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 env:
-  APPROVED_APPLICATION_SHA: 74aeed938f865828b02976b9f2be28b668ce2ac3
+  APPROVED_APPLICATION_SHA: 05f01cd4bb2578cf196cb2f38f89bedc7b04159a
 
 jobs:
   backend:
