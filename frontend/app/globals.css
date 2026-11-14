@@ -187,3 +187,10 @@
 .history-explanation p { margin: .6rem 0; }
 .history-source-hash { overflow-wrap: anywhere; }
 .history-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-top: 1rem; }
+
+.history-filter-field { display: grid; gap: 6px; min-width: 0; font-size: 12px; font-weight: 600; }
+.history-filter-field select, .history-filter-field input { min-height: 38px; width: 100%; max-width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: white; color: var(--ink); font: inherit; }
+.history-outcome-filter { max-width: 330px; margin: 12px 0; }
+.history-explanation h3, .history-explanation p { white-space: normal; overflow-wrap: anywhere; }
+.history-explanation { border-top: 1px solid var(--line); }
+.history-pagination span { flex: 1; text-align: center; white-space: normal; }

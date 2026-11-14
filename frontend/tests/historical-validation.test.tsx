@@ -23,6 +23,7 @@ test("saved rank and pending outcome remain clear in keyboard-accessible inline 
   account.focus();
   await userEvent.keyboard("{Enter}");
   expect(account).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("region", {name:"Test business historical explanation"}).closest("table")).toBeNull();
   expect(screen.getByText(/rank #20 among 78 accounts/)).toBeVisible();
   expect(screen.getByText(/Pending complete and verified actual SI coverage/)).toBeVisible();
   expect(screen.getByText(/do not identify which business factor/)).toBeVisible();
