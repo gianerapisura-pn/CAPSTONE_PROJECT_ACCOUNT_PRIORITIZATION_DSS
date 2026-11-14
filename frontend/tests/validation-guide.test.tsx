@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AdditionalValidation } from "@/components/additional-validation";
+import { AdditionalValidation, featureSetExplanation } from "@/components/additional-validation";
 import { ValidationGuide, validationGuides, validationContexts, validationFinding } from "@/components/validation-guide";
 
 test.each(Object.keys(validationGuides) as Array<keyof typeof validationGuides>)("%s is compact by default with optional technical details", async topic => {
@@ -51,5 +51,29 @@ test("findings summarize saved results without changing rows or inventing succes
   expect(validationFinding("sensitivity", [{ mean_spearman: null }])).toContain("unavailable");
   expect(validationFinding("backtest", [])).toBeNull();
   expect(validationFinding("bootstrap", [{ ci_2_5: NaN, ci_97_5: Infinity }])).toBe("Saved uncertainty bounds are unavailable.");
+  expect(JSON.stringify(rows)).toBe(before);
+});
+
+
+test("predictor names explain omissions, input windows and the four-input diagnostic without changing evidence", async () => {
+  const rows = [
+    {experiment:"all_7",n_features:7,features:"recency_days;frequency_24m",outer_folds:3,mean_macro_f1:.8,delta_macro_f1_vs_all_7:0},
+    {experiment:"without_account_activity_gap",n_features:6,features:"recency_days;frequency_24m",outer_folds:3,mean_macro_f1:.77,delta_macro_f1_vs_all_7:-.03},
+    {experiment:"four_mcs",n_features:4,features:"recency_days;frequency_24m;monetary_24m;avg_settlement_days",outer_folds:3,mean_macro_f1:.71,delta_macro_f1_vs_all_7:-.09},
+  ];
+  const before=JSON.stringify(rows);
+  render(<AdditionalValidation branch="predictive" evidence={{feature_ablation_summary:rows}} referenceDate="2025-12-31" />);
+  const label=screen.getByRole("button",{name:"Without gap between latest purchases"});
+  await userEvent.hover(label);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent("Days between the two latest valid Sales Invoice dates");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("feature_ablation_summary.csv");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("3 chronological evaluation folds");
+  await userEvent.unhover(label);
+  await userEvent.click(screen.getByRole("button",{name:"Four purchasing and settlement inputs"}));
+  expect(screen.getByRole("tooltip")).toHaveTextContent("not an MCS ranking");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("does not train a model");
+  expect(featureSetExplanation({experiment:"rfm_only"}).title).toBe("RFM inputs only");
+  expect(featureSetExplanation({experiment:"without_recent_monetary_value_12m"}).basis).toContain("12 months before the cutoff");
+  expect(featureSetExplanation({experiment:"unknown_set"}).note).toContain("Diagnostic comparison only");
   expect(JSON.stringify(rows)).toBe(before);
 });

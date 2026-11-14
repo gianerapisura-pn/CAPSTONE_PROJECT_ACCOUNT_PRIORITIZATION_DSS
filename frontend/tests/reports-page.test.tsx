@@ -226,7 +226,12 @@ test("validation evidence starts expanded and remains manually collapsible", asy
   render(<ReportsPage />);
   await user.click(screen.getByRole("tab", { name: "Analytics Validation" }));
   const disclosures = document.querySelectorAll("#validation-findings details.native-evidence-details");
-  expect(disclosures).toHaveLength(8);
+  expect(disclosures).toHaveLength(7);
+  const navigation = screen.getByRole("navigation", { name: "Analytics Validation sections" });
+  for (const link of within(navigation).getAllByRole("link")) {
+    expect(document.querySelector(link.getAttribute("href")!)).not.toBeNull();
+  }
+  expect(screen.getByRole("heading", { name: "Weights, backtests and robustness" }).closest("details")).toBeNull();
   for (const disclosure of disclosures) expect(disclosure).toHaveAttribute("open");
   const summary = screen.getByText("Model selection and historical classification evidence");
   await user.click(summary);

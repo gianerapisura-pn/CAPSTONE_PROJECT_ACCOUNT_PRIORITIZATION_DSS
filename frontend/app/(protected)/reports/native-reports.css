@@ -135,12 +135,44 @@
 .annual-ranking-table .history-number { text-align: right; font-variant-numeric: tabular-nums; }
 .annual-ranking-section .history-pagination { margin: 0; padding: 12px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 .annual-outcomes-section { min-width: 0; max-width: 100%; border: 1px solid var(--line); border-radius: 8px; background: #fff; overflow: hidden; }
-.annual-outcomes-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; border: 0; background: transparent; padding: 14px 16px; text-align: left; color: var(--green-dark); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-.annual-outcomes-toggle:focus-visible { outline: 2px solid var(--green); outline-offset: -3px; }
-.history-chevron { flex: 0 0 8px; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); }
-.annual-outcomes-toggle[aria-expanded="true"] .history-chevron { transform: rotate(45deg); }
 .annual-outcomes-content { min-width: 0; padding: 0 16px 16px; border-top: 1px solid var(--line); }
 .annual-outcomes-content > .native-note { margin: 12px 0; line-height: 1.6; }
 .annual-outcomes-content .annual-outcomes-table { table-layout: fixed; width: 100%; min-width: 620px; }
 .annual-outcomes-table th:not(:first-child), .annual-outcomes-table td { text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 700px) { .history-toolbar { grid-template-columns: minmax(0, 1fr); gap: 12px; } .annual-ranking-section .history-pagination { gap: 8px; } }
+
+/* Validation reading order and typography stay scoped to this report. */
+.analytics-validation { color: var(--ink); }
+.validation-introduction { padding: 20px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.validation-introduction h2 { margin: 0 0 8px; }
+.validation-introduction p { margin: 0 0 14px; font-size: 13px; line-height: 1.65; }
+.validation-introduction > p:last-child { margin-bottom: 0; }
+.validation-roadmap { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+.validation-roadmap a { display: grid; align-content: start; gap: 5px; padding: 14px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: #f7f9fa; font-size: 13px; line-height: 1.5; }
+.validation-roadmap a:hover { border-color: #8da6ad; background: #eef3f5; }
+.validation-roadmap span { color: #435466; font-size: 12px; }
+.analytics-validation .validation-group { gap: 18px; padding-top: 12px; }
+.analytics-validation .validation-group > h2 { padding-bottom: 10px; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 20px; }
+.analytics-validation .native-note, .analytics-validation .fine-print, .analytics-validation .native-chart-caption, .analytics-validation .native-chart-heading p { font-size: 13px; line-height: 1.65; color: #435466; overflow-wrap: anywhere; }
+.analytics-validation .native-chart-heading { min-height: 0; margin-bottom: 14px; }
+.analytics-validation .native-chart-heading h3 { font-size: 16px; line-height: 1.45; color: var(--ink); }
+.analytics-validation .native-chart-axes { font-size: 12px; line-height: 1.6; margin-top: 12px; }
+.analytics-validation .section-heading h2, .analytics-validation .annual-outcomes-section h2 { color: var(--ink); font-size: 17px; line-height: 1.45; }
+.annual-outcomes-section > .section-heading { margin: 0; padding: 14px 16px; }
+.analytics-validation table th { white-space: normal; line-height: 1.5; vertical-align: middle; font-size: 12px; text-transform: none; letter-spacing: 0; color: #354454; }
+.analytics-validation table td { line-height: 1.6; font-size: 13px; vertical-align: middle; }
+.analytics-validation table td:first-child { white-space: normal; overflow-wrap: anywhere; }
+.analytics-validation .feature-comparison-table { table-layout: fixed; width: 100%; min-width: 640px; }
+.feature-comparison-table th:first-child { width: 43%; }
+.feature-comparison-table th:nth-child(2) { width: 13%; }
+.feature-comparison-table th:nth-child(3) { width: 19%; }
+.feature-comparison-table th:nth-child(4) { width: 25%; }
+.feature-comparison-table th:not(:first-child), .feature-comparison-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+.analytics-validation .validation-table-hint { padding: 0 16px 12px; }
+.validation-robustness { display: grid; gap: 14px; min-width: 0; padding-top: 20px; border-top: 1px solid var(--line); }
+.validation-robustness > h3 { margin: 0; font-size: 18px; color: var(--ink); }
+.validation-group, .validation-robustness { scroll-margin-top: 110px; }
+/* Mouse clicks do not paint a box around whole charts; keyboard focus stays visible. */
+.analytics-validation:focus:not(:focus-visible), .analytics-validation .insight-target:focus:not(:focus-visible), .analytics-validation .recharts-wrapper:focus:not(:focus-visible), .analytics-validation .recharts-surface:focus:not(:focus-visible) { outline: none; box-shadow: none; }
+.analytics-validation:focus-visible, .analytics-validation .insight-target:focus-visible, .analytics-validation .recharts-wrapper:focus-visible, .analytics-validation .recharts-surface:focus-visible { outline: 2px solid #2864a7; outline-offset: 2px; }
+@media (max-width: 700px) { .validation-roadmap { grid-template-columns: minmax(0, 1fr); gap: 8px; } .validation-introduction { padding: 16px; } .analytics-validation .native-chart { padding: 14px 10px; } }

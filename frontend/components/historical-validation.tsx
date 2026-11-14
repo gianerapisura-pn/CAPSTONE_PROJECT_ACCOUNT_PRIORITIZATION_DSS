@@ -70,15 +70,14 @@ export function AnnualRankingHistory() {
 }
 
 export function AnnualGroupOutcomes({ rows }: { rows: Row[] }) {
-  const [open, setOpen] = useState(false);
   const years = [...new Set(rows.map(row => Number(row.year)).filter(Number.isFinite))].sort((a, b) => a - b);
   const [year, setYear] = useState("");
   const selected = year || String(years.at(-1) ?? "");
   const order = ["High", "Medium", "Low"];
   const visible = rows.filter(row => String(row.year) === selected).sort((a, b) => order.indexOf(String(a.priority_group)) - order.indexOf(String(b.priority_group)));
   return <section className="annual-outcomes-section" aria-label="Annual priority group outcomes">
-    <button type="button" className="annual-outcomes-toggle" aria-expanded={open} aria-controls={open ? "annual-outcomes-content" : undefined} onClick={() => setOpen(value => !value)}><span>View annual breakdown{years.length > 0 ? ` (${years[0]}–${years.at(-1)})` : ""}</span><span className="history-chevron" aria-hidden="true" /></button>
-    {open && <div id="annual-outcomes-content" className="annual-outcomes-content">
+    <div className="section-heading"><h2>Annual Priority Group Outcomes{years.length > 0 ? ` (${years[0]}–${years.at(-1)})` : ""}</h2></div>
+    <div className="annual-outcomes-content">
     <p className="native-note">The pooled table combines completed historical years. This breakdown shows where an individual year differed. Priority Group gives a relative review order; it does not guarantee subsequent sales.</p>
     {years.length ? <>
       <label className="history-filter-field history-outcome-filter">Group-outcome cutoff year<select value={selected} onChange={event => setYear(event.target.value)}>{years.map(value => <option key={value} value={value}>{value} cutoff → {value + 1} outcomes</option>)}</select></label>
@@ -87,6 +86,6 @@ export function AnnualGroupOutcomes({ rows }: { rows: Row[] }) {
         <td><ExplainedValue explanation={{ title: "Share of subsequent SI value", basis: `${selected} cutoff; the following 12 months.`, calculation: `${money.format(Number(row.next_year_sales))} group SI value ÷ ${money.format(Number(row.universe_sales))} total eligible SI value × 100 = ${percent(row.sales_capture)}.`, note: "This measures recorded Sales Invoice value, not buyer count or collected cash. Large purchases can give lower-priority groups a large value share." }}>{percent(row.sales_capture)}</ExplainedValue></td>
       </tr>)}</tbody></table></div>
     </> : <p>Verified annual group outcomes are unavailable.</p>}
-    </div>}
+    </div>
   </section>;
 }
