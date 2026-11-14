@@ -1,0 +1,23 @@
+{
+  "case_id": "CLIENT-UAT-05",
+  "record_type": "Client feedback relayed by the project representative in this conversation",
+  "reported_result": "PASS - user reports that the client completed all three checks and reported no problems",
+  "reported_checks": {
+    "historical_rankings_and_annual_group_outcomes": "Yes",
+    "understanding_of_results_and_explanations": "Yes",
+    "available_export_used": "Yes",
+    "problems_or_unclear_information_reported": "None"
+  },
+  "actual_session_date": null,
+  "client_name_and_role": null,
+  "actual_tested_url": null,
+  "actual_tested_build": null,
+  "researcher_approval": "Not recorded in this receipt",
+  "tracker_update": "Not performed",
+  "remaining_record_actions": [
+    "Enter the actual session date, client identity/role, URL and authentic tested-build evidence in the existing Retest Log.",
+    "Have the authorized researcher review the record and reconcile Researcher Review and Change Control."
+  ],
+  "original_six_uat_responses": "Retain unchanged; no repeat full survey is required for this reported targeted retest.",
+  "evidence_limit": "This receipt preserves the feedback supplied in the conversation. It is not a recording, direct observation, signed approval or proof of the session build."
+}
