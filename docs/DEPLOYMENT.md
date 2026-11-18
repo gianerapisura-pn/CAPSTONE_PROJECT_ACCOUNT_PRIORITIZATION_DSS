@@ -8,7 +8,7 @@ Register the private frozen artifact using the controlled local registration uti
 
 ## Frontend
 
-Configure NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SUPABASE_URL, and NEXT_PUBLIC_SUPABASE_ANON_KEY. Never expose the service-role key. Configure only an organizational app.powerbi.com report URL; Publish-to-Web URLs are rejected.
+Configure NEXT_PUBLIC_API_URL, NEXT_PUBLIC_SUPABASE_URL, and NEXT_PUBLIC_SUPABASE_ANON_KEY. Never expose the service-role key. Detailed Analytics is served within the Web DSS through Management Overview, Account & Prioritization Insights, and Analytics Validation. All three native views read the approved successful publication; no external Power BI report URL is required.
 
 Keep `NEXT_PUBLIC_DEMO_MODE=false` for real Supabase sign-in. To retain the demo button, set `NEXT_PUBLIC_DEMO_API_URL` to a separately deployed `DEMO_MODE=true` backend with isolated data. If that URL is absent, the demo button is hidden and marked demo sessions cannot use the production API. Do not point the demo URL at the production backend.
 
@@ -16,10 +16,12 @@ Keep `NEXT_PUBLIC_DEMO_MODE=false` for real Supabase sign-in. To retain the demo
 
 Apply the 18 timestamped migrations in order and verify latest-successful-run and final-study views plus RLS using a dedicated reporting login. Migration 20260930090015 adds server-only Power BI refresh state; grant no access to the reporting reader. Migration 20260930090016 provisions the two private storage buckets. Migration 20261007090017 adds package provenance to future run snapshots. Migration 20261012090018 adds CatBoost-aligned predictive reporting and closure provenance without rewriting old publications.
 
-## Power BI automatic refresh
+## Native reporting publication
 
-The integration is disabled by default and in demo mode. Follow `docs/POWER_BI_SETUP.md` for one-time PBIX, service-principal, workspace, reporting-reader, and credential setup. Put `POWER_BI_AUTO_REFRESH_ENABLED`, `POWER_BI_TENANT_ID`, `POWER_BI_CLIENT_ID`, `POWER_BI_CLIENT_SECRET`, `POWER_BI_WORKSPACE_ID`, and `POWER_BI_DATASET_ID` only in the backend secret store. Publish a test analytical run, verify that the reporting-page status reaches Completed, and reconcile the actual report data. Do not interpret an accepted refresh request as a completed report update.
+After an authorized successful analytical publication, verify that Account Prioritization and all three native Detailed Analytics views read the same published run and analysis reference, including after reload. Reconcile displayed values and permitted exports with the stored results. Preview and failed runs must not replace the latest successful publication. Use an authorized isolated staging environment for synthetic later-year import and recovery checks.
+
+`docs/POWER_BI_SETUP.md` is a historical specification. PBIX publication, Microsoft credentials and Power BI refresh are not prerequisites for the current native-reporting deployment. Retained legacy database objects do not enable or require an external refresh workflow.
 
 ## Release checks
 
-Run pytest; npm test; npm run lint; npm run typecheck; npm run build; and npm run test:e2e. Then execute authorized live Supabase checks, PBIX refresh/reconciliation, later-year/new-account import, generation-time measurement, and role-based UAT. Static tests do not complete those external actions.
+Run pytest; npm test; npm run lint; npm run typecheck; npm run build; and npm run test:e2e as applicable to the release changes. Verify authorized live Supabase access, native reporting and export reconciliation, and role-relevant behavior. Use isolated staging for later-year/new-account import and same-run reporting continuity. Retain existing evidence for unchanged paths; repeat affected checks when code, configuration or data changes warrant it. Report any recorded timing by its actual measurement scope. Technical checks remain separate from actual client UAT and reviewer decisions; static tests do not establish those external outcomes.
