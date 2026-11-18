@@ -102,7 +102,7 @@ test("yearly score-value association is not described as perturbation rank agree
   render(<AdditionalValidation branch="prescriptive" evidence={{
     fps_future_relationship: [{ year: 2021, auc_fps_for_next_year_purchase: .6, spearman_fps_vs_next_year_si: -.1234 }],
   }} referenceDate="2025-12-31" />);
-  await userEvent.click(screen.getByText("Supporting evidence: yearly FPS and recency-only diagnostics"));
+  expect(screen.getByText("Supporting evidence: yearly FPS and recency-only diagnostics").closest("details")).toHaveAttribute("open");
   await userEvent.click(screen.getByRole("button", { name: "-0.1234" }));
   const help = screen.getByRole("tooltip");
   expect(help).toHaveTextContent("2021 historical follow-up");
