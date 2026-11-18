@@ -7,6 +7,7 @@ import { accountInterpretation, displayedNumber, scalarInterpretation } from "@/
 
 // Removing a tooltip can expose another value beneath a stationary cursor.
 let hoverDismissedUntilMovement = false;
+let interactiveExplanationId: string | null = null;
 function resumeExplanationHover() { hoverDismissedUntilMovement = false; }
 
 export type ResultExplanation = {
@@ -158,6 +159,7 @@ export function ExplainedValue({ children, explanation, className = "", inline =
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerType = useRef("");
   const dismissed = useRef(false);
+  const interacting = useRef(false);
   const id = useId();
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const [open, setOpen] = useState(false);
@@ -167,7 +169,18 @@ export function ExplainedValue({ children, explanation, className = "", inline =
   }
   function scheduleClose() {
     cancelClose();
-    closeTimer.current = setTimeout(() => setOpen(false), 250);
+    if (interacting.current) return;
+    closeTimer.current = setTimeout(() => {
+      if (!interacting.current && !cardRef.current?.contains(document.activeElement)) setOpen(false);
+    }, 250);
+  }
+  function keepOpen() {
+    cancelClose();
+    interacting.current = true;
+    interactiveExplanationId = id;
+  }
+  function canHover() {
+    return !interactiveExplanationId || interactiveExplanationId === id;
   }
   useEffect(() => {
     if (!open) return;
@@ -203,7 +216,7 @@ export function ExplainedValue({ children, explanation, className = "", inline =
     window.addEventListener("scroll", closeOnPageScroll, true);
     const closeOnResize = () => setOpen(false);
     window.addEventListener("resize", closeOnResize);
-    return () => { window.removeEventListener("peslc-result-explanation-open", closeForAnotherResult); window.removeEventListener("keydown", close); window.removeEventListener("pointerdown", closeOnOutsidePress); window.removeEventListener("scroll", closeOnPageScroll, true); window.removeEventListener("resize", closeOnResize); };
+    return () => { interacting.current = false; if (interactiveExplanationId === id) interactiveExplanationId = null; window.removeEventListener("peslc-result-explanation-open", closeForAnotherResult); window.removeEventListener("keydown", close); window.removeEventListener("pointerdown", closeOnOutsidePress); window.removeEventListener("scroll", closeOnPageScroll, true); window.removeEventListener("resize", closeOnResize); };
   }, [open, id]);
   useEffect(() => () => cancelClose(), []);
   useLayoutEffect(() => {
@@ -233,16 +246,17 @@ export function ExplainedValue({ children, explanation, className = "", inline =
   return <>
     <span ref={ref} className={`explained-value ${inline ? "" : "explained-value-block"} ${className}`} tabIndex={0} role="button" aria-expanded={open} aria-describedby={open ? id : undefined}
       onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); dismissed.current = false; if (open) setOpen(false); else show(); } }}
-      onPointerEnter={event => { if (event.pointerType !== "touch" && !hoverDismissedUntilMovement) show(); }}
-      onPointerMove={event => { if (hoverDismissedUntilMovement && event.pointerType !== "touch") { resumeExplanationHover(); show(); } }}
+      onPointerEnter={event => { if (event.pointerType !== "touch" && !hoverDismissedUntilMovement && canHover()) show(); }}
+      onPointerMove={event => { if (hoverDismissedUntilMovement && event.pointerType !== "touch" && canHover()) { resumeExplanationHover(); show(); } }}
       onPointerLeave={() => { dismissed.current = false; scheduleClose(); }} onFocus={() => { if (pointerType.current !== "touch") show(); }} onBlur={() => { dismissed.current = false; scheduleClose(); }}
       onPointerDown={event => { pointerType.current = event.pointerType; }}
-      onClick={event => { event.preventDefault(); event.stopPropagation(); dismissed.current = false; if (!open) show(); else if (pointerType.current === "touch") setOpen(false); pointerType.current = ""; }}>
+      onClick={event => { event.preventDefault(); event.stopPropagation(); dismissed.current = false; if (!open) { show(); keepOpen(); } else if (pointerType.current === "touch") setOpen(false); else keepOpen(); pointerType.current = ""; }}>
       {children}
     </span>
     {open && position && createPortal(<div ref={cardRef} id={id} role="tooltip" tabIndex={0} className={`result-explanation${explanation.compact ? " result-explanation-compact" : ""}`} style={{ left: position.left, top: position.top }}
-      onPointerEnter={cancelClose} onPointerLeave={scheduleClose} onFocus={cancelClose} onBlur={scheduleClose}
-      onClick={event => { event.stopPropagation(); }}>
+      onPointerEnter={cancelClose} onPointerLeave={scheduleClose} onPointerDownCapture={keepOpen} onFocus={keepOpen}
+      onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) scheduleClose(); }}
+      onClick={event => { keepOpen(); event.stopPropagation(); }}>
       <span className="result-explanation-eyebrow">About this result</span>
       <strong>{explanation.title}</strong>
       {explanation.compact && explanation.interpretation && <p className="result-interpretation">{explanation.interpretation}</p>}

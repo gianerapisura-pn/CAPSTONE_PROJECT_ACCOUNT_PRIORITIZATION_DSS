@@ -126,3 +126,72 @@ test("missing or unreconciled evidence retains saved values and reports the limi
   expect(resultExplanation("normalized_recency", normalizedRow, conflicting).note).toContain("administrator review");
   expect(resultExplanation("normalized_recency", normalizedRow, conflicting).inputs).toBeUndefined();
 });
+
+
+test("expanding calculation details survives layout pointer leave and pending anchor blur", () => {
+  vi.useFakeTimers();
+  try {
+    render(<ResultValue metric="frequency">12 invoices</ResultValue>);
+    const value = screen.getByText("12 invoices");
+    fireEvent.pointerMove(window);
+    fireEvent.pointerEnter(value);
+    const card = screen.getByRole("tooltip");
+    const summary = screen.getByText("Definition and calculation");
+    fireEvent.pointerLeave(value);
+    fireEvent.pointerDown(summary);
+    fireEvent.blur(value, {relatedTarget:summary});
+    fireEvent.click(summary);
+    fireEvent.pointerLeave(card);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.getByRole("tooltip")).toBe(card);
+    expect(summary.closest("details")).toHaveAttribute("open");
+    expect(card).toHaveTextContent("Count each eligible invoice once");
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  } finally { vi.useRealTimers(); }
+});
+
+test("keyboard focus and touch keep expanded details readable until explicit dismissal", () => {
+  vi.useFakeTimers();
+  try {
+    render(<ResultValue metric="frequency">12 invoices</ResultValue>);
+    const value = screen.getByText("12 invoices");
+    fireEvent.focus(value);
+    const card = screen.getByRole("tooltip");
+    const summary = screen.getByText("Definition and calculation");
+    fireEvent.blur(value, {relatedTarget:card});
+    fireEvent.focus(card);
+    fireEvent.blur(card, {relatedTarget:summary});
+    fireEvent.focus(summary);
+    fireEvent.click(summary);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.getByRole("tooltip")).toBe(card);
+    expect(summary.closest("details")).toHaveAttribute("open");
+    fireEvent.keyDown(window, {key:"Escape"});
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    fireEvent.pointerDown(value, {pointerType:"touch"});
+    fireEvent.click(value);
+    fireEvent.pointerLeave(value);
+    act(() => vi.advanceTimersByTime(1000));
+    const touchSummary=screen.getByText("Definition and calculation");
+    fireEvent.pointerDown(touchSummary, {pointerType:"touch"});
+    fireEvent.click(touchSummary);
+    fireEvent.pointerLeave(screen.getByRole("tooltip"));
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+  } finally { vi.useRealTimers(); }
+});
+
+test("an interacted explanation is not replaced by values exposed during expansion", () => {
+  render(<><ResultValue metric="frequency">12 invoices</ResultValue><ResultValue metric="recency">140 days</ResultValue></>);
+  fireEvent.pointerMove(window);
+  fireEvent.pointerEnter(screen.getByText("12 invoices"));
+  const summary=screen.getByText("Definition and calculation");
+  fireEvent.pointerDown(summary);
+  fireEvent.click(summary);
+  fireEvent.pointerEnter(screen.getByText("140 days"));
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Count each eligible invoice once");
+  fireEvent.click(screen.getByText("140 days"));
+  expect(screen.getAllByRole("tooltip")).toHaveLength(1);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("140 days separate");
+});
