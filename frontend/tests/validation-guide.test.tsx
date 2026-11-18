@@ -77,3 +77,36 @@ test("predictor names explain omissions, input windows and the four-input diagno
   expect(featureSetExplanation({experiment:"unknown_set"}).note).toContain("Diagnostic comparison only");
   expect(JSON.stringify(rows)).toBe(before);
 });
+
+
+test("group value shares explain the whole group and preserve the recorded incidence denominator", async () => {
+  const evidence = { group_pooled_outcomes: [
+    { priority_group: "High", future_buyer_account_years: 2, account_years: 10, purchase_incidence: .2, sales_capture: .3 },
+    { priority_group: "Low", future_buyer_account_years: 1, account_years: 8, purchase_incidence: .125, sales_capture: .1 },
+  ] };
+  const before = JSON.stringify(evidence);
+  render(<AdditionalValidation branch="prescriptive" evidence={evidence} referenceDate="2025-12-31" />);
+  await userEvent.click(screen.getByRole("button", { name: "30.00%" }));
+  const help = screen.getByRole("tooltip");
+  expect(help).toHaveTextContent("High Priority, pooled historical account-years");
+  expect(help).toHaveTextContent("entire Priority Group");
+  expect(help).toHaveTextContent("Saved pooled value share: 30.00%");
+  expect(help).not.toHaveTextContent("selected next-12-month");
+  await userEvent.keyboard("{Escape}");
+  await userEvent.click(screen.getByRole("button", { name: "20.00%" }));
+  expect(screen.getByRole("tooltip")).toHaveTextContent("2 buyer account-years / 10 eligible account-years");
+  expect(JSON.stringify(evidence)).toBe(before);
+});
+
+test("yearly score-value association is not described as perturbation rank agreement", async () => {
+  render(<AdditionalValidation branch="prescriptive" evidence={{
+    fps_future_relationship: [{ year: 2021, auc_fps_for_next_year_purchase: .6, spearman_fps_vs_next_year_si: -.1234 }],
+  }} referenceDate="2025-12-31" />);
+  await userEvent.click(screen.getByText("Supporting evidence: yearly FPS and recency-only diagnostics"));
+  await userEvent.click(screen.getByRole("button", { name: "-0.1234" }));
+  const help = screen.getByRole("tooltip");
+  expect(help).toHaveTextContent("2021 historical follow-up");
+  expect(help).toHaveTextContent("FPS versus next-year invoice value (-0.1234)");
+  expect(help).toHaveTextContent("observed next-year SI value");
+  expect(help).not.toHaveTextContent("before and after a test change");
+});

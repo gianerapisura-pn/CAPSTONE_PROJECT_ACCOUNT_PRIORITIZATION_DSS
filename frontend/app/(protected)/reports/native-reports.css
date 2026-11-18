@@ -176,3 +176,37 @@
 .analytics-validation:focus:not(:focus-visible), .analytics-validation .insight-target:focus:not(:focus-visible), .analytics-validation .recharts-wrapper:focus:not(:focus-visible), .analytics-validation .recharts-surface:focus:not(:focus-visible) { outline: none; box-shadow: none; }
 .analytics-validation:focus-visible, .analytics-validation .insight-target:focus-visible, .analytics-validation .recharts-wrapper:focus-visible, .analytics-validation .recharts-surface:focus-visible { outline: 2px solid #2864a7; outline-offset: 2px; }
 @media (max-width: 700px) { .validation-roadmap { grid-template-columns: minmax(0, 1fr); gap: 8px; } .validation-introduction { padding: 16px; } .analytics-validation .native-chart { padding: 14px 10px; } }
+
+/* A single reading column keeps evidence in sequence and avoids cramped tables. */
+.analytics-validation { gap: 24px; }
+.analytics-validation .validation-group { gap: 24px; }
+.analytics-validation .validation-group > h2 { font-size: 21px; line-height: 1.45; margin-top: 12px; }
+.analytics-validation .validation-context > h2 { margin: 0 0 12px; font-size: 17px; line-height: 1.45; }
+.analytics-validation .native-table-section { border: 1px solid var(--line); border-radius: 8px; background: #fff; overflow: hidden; }
+.analytics-validation .section-heading { padding: 16px 16px 0; margin: 0; }
+.analytics-validation .section-heading h2 { margin: 0; }
+.analytics-validation .native-chart-grid { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+.analytics-validation .native-chart-canvas { max-width: 900px; width: 100%; margin-inline: auto; }
+.analytics-validation .native-table-section table { min-width: 620px; }
+.analytics-validation table th { background: #f3f6f8; }
+.analytics-validation table td, .analytics-validation table th { padding: 12px 16px; }
+.analytics-validation table tbody tr:nth-child(even) { background: #fafcfd; }
+.analytics-validation table td:not(:first-child) { font-variant-numeric: tabular-nums; }
+.analytics-validation .validation-finding { padding: 16px; border: 1px solid #d8e3e8; border-radius: 8px; background: #f5f8fa; }
+.analytics-validation .validation-finding h3 { color: var(--ink); font-size: 16px; line-height: 1.5; }
+.analytics-validation .validation-finding p { color: #354454; }
+.analytics-validation .native-evidence-details { padding: 16px; }
+.analytics-validation .native-evidence-details > summary { font-size: 14px; line-height: 1.6; color: var(--ink); }
+.analytics-validation .native-evidence-details[open] > summary { margin-bottom: 16px; }
+.analytics-validation .validation-robustness { gap: 24px; padding-top: 28px; }
+.analytics-validation .explained-value { text-underline-offset: 4px; }
+.analytics-validation .report-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.analytics-validation .report-facts > div { min-width: 0; align-content: start; gap: 8px; }
+.analytics-validation .report-facts > div > span { font-size: 12px; line-height: 1.5; color: #435466; }
+@media (max-width: 700px) {
+  .analytics-validation .report-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .analytics-validation .validation-group { gap: 18px; }
+  .analytics-validation .validation-group > h2 { font-size: 19px; }
+  .analytics-validation .native-evidence-details { padding: 12px; }
+  .analytics-validation table td, .analytics-validation table th { padding: 10px 12px; }
+}

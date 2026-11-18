@@ -221,29 +221,33 @@ test("RFM component and score filter one criterion and preserve link scope", asy
   expect(within(screen.getByLabelText("Active filters")).getByRole("status")).toHaveTextContent("3 matching accounts");
 });
 
-test("validation evidence starts expanded and remains manually collapsible", async () => {
+test("validation shows core evidence and keeps advanced diagnostics optional", async () => {
   const user = userEvent.setup();
   render(<ReportsPage />);
   await user.click(screen.getByRole("tab", { name: "Analytics Validation" }));
   const disclosures = document.querySelectorAll("#validation-findings details.native-evidence-details");
-  expect(disclosures).toHaveLength(7);
+  expect(disclosures).toHaveLength(6);
   const navigation = screen.getByRole("navigation", { name: "Analytics Validation sections" });
   for (const link of within(navigation).getAllByRole("link")) {
     expect(document.querySelector(link.getAttribute("href")!)).not.toBeNull();
   }
-  expect(screen.getByRole("heading", { name: "Weights, backtests and robustness" }).closest("details")).toBeNull();
-  for (const disclosure of disclosures) expect(disclosure).toHaveAttribute("open");
+  expect(screen.getByRole("heading", { name: "3. How stable is the review order?" }).closest("details")).toBeNull();
+  for (const disclosure of disclosures) {
+    const core = disclosure.querySelector("summary")?.textContent === "Model selection and historical classification evidence";
+    expect(disclosure.hasAttribute("open")).toBe(core);
+  }
   const summary = screen.getByText("Model selection and historical classification evidence");
   await user.click(summary);
   expect(summary.closest("details")).not.toHaveAttribute("open");
   await user.click(summary);
   expect(summary.closest("details")).toHaveAttribute("open");
   expect(screen.getByRole("heading", { name: "Prediction Horizon Comparison" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Prediction Horizon Comparison" }).querySelector("[role=button]")).toBeNull();
   expect(screen.getByRole("heading", { name: "Model Benchmark: Mean Macro F1" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Development observations by cutoff year" })).toBeInTheDocument();
   expect(screen.getByText("Development class evidence is unavailable for this registered model.")).toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "Historical lookback comparison" })).not.toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Prescriptive robustness and historical usefulness" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "What determines the Final Priority Score?" })).toBeInTheDocument();
   expect(screen.queryByText(/Stage 4 Extra Trees horizon screen/)).not.toBeInTheDocument();
   expect(screen.queryByText(/below-random years remain visible/)).not.toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Sensitivity: Mean Spearman Rank Correlation" })).toBeInTheDocument();
@@ -268,6 +272,7 @@ test("CRITIC influence shows ten rows per page without changing saved results", 
   render(<ReportsPage />);
   await user.click(screen.getByRole("tab", { name: "Analytics Validation" }));
   const panel = screen.getByText("Leave-one-account-out CRITIC influence (23)").closest("details")!;
+  await user.click(panel.querySelector("summary")!);
   const scope = within(panel);
   const bodyRows = () => panel.querySelectorAll("tbody tr");
   expect(scope.queryByRole("columnheader",{name:"Recomputed weights"})).not.toBeInTheDocument();
@@ -293,6 +298,8 @@ test("empty CRITIC influence has no phantom page or active navigation", async ()
   render(<ReportsPage />);
   await userEvent.setup().click(screen.getByRole("tab", { name: "Analytics Validation" }));
   const panel = screen.getByText("Leave-one-account-out CRITIC influence (0)").closest("details")!;
+  await userEvent.click(panel.querySelector("summary")!);
+  for (const label of ["Historical criterion-removal checks (0)", "Priority boundary movement observations (0)"]) await userEvent.click(screen.getByText(label));
   expect(panel.querySelectorAll("tbody tr")).toHaveLength(0);
   expect(within(panel).getByText("Showing 0-0 of 0")).toBeInTheDocument();
   expect(within(panel).getByRole("button", { name: "Previous influence page" })).toBeDisabled();
@@ -314,6 +321,8 @@ test("historical checks and boundary observations have independent ten-row pages
   await user.click(screen.getByRole("tab", { name: "Analytics Validation" }));
   const historical = screen.getByText("Historical criterion-removal checks (23)").closest("details")!;
   const boundary = screen.getByText("Priority boundary movement observations (31)").closest("details")!;
+  await user.click(historical.querySelector("summary")!);
+  await user.click(boundary.querySelector("summary")!);
   for (const [panel, label, total] of [[historical, "historical criterion-removal", 23], [boundary, "boundary movement", 31]] as const) {
     const scope = within(panel);
     expect(panel.querySelectorAll("tbody tr")).toHaveLength(10);
