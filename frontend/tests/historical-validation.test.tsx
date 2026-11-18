@@ -87,6 +87,8 @@ test("annual groups are always visible, retain exceptions and explain their deno
   expect(await screen.findByText(/1 subsequent buyers ÷ 22 accounts/)).not.toBeVisible();
   await userEvent.click(screen.getByText("Definition and calculation"));
   expect(await screen.findByText(/1 subsequent buyers ÷ 22 accounts/)).toBeVisible();
+  expect(screen.getByRole("tooltip")).toHaveTextContent("1 of 22 Low Priority accounts");
+  await userEvent.keyboard("{Escape}");
   await userEvent.hover(screen.getByText("64.69%"));
   expect(screen.getByRole("tooltip").querySelector(".result-interpretation")).toHaveTextContent("64.69%");
   await userEvent.click(screen.getByText("Definition and calculation"));
