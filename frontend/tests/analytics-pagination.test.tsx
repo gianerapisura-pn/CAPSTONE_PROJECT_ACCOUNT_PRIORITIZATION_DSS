@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, vi } from "vitest";
 import RfmPage from "@/app/(protected)/analytics/rfm/page";
@@ -27,6 +27,16 @@ for (const [name, Component, path, file] of [
     const before = JSON.stringify(rows);
     const view = render(<Component />);
     expect(screen.getByText("Table order: Account Name (A-Z). This is not a ranking.")).toBeInTheDocument();
+    if (name === "RFM") {
+      const firstRow = document.querySelector("tbody tr")! as HTMLElement;
+      const invoiceValue = within(firstRow).getByText("4", {selector:"span.explained-value"});
+      await user.click(invoiceValue);
+      await user.click(screen.getByText("Definition and calculation"));
+      expect(screen.getByRole("tooltip")).toHaveTextContent("across the available history: 4.");
+      expect(screen.getByRole("tooltip")).toHaveTextContent("2030-12-31");
+      expect(screen.getByRole("tooltip")).not.toHaveTextContent("unavailable");
+      await user.keyboard("{Escape}");
+    }
     const displayedNames = () => [...document.querySelectorAll("tbody tr td:first-child")].map(cell => cell.textContent);
     const allNames = [...displayedNames()];
     expect(document.querySelectorAll("tbody tr")).toHaveLength(10);
