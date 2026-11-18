@@ -2,6 +2,7 @@
 
 import { Info, Scale } from "lucide-react";
 import { PageHeader, PageState } from "@/components/page-state";
+import { ValidationValue } from "@/components/validation-value";
 import { ResultValue } from "@/components/result-explanation";
 import { useApi } from "@/lib/use-api";
 import styles from "./sensitivity.module.css";
@@ -62,7 +63,7 @@ export default function SensitivityPage() {
                 </div>
               </details>
             </div>
-            <div className="table-wrap"><table><thead><tr><th>Relative range</th><th>Iterations</th><th>Mean Spearman</th><th>Minimum</th><th>Maximum</th><th>Average group movement</th><th>Maximum movement</th></tr></thead><tbody>{data.summaries.map((row) => <tr key={row.weight_range}><td><strong><ResultValue metric="scenarios">+/-{row.weight_range * 100}%</ResultValue></strong></td><td><ResultValue metric="scenarios">{row.iterations}</ResultValue></td><td><ResultValue metric="spearman">{row.mean_spearman.toFixed(4)}</ResultValue></td><td><ResultValue metric="spearman">{row.min_spearman.toFixed(4)}</ResultValue></td><td><ResultValue metric="spearman">{row.max_spearman.toFixed(4)}</ResultValue></td><td><ResultValue metric="movement">{(row.group_movement_rate * 100).toFixed(2)}%</ResultValue></td><td><ResultValue metric="movement">{(row.max_group_movement_rate * 100).toFixed(2)}%</ResultValue></td></tr>)}</tbody></table></div>
+            <div className="table-wrap"><table><thead><tr><th>Relative range</th><th>Iterations</th><th>Mean Spearman</th><th>Minimum</th><th>Maximum</th><th>Average group movement</th><th>Maximum movement</th></tr></thead><tbody>{data.summaries.map((row) => <tr key={row.weight_range}><td><strong><ValidationValue evidence={row} context={`${(row.weight_range * 100).toFixed(0)}% weight-change range`} metric="perturbation">+/-{row.weight_range * 100}%</ValidationValue></strong></td><td><ValidationValue evidence={row} context={`${(row.weight_range * 100).toFixed(0)}% weight-change range`} metric="scenarios">{row.iterations}</ValidationValue></td><td><ValidationValue evidence={row} context={`${(row.weight_range * 100).toFixed(0)}% weight-change range`} metric="spearman" rawValue={row.mean_spearman}>{row.mean_spearman.toFixed(4)}</ValidationValue></td><td><ValidationValue evidence={row} context={`${(row.weight_range * 100).toFixed(0)}% weight-change range`} metric="spearman" rawValue={row.min_spearman}>{row.min_spearman.toFixed(4)}</ValidationValue></td><td><ValidationValue evidence={row} context={`${(row.weight_range * 100).toFixed(0)}% weight-change range`} metric="spearman" rawValue={row.max_spearman}>{row.max_spearman.toFixed(4)}</ValidationValue></td><td><ValidationValue evidence={row} context={`${(row.weight_range * 100).toFixed(0)}% weight-change range`} metric="movement" rawValue={row.group_movement_rate}>{(row.group_movement_rate * 100).toFixed(2)}%</ValidationValue></td><td><ValidationValue evidence={row} context={`${(row.weight_range * 100).toFixed(0)}% weight-change range`} metric="movement" rawValue={row.max_group_movement_rate}>{(row.max_group_movement_rate * 100).toFixed(2)}%</ValidationValue></td></tr>)}</tbody></table></div>
           </section>
         </>}
       </PageState>

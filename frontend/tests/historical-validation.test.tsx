@@ -83,8 +83,13 @@ test("annual groups are always visible, retain exceptions and explain their deno
   const table=screen.getByRole("table");
   expect(within(table).getByText("Low")).toBeVisible();
   await userEvent.hover(screen.getByText("4.55%"));
+  expect(screen.getByRole("tooltip").querySelector(".result-interpretation")).toHaveTextContent("1 of 22 Low Priority accounts");
+  expect(await screen.findByText(/1 subsequent buyers ÷ 22 accounts/)).not.toBeVisible();
+  await userEvent.click(screen.getByText("Definition and calculation"));
   expect(await screen.findByText(/1 subsequent buyers ÷ 22 accounts/)).toBeVisible();
   await userEvent.hover(screen.getByText("64.69%"));
+  expect(screen.getByRole("tooltip").querySelector(".result-interpretation")).toHaveTextContent("64.69%");
+  await userEvent.click(screen.getByText("Definition and calculation"));
   expect(await screen.findByText(/not buyer count or collected cash/)).toBeVisible();
   expect(JSON.stringify(rows)).toBe(before);
   expect(screen.getByRole("table")).toBeVisible();

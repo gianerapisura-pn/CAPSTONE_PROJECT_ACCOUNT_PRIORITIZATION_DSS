@@ -194,3 +194,8 @@
 .history-explanation h3, .history-explanation p { white-space: normal; overflow-wrap: anywhere; }
 .history-explanation { border-top: 1px solid var(--line); }
 .history-pagination span { flex: 1; text-align: center; white-space: normal; }
+
+/* Value help leads with the result; longer evidence remains optional and scrolls within the viewport. */
+.result-explanation-compact{max-height:min(420px,calc(100dvh - 24px));overflow:auto}
+.result-explanation-compact .result-interpretation{font-size:13px;line-height:1.6}
+.result-explanation-compact>details>summary{font-size:12px;line-height:1.5;cursor:pointer;color:var(--green-dark)}

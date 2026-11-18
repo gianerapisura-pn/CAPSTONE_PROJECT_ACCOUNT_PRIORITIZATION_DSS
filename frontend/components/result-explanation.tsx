@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Children, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AccountDecisionRow, NormalizationEvidence } from "@/types/dss";
+import { accountInterpretation, displayedNumber, scalarInterpretation } from "@/lib/result-interpretation";
 
 // Removing a tooltip can expose another value beneath a stationary cursor.
 let hoverDismissedUntilMovement = false;
@@ -16,6 +17,7 @@ export type ResultExplanation = {
   note?: string;
   source?: string;
   interpretation?: string;
+  compact?: boolean;
 };
 
 type Criterion = "recency" | "frequency" | "monetary" | "settlement";
@@ -169,6 +171,10 @@ export function ExplainedValue({ children, explanation, className = "", inline =
   }
   useEffect(() => {
     if (!open) return;
+    const closeForAnotherResult = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== id) { cancelClose(); setOpen(false); }
+    };
+    window.addEventListener("peslc-result-explanation-open", closeForAnotherResult);
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         dismissed.current = true;
@@ -197,8 +203,8 @@ export function ExplainedValue({ children, explanation, className = "", inline =
     window.addEventListener("scroll", closeOnPageScroll, true);
     const closeOnResize = () => setOpen(false);
     window.addEventListener("resize", closeOnResize);
-    return () => { window.removeEventListener("keydown", close); window.removeEventListener("pointerdown", closeOnOutsidePress); window.removeEventListener("scroll", closeOnPageScroll, true); window.removeEventListener("resize", closeOnResize); };
-  }, [open]);
+    return () => { window.removeEventListener("peslc-result-explanation-open", closeForAnotherResult); window.removeEventListener("keydown", close); window.removeEventListener("pointerdown", closeOnOutsidePress); window.removeEventListener("scroll", closeOnPageScroll, true); window.removeEventListener("resize", closeOnResize); };
+  }, [open, id]);
   useEffect(() => () => cancelClose(), []);
   useLayoutEffect(() => {
     if (!open || !cardRef.current || !ref.current || !position) return;
@@ -219,6 +225,7 @@ export function ExplainedValue({ children, explanation, className = "", inline =
     cancelClose();
     const box = ref.current?.getBoundingClientRect();
     if (!box) return;
+    window.dispatchEvent(new CustomEvent("peslc-result-explanation-open", { detail: id }));
     const width = Math.min(420, window.innerWidth - 24);
     setPosition({ left: Math.max(12, Math.min(box.left + box.width / 2 - width / 2, window.innerWidth - width - 12)), top: box.bottom + 8 });
     setOpen(true);
@@ -233,28 +240,36 @@ export function ExplainedValue({ children, explanation, className = "", inline =
       onClick={event => { event.preventDefault(); event.stopPropagation(); dismissed.current = false; if (!open) show(); else if (pointerType.current === "touch") setOpen(false); pointerType.current = ""; }}>
       {children}
     </span>
-    {open && position && createPortal(<div ref={cardRef} id={id} role="tooltip" tabIndex={0} className="result-explanation" style={{ left: position.left, top: position.top }}
+    {open && position && createPortal(<div ref={cardRef} id={id} role="tooltip" tabIndex={0} className={`result-explanation${explanation.compact ? " result-explanation-compact" : ""}`} style={{ left: position.left, top: position.top }}
       onPointerEnter={cancelClose} onPointerLeave={scheduleClose} onFocus={cancelClose} onBlur={scheduleClose}
       onClick={event => { event.stopPropagation(); }}>
       <span className="result-explanation-eyebrow">About this result</span>
       <strong>{explanation.title}</strong>
+      {explanation.compact && explanation.interpretation && <p className="result-interpretation">{explanation.interpretation}</p>}
+      {explanation.compact && explanation.interpretation ? <details className="result-explanation-inputs" onToggle={() => setPosition(current => current ? { ...current } : current)}><summary>Definition and calculation</summary>{explanation.interpretation !== explanation.basis && <p>{explanation.basis}</p>}{explanation.source && <p>{explanation.source}</p>}{explanation.calculation && <p>{explanation.calculation}</p>}{explanation.inputs?.length ? <ul>{explanation.inputs.map((input, index) => <li key={index}>{input}</li>)}</ul> : null}{explanation.note && <p>{explanation.note}</p>}</details> : <>
       <p><b>Meaning</b>{explanation.basis}</p>
       {explanation.source && <p><b>Information used</b>{explanation.source}</p>}
       {explanation.calculation && <div className="result-explanation-formula"><b>Calculation</b>{explanation.calculation}</div>}
       {explanation.inputs?.length ? <details className="result-explanation-inputs" onToggle={() => setPosition(current => current ? { ...current } : current)}><summary>Saved values for this result</summary><ul>{explanation.inputs.map((input, index) => <li key={index}>{input}</li>)}</ul></details> : null}
       {explanation.note && <small><b>Important</b>{explanation.note}</small>}
       {explanation.interpretation && <p><b>For management</b>{explanation.interpretation}</p>}
+      </>}
     </div>, document.body)}
   </>;
 }
 
-export function ResultValue({ metric, row, normalization, children, className, inline }: {
+function resultText(children: ReactNode): string {
+  return Children.toArray(children).map(child => typeof child === "string" || typeof child === "number" ? String(child) : isValidElement<{children?: ReactNode}>(child) ? resultText(child.props.children) : "").join("");
+}
+
+export function ResultValue({ metric, row, normalization, children, className, inline, interpretation }: {
   metric: string;
   row?: Partial<AccountDecisionRow> | null;
   normalization?: NormalizationEvidence;
   children: ReactNode;
   className?: string;
   inline?: boolean;
+  interpretation?: string;
 }) {
   const explanation = resultExplanation(metric, row, normalization);
   if (row) {
@@ -266,5 +281,17 @@ export function ResultValue({ metric, row, normalization, children, className, i
     if (metric === "rfm_monetary") explanation.calculation = `Sum valid Sales Invoice amounts across the available history: PHP ${row.full_history_monetary?.toLocaleString("en-PH", { minimumFractionDigits: 2 }) ?? "unavailable"}.`;
     if (metric === "settlement") explanation.calculation = `${row.settlement_invoice_count ?? "Unavailable"} eligible reconciled invoices contribute to this saved mean of ${decimal(row.average_settlement_days)} days. Missing durations are excluded, not zero.`;
   }
+  const text = resultText(children);
+  const value = displayedNumber(text);
+  let reading = interpretation ?? (row ? accountInterpretation(metric, row, value) : scalarInterpretation(metric, value));
+  if (!reading && metric === "prediction" && (text === "With Future Sales" || text === "With No Future Sales")) reading = accountInterpretation(metric, { predicted_future_transaction_class: text });
+  if (metric.startsWith("normalized_") && normalization && row?.analysis_run_id === normalization.analysis_run_id && row?.analysis_reference_date === normalization.analysis_reference_date) {
+    const evidence = normalization.criteria[metric.slice(11) as Criterion];
+    if (evidence?.status === "unreconciled") reading = "The saved population inputs do not reconcile with this normalized result. Administrator review is needed; no replacement score is inferred.";
+    else if (evidence?.status === "verified" && evidence.minimum === evidence.maximum) reading = "All eligible accounts have the same original value on this measure. The saved rule assigns 0.5, so this measure does not distinguish their normalized values.";
+  }
+  if (metric === "count" && !row && !interpretation) return className ? <span className={className}>{children}</span> : <>{children}</>;
+  explanation.interpretation = reading ?? explanation.interpretation ?? explanation.basis;
+  explanation.compact = true;
   return <ExplainedValue explanation={explanation} className={className} inline={inline}>{children}</ExplainedValue>;
 }

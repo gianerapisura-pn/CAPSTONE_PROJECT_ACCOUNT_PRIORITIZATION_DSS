@@ -2,6 +2,7 @@
 
 import { Activity, CalendarDays, CircleDollarSign, ShieldAlert, Users } from "lucide-react";
 import Link from "next/link";
+import { evidenceInterpretation, scalarInterpretation } from "@/lib/result-interpretation";
 import { PageHeader, PageState } from "@/components/page-state";
 import { ResultValue } from "@/components/result-explanation";
 import { useApi } from "@/lib/use-api";
@@ -44,13 +45,13 @@ export default function DashboardPage() {
         <section className="dashboard-grid">
           <div className="data-section">
             <div className="section-heading"><div><span className="eyebrow">Decision distribution</span><h2>Priority groups</h2></div><span><ResultValue metric="ranked_count">{data.ranked_accounts} ranked accounts</ResultValue></span></div>
-            <div className="compact-list">{groups.map(item => <div className="compact-row" key={item.name}><Link href={"/accounts?priority_group=" + item.name}><strong>{item.name} Priority</strong><small>Recommended attention tier</small></Link><span className="score"><ResultValue metric="group_count">{item.value}</ResultValue></span></div>)}</div>
+            <div className="compact-list">{groups.map(item => <div className="compact-row" key={item.name}><Link href={"/accounts?priority_group=" + item.name}><strong>{item.name} Priority</strong><small>Recommended attention tier</small></Link><span className="score"><ResultValue metric="group_count" interpretation={`${item.name} Priority contains ${item.value} of ${data.ranked_accounts} ranked accounts. ${item.name === "High" ? "Review this group first." : item.name === "Medium" ? "Review after the High Priority group." : "Review after higher-priority groups; this is not an exclusion list."}`}>{item.value}</ResultValue></span></div>)}</div>
           </div>
           <div className="data-section">
             <div className="section-heading"><div><span className="eyebrow">Separate predictive context</span><h2>Operational 12-month With Future Sales class</h2></div><ShieldAlert /></div>
             <div className="compact-list">
-              <div><div><strong>With Future Sales</strong><small>Supporting class only; not part of FPS</small></div><span className="score"><ResultValue metric="prediction">{data.prediction_class_counts?.["With Future Sales"] ?? "Unavailable"}</ResultValue></span></div>
-              <div><div><strong>With No Future Sales</strong><small>Does not imply account closure</small></div><span className="score"><ResultValue metric="prediction">{data.prediction_class_counts?.["With No Future Sales"] ?? "Unavailable"}</ResultValue></span></div>
+              <div><div><strong>With Future Sales</strong><small>Supporting class only; not part of FPS</small></div><span className="score"><ResultValue metric="prediction" interpretation={"These accounts are forecast to have a valid invoice in the following 12 months; the count is not confirmed future sales."}>{data.prediction_class_counts?.["With Future Sales"] ?? "Unavailable"}</ResultValue></span></div>
+              <div><div><strong>With No Future Sales</strong><small>Does not imply account closure</small></div><span className="score"><ResultValue metric="prediction" interpretation={"These accounts are forecast to have no valid invoice in the following 12 months; this does not mean account closure or removal from prioritization."}>{data.prediction_class_counts?.["With No Future Sales"] ?? "Unavailable"}</ResultValue></span></div>
             </div>
           </div>
         </section>
@@ -58,13 +59,13 @@ export default function DashboardPage() {
         <section className="dashboard-grid bottom">
           <div className="data-section">
             <div className="section-heading"><div><span className="eyebrow">Management attention</span><h2>Top prioritized accounts</h2></div><Link href="/accounts">View all accounts</Link></div>
-            <div className="compact-list">{data.top_accounts.slice(0, 6).map(row => <div className="compact-row" key={row.account}><span className="compact-rank"><ResultValue metric="rank">{row.priority_rank}</ResultValue></span><Link href={`/accounts/${encodeURIComponent(row.account)}`}><strong>{row.account}</strong><small>{row.priority_group} Priority</small></Link><span className="score"><ResultValue metric="fps">{row.final_priority_score.toFixed(4)}</ResultValue></span></div>)}</div>
+            <div className="compact-list">{data.top_accounts.slice(0, 6).map(row => <div className="compact-row" key={row.account}><span className="compact-rank"><ResultValue metric="rank" row={row}>{row.priority_rank}</ResultValue></span><Link href={`/accounts/${encodeURIComponent(row.account)}`}><strong>{row.account}</strong><small>{row.priority_group} Priority</small></Link><span className="score"><ResultValue metric="fps" row={row}>{row.final_priority_score.toFixed(4)}</ResultValue></span></div>)}</div>
           </div>
           <div className="data-section">
             <div className="section-heading"><div><span className="eyebrow">Ranking stability</span><h2>Current sensitivity summary</h2></div><Activity /></div>
             {data.stability ? <dl className="method-facts">
-              <div><dt>Minimum Spearman</dt><dd><ResultValue metric="spearman">{data.stability.minimum_spearman.toFixed(4)}</ResultValue></dd></div>
-              <div><dt>Maximum Priority Group movement</dt><dd><ResultValue metric="movement">{(data.stability.maximum_group_movement_rate * 100).toFixed(2)}%</ResultValue></dd></div>
+              <div><dt>Minimum Spearman</dt><dd><ResultValue metric="spearman" interpretation={evidenceInterpretation("spearman", { max_group_movement_rate: data.stability.maximum_group_movement_rate }, [], data.stability.minimum_spearman)}>{data.stability.minimum_spearman.toFixed(4)}</ResultValue></dd></div>
+              <div><dt>Maximum Priority Group movement</dt><dd><ResultValue metric="movement" interpretation={scalarInterpretation("movement", data.stability.maximum_group_movement_rate)}>{(data.stability.maximum_group_movement_rate * 100).toFixed(2)}%</ResultValue></dd></div>
             </dl> : <p>Stability evidence is unavailable for the current run.</p>}
             <Link className="button secondary" href="/reports">Open detailed reporting</Link>
           </div>
