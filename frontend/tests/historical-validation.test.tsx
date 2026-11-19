@@ -18,6 +18,8 @@ test("saved rank and pending outcome remain clear in keyboard-accessible inline 
   render(<AnnualRankingHistory />);
   expect(screen.getByLabelText("Ranking year")).toHaveValue("2025");
   expect(screen.getByText("#12")).toBeVisible();
+  expect(screen.getByText("#20 → #12")).toBeVisible();
+  expect(screen.getByText(/Rank change reads previous → selected year/)).toBeVisible();
   expect(screen.getByText("0.6123")).toBeVisible();
   const account = screen.getByRole("button", { name: "Test business" });
   account.focus();
@@ -51,8 +53,9 @@ test("missing comparison and observed SI value are distinct from forecasts", asy
   expect(screen.getByText(/Subsequently observed SI value through 2019/)).toBeVisible();
   expect(screen.getByText(/not used to calculate that FPS/)).toBeVisible();
   expect(screen.queryByText(/Pending complete/)).not.toBeInTheDocument();
-  expect(rankMovement({...previous,positions:-8})).toBe("↓ 8 positions");
-  expect(rankMovement({...previous,positions:0})).toBe("Same rank");
+  expect(rankMovement(previous,28)).toBe("#20 → #28");
+  expect(rankMovement(previous,20)).toBe("Same rank");
+  expect(rankMovement(null,12)).toBe("No comparable previous-year rank");
 });
 
 test("loading, unavailable and empty states never show stale ranking rows", async () => {

@@ -15,10 +15,10 @@ type HistoryResponse = { study_reference_date: string; years: number[]; year: nu
 type Row = Record<string, string | number | boolean | null>;
 const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
 const percent = (value: Row[string]) => typeof value === "number" && Number.isFinite(value) ? `${(value * 100).toFixed(2)}%` : "Unavailable";
-export function rankMovement(previous: Comparison | null) {
+export function rankMovement(previous: Comparison | null, currentRank: number) {
   if (!previous) return "No comparable previous-year rank";
-  if (previous.positions === 0) return "Same rank";
-  return `${previous.positions > 0 ? "↑" : "↓"} ${Math.abs(previous.positions)} positions`;
+  if (previous.rank === currentRank) return "Same rank";
+  return `#${previous.rank} → #${currentRank}`;
 }
 
 function RankingDetails({ row }: { row: HistoricalRanking }) {
@@ -26,7 +26,7 @@ function RankingDetails({ row }: { row: HistoricalRanking }) {
             <h3>{row.account_name} — {row.year}</h3>
             <p>At {row.cutoff}, this account held rank #{row.rank} among {row.population} eligible accounts, with FPS {row.fps.toFixed(4)} and {row.priority_group} Priority. This is the {row.designation.toLowerCase()}.</p>
             <p>Final Priority Score (FPS) combines purchasing recency, invoice frequency, Sales Invoice value and settlement duration using the saved weights at that cutoff. Higher scores place an account earlier in the review order; they do not guarantee a purchase.</p>
-            {row.previous ? <><p>In {row.previous.year}, it held rank #{row.previous.rank} among {row.previous.population} accounts. {rankMovement(row.previous)}. Its Priority Group {row.previous.group_changed ? `changed from ${row.previous.priority_group} to ${row.priority_group}` : `remained ${row.priority_group}`}.</p>
+            {row.previous ? <><p>In {row.previous.year}, it held rank #{row.previous.rank} among {row.previous.population} accounts. {row.previous.rank === row.rank ? "It kept the same rank" : `Its rank moved from #${row.previous.rank} to #${row.rank}`}. Its Priority Group {row.previous.group_changed ? `changed from ${row.previous.priority_group} to ${row.priority_group}` : `remained ${row.priority_group}`}.</p>
               <p>Previous FPS: {row.previous.fps.toFixed(4)}; selected-year FPS: {row.fps.toFixed(4)}. Each year uses its own eligible population, cutoff information and objective weights. Rank and FPS changes alone do not identify which business factor caused the movement.</p></> : <p>No comparable previous-year rank is registered. This does not establish that the account was new, inactive or closed.</p>}
             {row.outcome_status === "observed" && row.subsequent_si_value !== null ? <p>Subsequently observed SI value through {row.evaluation_end}: <strong>{money.format(row.subsequent_si_value)}</strong>. This outcome was observed after the ranking cutoff and was not used to calculate that FPS.</p> : <p>Succeeding {row.evaluation_end.slice(0, 4)} outcome: Pending complete and verified actual SI coverage. A CatBoost classification is not an observed purchase.</p>}
             <details><summary>Evidence source</summary><p>{row.source_member}</p><p className="history-source-hash">SHA-256: {row.source_member_sha256}</p></details>
@@ -43,7 +43,7 @@ export function AnnualRankingHistory() {
   const { data, error, loading, reload } = useApi<HistoryResponse>(`/reports/native/ranking-history?${params}`);
   return <section className="native-table-section annual-ranking-section" aria-label="Annual account ranking history">
     <div className="section-heading"><h2>Annual Account Ranking History</h2></div>
-    <p className="native-note">Choose a year to see the saved review order. Select an account name to compare its position with the previous year. These fixed study records stay separate from later operational imports.</p>
+    <p className="native-note">Choose a year to see the saved review order. Rank change reads previous → selected year; a smaller rank number comes earlier in the review order. Select an account name for details. These fixed study records stay separate from later operational imports.</p>
     <div className="history-toolbar">
       <label className="history-filter-field">Ranking year<select value={year || String(data?.year ?? "")} onChange={event => { setYear(event.target.value); setPage(1); setExpanded(null); }}>
         {!data && <option value="">Loading study years</option>}
@@ -53,13 +53,13 @@ export function AnnualRankingHistory() {
     </div>
     {loading ? <p role="status">Loading saved historical rankings…</p> : error ? <div role="alert"><p>{error}</p><button className="button secondary" onClick={() => void reload()}>Retry historical rankings</button></div> : data && <>
       <p className="native-note">{data.year} year-end · {data.population} eligible ranked accounts · Study reference {data.study_reference_date}. Searching keeps each account’s saved rank.</p>
-      {!data.items.length ? <p role="status">No historical accounts match this search.</p> : <div className="table-wrap"><table className="annual-ranking-table" aria-label="Saved annual account rankings"><colgroup><col className="history-account-column" /><col className="history-rank-column" /><col className="history-score-column" /><col className="history-group-column" /><col className="history-change-column" /></colgroup><thead><tr><th scope="col">Account</th><th scope="col" className="history-number">Rank</th><th scope="col" className="history-number">FPS</th><th scope="col">Priority Group</th><th scope="col">Change from previous year</th></tr></thead><tbody>
+      {!data.items.length ? <p role="status">No historical accounts match this search.</p> : <div className="table-wrap"><table className="annual-ranking-table" aria-label="Saved annual account rankings"><colgroup><col className="history-account-column" /><col className="history-rank-column" /><col className="history-score-column" /><col className="history-group-column" /><col className="history-change-column" /></colgroup><thead><tr><th scope="col">Account</th><th scope="col" className="history-number">Rank</th><th scope="col" className="history-number">FPS</th><th scope="col">Priority Group</th><th scope="col">Rank: previous → selected</th></tr></thead><tbody>
         {data.items.map(row => {
           const key = `${row.year}-${row.account_key}`;
           const open = expanded === key;
           return <tr key={key}>
             <td><button className="account-name-button" aria-expanded={open} aria-controls={open ? `history-${key}` : undefined} onClick={() => setExpanded(open ? null : key)}>{row.account_name}</button></td>
-            <td className="history-number">#{row.rank}</td><td className="history-number">{row.fps.toFixed(4)}</td><td>{row.priority_group}</td><td className="history-change">{rankMovement(row.previous)}</td>
+            <td className="history-number">#{row.rank}</td><td className="history-number">{row.fps.toFixed(4)}</td><td>{row.priority_group}</td><td className="history-change">{rankMovement(row.previous, row.rank)}</td>
           </tr>;
         })}
       </tbody></table></div>}
