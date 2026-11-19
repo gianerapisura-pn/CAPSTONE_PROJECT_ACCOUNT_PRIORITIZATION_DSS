@@ -7,7 +7,7 @@ export const validationGuides = {
     "Start here: which results are we checking?",
     "The study forecast and its model details come from registered, verified study evidence. Current ranking and sensitivity counts come from the published run shown above.",
     "Future SI means at least one valid Sales Invoice in the stated future window. No Future SI means none predicted in that window, not account closure. Account-scenario rows count repeated checks, not different accounts.",
-    "A pending forecast can be checked only after its full outcome window has ended and complete invoice coverage has been verified.",
+    "A prospective forecast can be checked only after its full outcome window has ended and complete invoice coverage has been verified.",
   ],
   development: [
     "Why check the historical examples?",
@@ -37,7 +37,7 @@ export const validationGuides = {
     "Was performance similar from year to year?",
     "Each row contains one saved chronological CatBoost evaluation year, using earlier information for its predictions and later observed invoices to check them.",
     "Missed Future counts actual buyers predicted not to buy. False Future counts predicted buyers who had no valid invoice in the outcome window. Error and Future recall are percentages; Macro F1 and balanced accuracy are 0-to-1 scores.",
-    "Compare rows to see variation hidden by an overall average. These are historical tests, not confirmed results for the pending study forecast.",
+    "Compare rows to see variation hidden by an overall average. These are historical tests, not confirmed results for the prospective study forecast.",
   ],
   canonical: [
     "Why show the complete model comparison?",
@@ -55,7 +55,7 @@ export const validationGuides = {
     "Did the model also work in later completed periods?",
     "These registered confirmations compare historical predictions with invoices observed after their stated cutoff and through their outcome end date.",
     "Actual Future / No Future are observed account counts; Predicted Future / No Future are model classifications. Error is the wrong-classification share, accuracy is the correct share, and Macro F1 balances both classes.",
-    "Different periods can have different eligible accounts. These checks provide later historical evidence, not confirmed accuracy for the separate pending study forecast.",
+    "Different periods can have different eligible accounts. These checks provide later historical evidence, not confirmed accuracy for the separate prospective study forecast.",
   ],
   features: [
     "Does the choice of model inputs matter?",
@@ -212,9 +212,9 @@ export function validationFinding(topic: Topic, rows: readonly Evidence[]): stri
     case "benchmark": case "metrics": case "canonical": {
       const a = rows.find(row => row.family === "CatBoost")?.mean_macro_f1;
       const b = rows.find(row => row.family === "Extra Trees")?.mean_macro_f1;
-      return typeof a === "number" && Number.isFinite(a) && typeof b === "number" && Number.isFinite(b) ? `Historical mean Macro F1: CatBoost ${a.toFixed(4)}; Extra Trees ${b.toFixed(4)}. This does not establish pending-forecast accuracy.` : `${rows.length} model results recorded; the CatBoost/Extra Trees score comparison is incomplete.`;
+      return typeof a === "number" && Number.isFinite(a) && typeof b === "number" && Number.isFinite(b) ? `Historical mean Macro F1: CatBoost ${a.toFixed(4)}; Extra Trees ${b.toFixed(4)}. This does not establish prospective-forecast accuracy.` : `${rows.length} model results recorded; the CatBoost/Extra Trees score comparison is incomplete.`;
     }
-    case "yearly": case "later": return `Historical Macro F1: ${range("macro_f1")} across ${rows.length} recorded periods; not pending-forecast accuracy.`;
+    case "yearly": case "later": return `Historical Macro F1: ${range("macro_f1")} across ${rows.length} recorded periods; not prospective-forecast accuracy.`;
     case "influence": {
       const changes = numbers("maximum_absolute_weight_change");
       return `${rows.length} account-omission checks; largest weight change: ${changes.length ? `${(Math.max(...changes) * 100).toFixed(2)} percentage points` : "unavailable"}. Published weights are unchanged.`;

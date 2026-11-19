@@ -60,7 +60,7 @@ export function scalarInterpretation(metric: string, value?: number): string | u
   if (metric === "settlement_count") return value === 0 ? "No eligible matched settlement evidence supports an average; missing durations must not become zero." : `${value === 1 ? "One matched invoice supports" : `${value} matched invoices support`} the settlement summary. Unmatched or invalid durations are excluded.`;
   if (metric === "warnings") return value === 0 ? "No warnings were saved for this run. That does not independently certify data completeness or forecast accuracy." : `${value} saved warning${value === 1 ? " needs" : "s need"} review before interpreting this run; a warning is not automatically a failed analysis.`;
   if (metric === "weight") return `${pct(value)} of the normalized four-factor score is assigned to this criterion. This share affects review order, not CatBoost's predicted class.`;
-  if (metric === "recall") return `The model identified ${pct(value)} of actual historical Future Sales cases; ${pct(1 - value)} were missed. This is not confirmed performance for the pending forecast.`;
+  if (metric === "recall") return `The model identified ${pct(value)} of actual historical Future Sales cases; ${pct(1 - value)} were missed. This is not confirmed performance for the prospective forecast.`;
   if (metric === "error") return `${pct(value)} of historical classifications were wrong, corresponding to ${pct(1 - value)} correct. These are completed-period results, not future certainty.`;
   if (metric === "balanced_accuracy") return `The average recall across the two classes is ${pct(value)}. This gives each class equal weight even when their case counts differ.`;
   if (metric === "mcc") return value === 0 ? "No correlation between the historical predicted and observed classes was recorded on this measure." : `${value > 0 ? "Predicted and observed classes agree in direction" : "Predicted and observed classes disagree in direction"} on this historical measure. Read the error counts alongside it; this is not a buying probability.`;
@@ -100,7 +100,7 @@ export function evidenceInterpretation(metric: string, row: Evidence, peers: rea
       const other = peers.filter(item => item !== row && numeric(item.mean_macro_f1));
       if (other.length) {
         const best = Math.max(...other.map(item => item.mean_macro_f1 as number));
-        return score > best ? `Highest saved mean Macro F1 in this displayed comparison, ahead of the next score by ${fixed(score - best)} using unrounded results. A historical lead is not confirmed future accuracy.` : score === best ? "This score ties the best other score in the displayed comparison. The saved comparison does not establish future accuracy." : `The best displayed score is ${fixed(best - score)} higher using unrounded results. This is historical comparison, not realized accuracy of the pending forecast.`;
+        return score > best ? `Highest saved mean Macro F1 in this displayed comparison, ahead of the next score by ${fixed(score - best)} using unrounded results. A historical lead is not confirmed future accuracy.` : score === best ? "This score ties the best other score in the displayed comparison. The saved comparison does not establish future accuracy." : `The best displayed score is ${fixed(best - score)} higher using unrounded results. This is historical comparison, not realized accuracy of the prospective forecast.`;
       }
     }
   }

@@ -14,7 +14,7 @@ beforeEach(() => {
   vi.mocked(useApi).mockReturnValue({ data: response(), loading: false, error: "", reload });
 });
 
-test("saved rank and pending outcome remain clear in keyboard-accessible inline details", async () => {
+test("saved rank and prospective outcome remain clear in keyboard-accessible inline details", async () => {
   render(<AnnualRankingHistory />);
   expect(screen.getByLabelText("Ranking year")).toHaveValue("2025");
   expect(screen.getByText("#12")).toBeVisible();
@@ -27,7 +27,7 @@ test("saved rank and pending outcome remain clear in keyboard-accessible inline 
   expect(account).toHaveAttribute("aria-expanded", "true");
   expect(screen.getByRole("region", {name:"Test business historical explanation"}).closest("table")).toBeNull();
   expect(screen.getByText(/rank #20 among 78 accounts/)).toBeVisible();
-  expect(screen.getByText(/Pending complete and verified actual SI coverage/)).toBeVisible();
+  expect(screen.getByText(/Future evaluation requires the completed outcome period and complete, verified SI coverage/)).toBeVisible();
   expect(screen.getByText(/do not identify which business factor/)).toBeVisible();
   expect(screen.queryByText("Evidence source")).not.toBeInTheDocument();
   expect(screen.queryByText("study.csv")).not.toBeInTheDocument();
@@ -55,7 +55,7 @@ test("missing comparison and observed SI value are distinct from forecasts", asy
   await userEvent.click(screen.getByRole("button",{name:"Test business"}));
   expect(screen.getByText(/Subsequently observed SI value through 2019/)).toBeVisible();
   expect(screen.getByText(/not used to calculate that FPS/)).toBeVisible();
-  expect(screen.queryByText(/Pending complete/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Future evaluation requires/)).not.toBeInTheDocument();
   expect(rankMovement(previous,28)).toBe("#20 → #28");
   expect(rankMovement(previous,20)).toBe("Same rank");
   expect(rankMovement(null,12)).toBe("No comparable previous-year rank");
