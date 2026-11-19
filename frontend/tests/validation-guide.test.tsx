@@ -66,7 +66,8 @@ test("predictor names explain omissions, input windows and the four-input diagno
   const label=screen.getByRole("button",{name:"Without gap between latest purchases"});
   await userEvent.hover(label);
   expect(await screen.findByRole("tooltip")).toHaveTextContent("Days between the two latest valid Sales Invoice dates");
-  expect(screen.getByRole("tooltip")).toHaveTextContent("feature_ablation_summary.csv");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Saved historical predictor comparisons");
+  expect(screen.getByRole("tooltip")).not.toHaveTextContent(/01_DATA|02_CODE|\.csv|\.py/);
   expect(screen.getByRole("tooltip")).toHaveTextContent("3 chronological evaluation folds");
   await userEvent.unhover(label);
   await userEvent.click(screen.getByRole("button",{name:"Four purchasing and settlement inputs"}));

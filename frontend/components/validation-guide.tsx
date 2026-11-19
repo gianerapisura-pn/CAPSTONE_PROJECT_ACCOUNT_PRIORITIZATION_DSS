@@ -7,7 +7,7 @@ export const validationGuides = {
     "Start here: which results are we checking?",
     "The study forecast and its model details come from registered, verified study evidence. Current ranking and sensitivity counts come from the published run shown above.",
     "Future SI means at least one valid Sales Invoice in the stated future window. No Future SI means none predicted in that window, not account closure. Account-scenario rows count repeated checks, not different accounts.",
-    "A pending forecast can be checked only after its full outcome window has ended and complete invoice coverage has been verified. The SHA-256 code identifies the approved model file; it is not a performance score.",
+    "A pending forecast can be checked only after its full outcome window has ended and complete invoice coverage has been verified.",
   ],
   development: [
     "Why check the historical examples?",

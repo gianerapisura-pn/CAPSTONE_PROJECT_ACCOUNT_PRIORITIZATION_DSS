@@ -29,7 +29,6 @@ function RankingDetails({ row }: { row: HistoricalRanking }) {
             {row.previous ? <><p>In {row.previous.year}, it held rank #{row.previous.rank} among {row.previous.population} accounts. {row.previous.rank === row.rank ? "It kept the same rank" : `Its rank moved from #${row.previous.rank} to #${row.rank}`}. Its Priority Group {row.previous.group_changed ? `changed from ${row.previous.priority_group} to ${row.priority_group}` : `remained ${row.priority_group}`}.</p>
               <p>Previous FPS: {row.previous.fps.toFixed(4)}; selected-year FPS: {row.fps.toFixed(4)}. Each year uses its own eligible population, cutoff information and objective weights. Rank and FPS changes alone do not identify which business factor caused the movement.</p></> : <p>No comparable previous-year rank is registered. This does not establish that the account was new, inactive or closed.</p>}
             {row.outcome_status === "observed" && row.subsequent_si_value !== null ? <p>Subsequently observed SI value through {row.evaluation_end}: <strong>{money.format(row.subsequent_si_value)}</strong>. This outcome was observed after the ranking cutoff and was not used to calculate that FPS.</p> : <p>Succeeding {row.evaluation_end.slice(0, 4)} outcome: Pending complete and verified actual SI coverage. A CatBoost classification is not an observed purchase.</p>}
-            <details><summary>Evidence source</summary><p>{row.source_member}</p><p className="history-source-hash">SHA-256: {row.source_member_sha256}</p></details>
   </div>;
 }
 

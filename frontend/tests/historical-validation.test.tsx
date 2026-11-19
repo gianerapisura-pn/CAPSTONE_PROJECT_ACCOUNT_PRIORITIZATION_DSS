@@ -29,6 +29,9 @@ test("saved rank and pending outcome remain clear in keyboard-accessible inline 
   expect(screen.getByText(/rank #20 among 78 accounts/)).toBeVisible();
   expect(screen.getByText(/Pending complete and verified actual SI coverage/)).toBeVisible();
   expect(screen.getByText(/do not identify which business factor/)).toBeVisible();
+  expect(screen.queryByText("Evidence source")).not.toBeInTheDocument();
+  expect(screen.queryByText("study.csv")).not.toBeInTheDocument();
+  expect(screen.queryByText(/SHA-256/)).not.toBeInTheDocument();
   await userEvent.click(account);
   expect(account).toHaveAttribute("aria-expanded", "false");
 });
