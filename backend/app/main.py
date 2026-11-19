@@ -64,6 +64,7 @@ from app.services.si_coverage import (
 )
 from app.services.publication_workflow import publish_existing_source
 from app.services.normalization_evidence import normalization_evidence
+from app.services.model_review import review_status
 from app.services.ranking_history import ranking_history
 
 settings = get_settings()
@@ -1048,6 +1049,11 @@ def current_model(user: AuthenticatedUser = Depends(require_admin), db: Session 
             "validation_metrics": model.oop_metrics,
             "operational_monitoring": operational_performance_summary(db, model),
             "study_monitoring": study_monitoring}
+
+
+@app.get("/models/review")
+def predictive_model_review(user: AuthenticatedUser = Depends(require_admin), db: Session = Depends(get_db)):
+    return review_status(db)
 
 
 @app.post("/models/monitor")

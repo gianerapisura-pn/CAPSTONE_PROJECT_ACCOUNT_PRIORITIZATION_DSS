@@ -22,6 +22,12 @@ vi.mock("@/lib/use-api", () => ({
       status: "active", model_version: "catboost_stage8", model_family: "CatBoost Classifier",
       selected_outcome_horizon: 12, validation_metrics: { macro_f1: 0.7997344352724599 },
     }, error: "", loading: false, reload: vi.fn() };
+    if (path === "/models/review") return { data: {
+      status: "waiting_for_data", active_model: "CatBoost Classifier",
+      message: "No fresh annual review window has completed after the original study.",
+      recommendation: "Keep the current model.", eligible_windows: 0, required_windows: 2,
+      next_outcome_end: "2027-12-31", comparison: null,
+    }, error: "", loading: false, reload: vi.fn() };
     if (path.startsWith("/account-context")) return { data: {
       items: [], total: 0, publication_note: "A new run is required.",
     }, error: "", loading: false, reload: vi.fn() };
@@ -43,9 +49,10 @@ test("settings retains methodology while removing ordinary technical configurati
   expect(screen.queryByRole("button",{name:"Review corrections"})).not.toBeInTheDocument();
   expect(screen.queryByText(/Collection records require review/)).not.toBeInTheDocument();
   expect(screen.getByText("Recheck completed prediction windows")).toBeInTheDocument();
+  expect(screen.getByRole("heading",{name:"Predictive model review"})).toBeVisible();
 });
 
 test("management retains read-only methodology without administrator maintenance editors",()=>{
  authState.role="management";
- try{render(<SettingsPage/>);expect(screen.getByRole("heading",{name:"Historical Settlement Duration"})).toBeInTheDocument();expect(screen.queryByRole("heading",{name:"Account Information Management"})).not.toBeInTheDocument();expect(screen.queryByText("Recheck completed prediction windows")).not.toBeInTheDocument();expect(screen.queryByRole("link",{name:/Required Source File Columns/})).not.toBeInTheDocument();}finally{authState.role="administrator";}
+ try{render(<SettingsPage/>);expect(screen.getByRole("heading",{name:"Historical Settlement Duration"})).toBeInTheDocument();expect(screen.queryByRole("heading",{name:"Account Information Management"})).not.toBeInTheDocument();expect(screen.queryByText("Recheck completed prediction windows")).not.toBeInTheDocument();expect(screen.queryByRole("heading",{name:"Predictive model review"})).not.toBeInTheDocument();expect(screen.queryByRole("link",{name:/Required Source File Columns/})).not.toBeInTheDocument();}finally{authState.role="administrator";}
 });
