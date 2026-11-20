@@ -12,6 +12,7 @@ import re
 from zipfile import ZipFile
 
 import joblib
+import httpx
 import numpy as np
 import pandas as pd
 import sklearn
@@ -758,7 +759,7 @@ def future_transaction_for_current_run(
             active.model_family or config.model_family,
         )
         return replace(result, report=dict(active.oop_metrics or {}))
-    except (OSError, ValueError, EOFError, KeyError):
+    except (httpx.HTTPError, OSError, ValueError, EOFError, KeyError):
         active.review_recommended = True
         return unavailable_prediction(config)
 

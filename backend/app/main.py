@@ -49,7 +49,9 @@ from app.services.model_lifecycle import (
     operational_performance_summary,
     unavailable_prediction,
 )
-from app.services.study_predictions import MODEL_ARTIFACT_SHA256, MODEL_VERSION, final_study_prediction_payload
+from app.services.study_predictions import (
+    FORECAST_ORIGIN, MODEL_ARTIFACT_SHA256, MODEL_VERSION, final_study_prediction_payload,
+)
 from app.services.prescriptive_evidence import EVIDENCE_VERSION
 from app.services.additional_validation_evidence import EVIDENCE_VERSION as ADDITIONAL_EVIDENCE_VERSION, REPORT_SCOPES
 from app.services.locked_packages import (
@@ -437,6 +439,7 @@ def update_account_context(account_key: str, request: AccountContextRequest,
     if not row:
         raise HTTPException(404, "Account not found.")
     values = request.model_dump()
+    serialized_values = request.model_dump(mode="json")
     required = ("entity_type", "business_category", "primary_business_type")
     if any(values.get(field) in (None, "") for field in required):
         raise HTTPException(422, "Complete account identity context is required.")
@@ -466,12 +469,12 @@ def update_account_context(account_key: str, request: AccountContextRequest,
     }
     for field, value in values.items():
         setattr(row, field, value)
-    if any(previous[field] != values[field] for field in (
+    if any(previous[field] != serialized_values[field] for field in (
         "account_status", "last_verified", "verification_type", "verification_date", "verification_basis"
     )):
         row.status_confirming_role = None
         row.status_claim_scope = None
-    if any(previous[field] != values[field] for field in (
+    if any(previous[field] != serialized_values[field] for field in (
         "entity_type", "business_category", "primary_business_type"
     )):
         row.identity_source_type = None
@@ -481,7 +484,7 @@ def update_account_context(account_key: str, request: AccountContextRequest,
         row.identity_source_note = None
     audit(db, user.user_id, "account_context_updated", "dim_account", account_key, {
         "previous": previous,
-        "updated": request.model_dump(mode="json"),
+        "updated": serialized_values,
         "publication_required": True,
     })
     db.commit()
@@ -898,7 +901,9 @@ def account_detail(account_key: str, user: AuthenticatedUser = Depends(require_u
         SensitivityScenarioRecord.account_key == account.account_key)).all()
     ranks = [x.payload["scenario_rank"] for x in scenarios]
     study_prediction = db.scalar(select(PredictiveStudyPrediction).where(
-        PredictiveStudyPrediction.account_key == account.account_key
+        PredictiveStudyPrediction.account_key == account.account_key,
+        PredictiveStudyPrediction.model_version == MODEL_VERSION,
+        PredictiveStudyPrediction.forecast_origin == FORECAST_ORIGIN,
     ))
     saved_priorities = [record.payload for record in db.scalars(select(AccountPriorityResult).where(
         AccountPriorityResult.analysis_run_id == run.analysis_run_id)).all()]

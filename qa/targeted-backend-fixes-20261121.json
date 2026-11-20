@@ -1,0 +1,35 @@
+{
+  "scope": "Account Details study selection, unchanged account-context save, model-storage HTTP failure handling",
+  "base_commit": "31572be20bd68428ba82f385cb56938c903ab55d",
+  "changes": [
+    "Select the official study model and forecast origin in Account Details.",
+    "Compare account-context dates using consistent JSON representations; preserve unchanged provenance and invalidate only genuinely changed context.",
+    "Return explicit model_unavailable predictions for HTTPX storage failures while preserving validated-model publication gates."
+  ],
+  "verification": {
+    "new_targeted_backend_cases": 15,
+    "full_backend": {"passed": 244, "failed": 0, "errors": 0, "skipped": 0, "warnings": 39},
+    "frontend": {"passed": 186, "failed": 0, "skipped": 0, "test_files": 32},
+    "private_package_unchanged": true,
+    "original_review_database_unchanged": true,
+    "isolated_review_copy_unchanged": true,
+    "production_read_only_checks": {
+      "official_catboost_study_predictions": 83,
+      "retained_historical_extra_trees_predictions": 84,
+      "b2b_accounts": 84,
+      "accounts_missing_status_provenance": 0
+    }
+  },
+  "retained": [
+    "Frozen CatBoost artifact and approved analytical method",
+    "Original analytical archive and verified study outputs",
+    "Cutoff-based closed-account eligibility",
+    "Original client UAT responses and decisions"
+  ],
+  "production_browser_check": {
+    "status": "NOT EXECUTED",
+    "reason": "Automatic approval review rejected creating QA sessions through production Supabase admin endpoints without specific authorization."
+  },
+  "schema_migration_required": false,
+  "business_data_repair_required_by_current_read_only_checks": false
+}
