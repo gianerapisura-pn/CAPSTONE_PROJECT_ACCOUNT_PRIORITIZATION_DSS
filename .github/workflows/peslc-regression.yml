@@ -1,0 +1,82 @@
+name: PESLC isolated regression QA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Synthetic imports, publication and role checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: progress-future-import-model-monitoring-20261026
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install checked-in backend dependencies
+        working-directory: backend
+        run: python -m pip install -r requirements.txt
+      - name: Run isolated regression tests
+        working-directory: backend
+        env:
+          APP_ENV: test
+          DEMO_MODE: 'false'
+          DATABASE_URL: 'sqlite:///:memory:'
+          OMP_NUM_THREADS: '1'
+          OPENBLAS_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+          PYTHONWARNINGS: default
+        # Private-package role parity runs locally with the approved isolated review database.
+        # This runner executes only self-contained synthetic checks; it receives no client data.
+        run: |
+          python -m pytest -q \
+            tests/test_auth.py \
+            tests/test_import_future.py \
+            tests/test_future_publication_integration.py \
+            tests/test_import_validation.py \
+            tests/test_import_corrections.py \
+            tests/test_persistence.py \
+            tests/test_account_and_model_failure_regressions.py
+
+  frontend:
+    name: Frontend tests, types and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: progress-future-import-model-monitoring-20261026
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      # Repair only the runner's copy of the stale dependency lockfile.
+      - name: Reconcile frontend lockfile in the runner
+        working-directory: frontend
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Verify clean frontend installation
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+      - name: Save regenerated lockfile for a separate reviewed commit
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-lockfile-review
+          path: frontend/package-lock.json
+          retention-days: 14
+      - name: Run frontend regression suite
+        working-directory: frontend
+        run: npm test
+      - name: TypeScript check
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Lint check
+        working-directory: frontend
+        run: npm run lint
