@@ -1,0 +1,76 @@
+{
+  "scope": "Production database connection exhaustion under concurrent requests",
+  "disposition": "CLOSED - FIXED AND RETESTED",
+  "application_commit": "bdcf9d15fc10eecd766ce2fd98f5c0e9229763ce",
+  "branch": "progress-future-import-model-monitoring-20261026",
+  "changes": [
+    "Use SQLAlchemy NullPool for PostgreSQL on Vercel so warm instances do not retain idle database sessions.",
+    "Use transaction-pooler port 6543 for the existing shared Supabase pooler on Vercel.",
+    "Disable Psycopg automatic prepared statements on the shared transaction pooler.",
+    "Preserve SQLite, non-Vercel connection settings, credentials, TLS URL options and transaction boundaries."
+  ],
+  "verification": {
+    "new_connection_regressions": 7,
+    "full_local_backend": {"passed": 251, "failures": 0, "errors": 0, "skipped": 0, "warnings": 39},
+    "ci": {
+      "url": "https://github.com/gianerapisura-pn/CAPSTONE_PROJECT_ACCOUNT_PRIORITIZATION_DSS/actions/runs/44912161525",
+      "result": "PASS",
+      "synthetic_backend_passed": 67,
+      "frontend_passed": 186,
+      "frontend_test_files": 32,
+      "typescript": "PASS",
+      "lint": "PASS"
+    },
+    "read_only_pooler_preflight": {"result": "PASS", "queries": 24, "concurrent_workers": 6},
+    "production_concurrent_account_details": {
+      "result": "PASS",
+      "roles": ["administrator", "management"],
+      "workers_per_wave": [3, 6],
+      "requests_per_wave_per_role": 84,
+      "total_requests": 336,
+      "failed_requests": 0,
+      "official_study_predictions_matched_per_wave": 83,
+      "correctly_unavailable_accounts_per_wave": 1
+    },
+    "production_browser": {
+      "result": "PASS",
+      "administrator_pages": 12,
+      "management_pages": 8,
+      "checks_including_permissions_and_write_guards": 23,
+      "unexpected_api_errors": 0,
+      "javascript_errors": 0,
+      "application_write_requests": 0,
+      "export_permissions": "PASS",
+      "management_import_restriction": "PASS",
+      "temporary_sessions_locally_revoked": true
+    },
+    "deployment": {
+      "id": "dpl_6ortupfQz6pBXUscayZsdzTDaTMa",
+      "url": "https://peslc-dss-academic-web.vercel.app",
+      "state": "READY",
+      "alias_verified": true,
+      "error_scan_window_utc": ["2026-11-21T14:08:41Z", "2026-11-21T14:10:02Z"],
+      "error_or_fatal_logs_found_in_window": 0
+    }
+  },
+  "preservation": {
+    "account_study_prediction_and_analytical_run_records_unchanged": true,
+    "private_analytical_archive_unchanged": true,
+    "review_database_fixtures_unchanged": true,
+    "schema_migration": false,
+    "ui_changes": false,
+    "model_retraining_or_replacement": false,
+    "manuscript_changes": false,
+    "uat_response_changes": false,
+    "paid_upgrade_or_infrastructure": false
+  },
+  "evidence_directory": "backend/.test-tmp/PESLC_CONNECTION_FIX_20261121/",
+  "earlier_attempts": "Original connection-limit failure retained in PESLC_TARGETED_FIXES_20261121/authenticated-production-attempt1.json. A local full-suite attempt using system Python failed collection because CatBoost was absent there; the completed 251-test run used the existing project virtual environment. Neither attempt is relabelled as a successful execution.",
+  "interpretation": "The observed concurrent-request connection-limit defect is fixed and passed the recorded retests. Counts from local, CI and browser runs overlap and must not be added as independent unique tests. This receipt does not replace historical evidence or claim unlimited-load capacity.",
+  "required_client_retest_for_this_fix": false,
+  "required_manuscript_method_or_result_change_for_this_fix": false,
+  "references": [
+    "https://supabase.com/kb/troubleshooting/using-sqlalchemy-with-supabase-FUqebT",
+    "https://supabase.com/kb/troubleshooting/disabling-prepared-statements-qL8lEL"
+  ]
+}
