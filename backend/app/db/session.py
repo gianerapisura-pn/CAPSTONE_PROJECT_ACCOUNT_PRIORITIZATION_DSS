@@ -1,7 +1,10 @@
 from __future__ import annotations
 import json
+import os
 from sqlalchemy import Uuid, create_engine, inspect, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 from app.core.config import get_settings
 from app.db.models import Base
 
@@ -11,6 +14,18 @@ def make_engine():
     kwargs = {"pool_pre_ping": True}
     if url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
+    elif os.environ.get("VERCEL") == "1":
+        parsed = make_url(url)
+        if parsed.get_backend_name() == "postgresql":
+            # Warm serverless instances must not retain idle database sessions.
+            # Supavisor provides the shared pool; SQLAlchemy closes each checkout.
+            kwargs["poolclass"] = NullPool
+            if (parsed.host or "").endswith(".pooler.supabase.com"):
+                if parsed.port == 5432:
+                    parsed = parsed.set(port=6543)
+                if parsed.port == 6543 and parsed.drivername == "postgresql+psycopg":
+                    kwargs["connect_args"] = {"prepare_threshold": None}
+            url = parsed
     return create_engine(url, **kwargs)
 
 
