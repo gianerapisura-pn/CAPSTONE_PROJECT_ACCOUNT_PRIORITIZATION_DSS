@@ -1,7 +1,7 @@
-# Final Corrective Implementation Record
+# Implementation Scope
 
-The final corrective pass replaced active prior predictive semantics with the locked 12-month Future Transaction Extra Trees contract. It added explicit analysis reference and verified B2B eligibility; final empirical-quintile RFM; cumulative invoice reconstruction and duplicate no-op behavior; frozen artifact hash/version loading without routine retraining; four-criterion CRITIC/MCS; 400 sensitivity scenarios; leave-one-out influence; seven exact k/n backtests; canonical API/UI fields; migration 009; and certified Power BI specifications.
+The DSS uses the registered frozen CatBoost artifact for 12-month Future Transaction classification, with an explicit analysis reference and verified B2B eligibility. Its analytical workflow includes empirical-quintile RFM, cumulative logical-invoice reconstruction, duplicate no-op handling, artifact hash/version verification, four-criterion CRITIC/MCS, 400 sensitivity scenarios, leave-one-account-out influence, and cutoff-safe historical backtests against the exact k/n expected-random baseline. Routine imports do not retrain the model, and predictions do not determine FPS, rank, or Priority Group.
 
-The work did not deploy forecasting, an alternative operational MCDM method, clustering, SHAP, probability calibration, or other unsupported analytics. Entropy, Equal Weighting, and CRITIC-weighted TOPSIS were evaluated only as supplementary robustness checks.
+The authenticated web DSS presents published results through its operational pages and three native Detailed Analytics views. Entropy, Equal Weighting, and CRITIC-weighted TOPSIS provide supplementary robustness evidence; the official ranking method is CRITIC-weighted additive MCS.
 
-Live Supabase migration, private baseline execution, PBIX refresh, target-environment timing, and UAT remain pending until authorized and executed.
+Release verification follows `docs/DEPLOYMENT.md`. User acceptance and technical validation remain separate evidence categories, with case definitions in `docs/UAT_PLAN.md` and `docs/UAT_TEST_CASES.csv`. Actual execution records establish their outcomes; this scope document does not assign test results.
