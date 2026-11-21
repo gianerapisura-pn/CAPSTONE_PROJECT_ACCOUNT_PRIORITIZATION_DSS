@@ -19,7 +19,7 @@ Detailed Analytics retains its tab and selections in its URL, including when ref
 
 ## Administrator
 
-Administrators additionally preview/commit files, choose the verified complete-through reference date, maintain controlled account context and provenance, resolve quarantined collection corrections with an audit reason, inspect run history, manage aliases, register the private frozen CatBoost artifact through the controlled backend process, and evaluate predictions after both outcome maturity and verified SI coverage. Context/correction changes require an explicit analytics rerun and never mutate an old publication. Native charts read each successful published run directly. Legacy optional Power BI services are not required for the three native reports.
+Administrators additionally preview/commit files, choose the verified complete-through reference date, maintain controlled account context and provenance, resolve quarantined collection corrections with an audit reason, inspect run history, manage aliases, register the private frozen CatBoost artifact through the controlled backend process, and evaluate predictions after both outcome maturity and verified SI coverage. Context/correction changes require an explicit analytics rerun and never mutate an old publication. Native charts read each successful published run directly and do not require an external reporting service.
 
 Exact duplicate files are blocked as audited no-ops. Unknown account context is not guessed. Routine import never retrains. Model unavailable warnings do not disable descriptive/prescriptive outputs.
 
