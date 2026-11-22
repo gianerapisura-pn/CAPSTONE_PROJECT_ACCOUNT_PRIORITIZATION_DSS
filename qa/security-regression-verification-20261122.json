@@ -1,0 +1,130 @@
+{
+  "scope": "Configured backend and frontend regression, private-source reconciliation, and read-only production database access review",
+  "source_commit": "62b8708e67e5460969e5952fe08a653a966b358f",
+  "verification": {
+    "backend": {
+      "result": "PASS",
+      "passed": 251,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "warnings": 39,
+      "duration_seconds": 184.617,
+      "private_package_and_review_database_configured": true
+    },
+    "frontend": {
+      "result": "PASS",
+      "passed": 186,
+      "failures": 0,
+      "skipped": 0,
+      "pending": 0,
+      "todo": 0,
+      "test_files": 32,
+      "exit_code": 0,
+      "obsolete_terminology_check": "PASS"
+    },
+    "database_access": {
+      "result": "PASS",
+      "method": "Read-only SQL role checks; approved Admin/Management profile context supplied through transaction-local JWT subject. These are database-level checks, not new browser sign-in tests.",
+      "roles": {
+        "anonymous": {
+          "role": "anon",
+          "raw_visible": 0,
+          "run_helper_executable": false,
+          "invoice_detail_visible": 0,
+          "role_helper_executable": false
+        },
+        "administrator": {
+          "raw_visible": 0,
+          "expected_role": "administrator",
+          "resolved_role": "administrator",
+          "own_profiles_visible": 1,
+          "invoice_detail_visible": 0,
+          "latest_successful_run_available": true
+        },
+        "management": {
+          "raw_visible": 0,
+          "expected_role": "management",
+          "resolved_role": "management",
+          "own_profiles_visible": 1,
+          "invoice_detail_visible": 0,
+          "latest_successful_run_available": true
+        },
+        "reporting_reader": {
+          "login": false,
+          "bypassrls": false,
+          "superuser": false,
+          "source_select": false,
+          "refresh_select": false,
+          "coverage_select": false,
+          "invoice_detail_select": false
+        }
+      }
+    },
+    "provider_health": {
+      "result": "PASS",
+      "advisory_count": 0
+    },
+    "source_reconciliation": {
+      "result": "PASS",
+      "package_sha256": "972f91f4bf96aa735688f1a35b702b68319fcb5602356961a1e209fd2190eb65",
+      "package_matches_verified_identity": true,
+      "source_and_tested_review_copy_logical_contents_match": true,
+      "review_logical_content_sha256": "deab2ab84d0505a33f90dd0da7071630ad5d7fbbe7ff967ccb2681649e23a702"
+    }
+  },
+  "security_advisories": {
+    "total_visible": 7,
+    "items": [
+      {
+        "name": "rls_enabled_no_policy",
+        "level": "INFO",
+        "count": 4,
+        "disposition": "Retained deny-by-default restrictions. Tested source and invoice-detail reads returned no rows; the reporting-reader role has no SELECT permission on the four reviewed restricted tables. No permissive policy was added.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy"
+      },
+      {
+        "name": "authenticated_security_definer_function_executable",
+        "level": "WARN",
+        "count": 2,
+        "disposition": "Reviewed helper definitions, fixed search paths, denied anonymous execution and tested approved-role behavior. Existing policy dependencies use these helpers. Permissions remain unchanged; the warnings are not reported as remediated.",
+        "remediation": "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable"
+      },
+      {
+        "name": "auth_leaked_password_protection",
+        "level": "WARN",
+        "count": 1,
+        "disposition": "Not enabled. Supabase documents the integrated protection as Pro and above. No paid upgrade was authorized; this advisory remains unresolved.",
+        "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection"
+      }
+    ]
+  },
+  "evidence": {
+    "directory": "backend/.test-tmp/PESLC_VERIFICATION_20261122_5d0a7727/",
+    "files": [
+      {
+        "file": "backend-regression.xml",
+        "sha256": "e3dea36d9cfb8f4d89bfbbd4e41c91394a0a32d5cacb7845eb9e006dea6ae22b"
+      },
+      {
+        "file": "backend-regression.log",
+        "sha256": "0c0693618adacbc1f4a7c7850dbaab4c2914bd541a3b7da359ba0d86bf0beccd"
+      },
+      {
+        "file": "frontend-results.json",
+        "sha256": "1c6df48686e507c5657f3525844eb07a43aa592fd911abdd1c6d6898db370609"
+      }
+    ]
+  },
+  "boundaries": {
+    "application_code_changed": false,
+    "database_schema_or_business_data_changed": false,
+    "paid_features_enabled": false,
+    "manuscript_changed": false,
+    "client_uat_repeated": false,
+    "production_browser_repeated": false,
+    "original_test_records_changed": false,
+    "actual_2026_outcome_evaluation_executed": false
+  },
+  "conclusion": "The executed regression suites and scoped database-access checks passed. Provider security advisories remain visible and are not converted to passed tests. No runtime fix or deployment was required by these checks."
+}
