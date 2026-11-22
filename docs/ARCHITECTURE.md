@@ -20,6 +20,8 @@
 
 The service-role key and private bucket credentials remain backend-only. The peslc_reporting_reader role is NOLOGIN, SELECT-only, cannot bypass RLS, and has no RAW/private-storage access.
 
+Authorization and latest-publication helper functions reside in the non-exposed `dss_private` schema with fixed empty search paths and explicit execution grants. RLS policies and reporting views reference these internal functions. RAW rows, invoice-row links, SI-coverage confirmations, and optional refresh-state records are server-only: client/reporting roles have no table privileges, and restrictive RLS policies deny anonymous and authenticated access.
+
 Local real-user sign-in uses the production-configured Supabase API. The optional demo button uses a separately configured demo API and isolated SQLite backend; a missing demo URL fails closed and never falls back to the production API.
 
 ## Locked evidence boundaries

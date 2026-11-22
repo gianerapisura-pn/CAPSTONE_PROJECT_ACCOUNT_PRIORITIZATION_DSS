@@ -4,6 +4,8 @@ Production uses Supabase Auth bearer sessions verified cryptographically by Fast
 
 Administrator controls import, account context, publication, artifact governance, monitoring, and alias review. Both approved roles read the same published Overview, Account Prioritization/Detail, all three native Detailed Analytics tabs, RFM, Settlement, Predictive, Sensitivity, and supplementary evidence. Management cannot perform administrative mutations.
 
+Database authorization helpers are internal functions in `dss_private`, not public RPC endpoints. Approved-role RLS checks retain explicit function execution privileges; anonymous callers have neither schema access nor execution rights. Browser users access server-only source and coverage records through authorized backend workflows rather than direct table grants.
+
 Keep SUPABASE_SERVICE_ROLE_KEY backend-only. Configure only the public Supabase URL and anon key in Next.js. Demo authentication remains visibly labelled, isolated, and disabled in production.
 
 The default backend configuration is production with demo disabled. Local demo access must explicitly set APP_ENV=development (or test), DEMO_MODE=true, and an isolated SQLite DATABASE_URL. Runtime checks reject demo access against a PostgreSQL database or a production environment. The frontend also disables demo URLs in production builds.

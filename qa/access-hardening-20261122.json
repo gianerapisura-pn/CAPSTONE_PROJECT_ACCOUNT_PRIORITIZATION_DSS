@@ -1,0 +1,127 @@
+{
+  "scope": "Private authorization helpers and server-only database access",
+  "migration": {
+    "version": "20261122045230",
+    "file": "supabase/migrations/20261122045230_private_authorization_helpers.sql",
+    "sha256": "8c8e0562c0b73478a8839b99aaed370c871b44d872d60266990a7c36a202ffe4",
+    "statement_fingerprint_md5": "57a58391a42d9b221f5d2b097c72360c",
+    "applied_to": [
+      "isolated_staging",
+      "production"
+    ],
+    "migration_history_versions_aligned": true
+  },
+  "controls": {
+    "helper_schema": "dss_private",
+    "data_api_schema_exposed": false,
+    "helper_search_path": "",
+    "anonymous_helper_execution": false,
+    "server_only_tables": [
+      "raw_source_rows",
+      "invoice_group_rows",
+      "si_coverage_confirmations",
+      "power_bi_refreshes"
+    ],
+    "client_and_reporting_table_privileges": false,
+    "restrictive_rls": "All commands denied for anon and authenticated; server privileges retained.",
+    "function_identities_preserved": true,
+    "parsed_dependencies_preserved": 48
+  },
+  "verification": {
+    "staging_database": {
+      "result": "PASS",
+      "read_only_check_groups": 9,
+      "additional_isolated_checks": 3,
+      "actual_reporting_reader": "PASS",
+      "permissive_policy_cannot_override_restriction": "PASS",
+      "temporary_test_setup_rolled_back": true,
+      "business_table_fingerprints_unchanged": 10
+    },
+    "production_database": {
+      "result": "PASS",
+      "read_only_check_groups": 9,
+      "business_table_fingerprints_unchanged": 10
+    },
+    "production_api": {
+      "result": "PASS",
+      "check_groups": 13,
+      "roles": [
+        "administrator",
+        "management"
+      ],
+      "concurrent_account_detail_requests": 336,
+      "failed_requests": 0,
+      "official_study_predictions_matched_per_wave": 83,
+      "unranked_account_correctly_has_no_study_prediction": true,
+      "exports_and_import_history_authorization": "PASS",
+      "public_helper_rpc_requests_return_404": true,
+      "private_schema_requests_return_406": true,
+      "temporary_sessions_revoked": true
+    },
+    "production_browser": {
+      "result": "PASS",
+      "checks": 23,
+      "javascript_errors": 0,
+      "application_write_requests": 0
+    },
+    "repository_contract": {
+      "result": "PASS",
+      "passed": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "retained_regression": {
+      "reference": "qa/security-regression-verification-20261122.json",
+      "backend_passed": 251,
+      "frontend_passed": 186,
+      "runtime_code_unchanged": true,
+      "new_full_suite_execution_claimed": false
+    }
+  },
+  "security_advisories": {
+    "before": 7,
+    "after": 1,
+    "targeted_free_findings_resolved": 6,
+    "remaining": [
+      {
+        "name": "auth_leaked_password_protection",
+        "level": "WARN",
+        "status": "DISABLED",
+        "reason": "Supabase integrated protection requires Pro or above. Free-only scope retained; no upgrade performed.",
+        "remediation": "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection"
+      }
+    ]
+  },
+  "preservation": {
+    "analytical_data_and_registered_models_unchanged": true,
+    "ranking_and_predictions_unchanged": true,
+    "ui_and_runtime_code_unchanged": true,
+    "original_qa_receipts_unchanged": true,
+    "manuscript_unchanged": true,
+    "new_client_uat_required": false,
+    "paid_infrastructure_or_feature": false
+  },
+  "evidence": {
+    "directory": "backend/.test-tmp/PESLC_ACCESS_HARDENING_20261122/",
+    "files": [
+      {
+        "file": "database-verification.json",
+        "sha256": "939910c1de5b77c726bc81da471ec97ffddf5e8bcb6c15874a19d6cd7d6a3574"
+      },
+      {
+        "file": "authenticated-production.json",
+        "sha256": "bc2409c0c4263e56fcea5f1a19e485b892c3fb9d89703808a985f2a1dcb34753"
+      },
+      {
+        "file": "authenticated-browser.json",
+        "sha256": "ee4ebc6c31f377a5139f46fbf97f8beff67d01f42ac34d4201dc1bf929acac05"
+      },
+      {
+        "file": "repository-tests.xml",
+        "sha256": "c50386a9be3f68442f00fa4cea62d5bb5c2d250b418e4628d8eba2d0d0dee5c8"
+      }
+    ]
+  },
+  "interpretation": "The six targeted free configuration findings are resolved on staging and production, and affected access/reporting checks passed. The remaining paid-feature advisory is not represented as resolved. This is scoped hardening verification, not a penetration test or proof of comprehensive security."
+}

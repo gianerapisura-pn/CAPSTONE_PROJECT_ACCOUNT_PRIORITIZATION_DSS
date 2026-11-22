@@ -14,7 +14,9 @@ Keep `NEXT_PUBLIC_DEMO_MODE=false` for real Supabase sign-in. To retain the demo
 
 ## Database
 
-Apply the 18 timestamped migrations in order and verify latest-successful-run and final-study views plus RLS using a dedicated reporting login. Migration 20260930090015 adds server-only Power BI refresh state; grant no access to the reporting reader. Migration 20260930090016 provisions the two private storage buckets. Migration 20261007090017 adds package provenance to future run snapshots. Migration 20261012090018 adds CatBoost-aligned predictive reporting and closure provenance without rewriting old publications.
+Review the target environment's migration history and apply only missing timestamped migrations in dependency order. Verify latest-successful-run and final-study views plus role-specific RLS behavior. Migration 20260930090015 defines server-only Power BI refresh state; grant no access to the reporting reader. Migration 20260930090016 provisions the two private storage buckets. Migration 20261007090017 defines package provenance for run snapshots. Migration 20261012090018 defines CatBoost-aligned predictive reporting and closure provenance without rewriting old publications.
+
+Migration 20261122045230 defines private authorization helpers and explicit server-only table restrictions. Keep `dss_private` outside the Data API exposed-schema configuration. Execute `supabase/tests/private_authorization_helpers.sql` for read-only access verification after deployment. The companion `supabase/tests/reporting_reader_hardening.sql` is an isolated-staging test with transaction-local setup and rollback; do not use it as a production setup script.
 
 ## Native reporting publication
 
