@@ -37,6 +37,7 @@ jobs:
         run: |
           python -m pytest -q \
             tests/test_auth.py \
+            tests/test_password_screening.py \
             tests/test_import_future.py \
             tests/test_future_publication_integration.py \
             tests/test_import_validation.py \
