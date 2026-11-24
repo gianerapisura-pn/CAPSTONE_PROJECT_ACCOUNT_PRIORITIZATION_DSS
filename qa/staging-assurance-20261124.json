@@ -1,0 +1,240 @@
+{
+  "scope": "Additional isolated staging assurance and production preservation",
+  "result": "PASS",
+  "application_source_commit": "78b5d7b5aec98dea30eecca80ab15b035f736eb5",
+  "application_runtime_commit": "bdcf9d15fc10eecd766ce2fd98f5c0e9229763ce",
+  "environment": {
+    "database": "ymonifjcvkxsqhabgpxp",
+    "backend": "current FastAPI; production configuration; local HTTP test transport",
+    "authentication": "Real Supabase sessions and database roles; no dependency overrides",
+    "storage": "Existing private staging buckets",
+    "synthetic_only": true
+  },
+  "synthetic_import": {
+    "new_source_rows": 1000,
+    "new_logical_invoices": 1000,
+    "new_accounts": 40,
+    "initial_source_rows": 295,
+    "initial_logical_invoices": 284,
+    "final_source_rows": 1297,
+    "final_logical_invoices": 1284,
+    "final_run_id": "8ed4e43f-477c-4121-b7f6-f2c9cce9396d"
+  },
+  "workflow_verification": {
+    "result": "PASS",
+    "check_groups": 16,
+    "checks": [
+      {
+        "name": "Private staging frozen artifact matches registered hash",
+        "result": "PASS"
+      },
+      {
+        "name": "1,000-row synthetic upload stored and atomically published",
+        "result": "PASS",
+        "new_logical_invoices": 1000,
+        "accounts": 40,
+        "bytes": 108096,
+        "duration_seconds": 256.106
+      },
+      {
+        "name": "Forty unverified new identities excluded from analytical population",
+        "result": "PASS"
+      },
+      {
+        "name": "Authorized context saves do not change the published run",
+        "result": "PASS",
+        "saved_accounts": 40
+      },
+      {
+        "name": "Explicit rerun publishes all forty verified synthetic accounts",
+        "result": "PASS"
+      },
+      {
+        "name": "Exact duplicate re-upload is audited no-op",
+        "result": "PASS"
+      },
+      {
+        "name": "Late distinct collection updates settlement without invoice or monetary inflation",
+        "result": "PASS"
+      },
+      {
+        "name": "Explicit alias approval persists decision and audit without rewriting publication",
+        "result": "PASS"
+      },
+      {
+        "name": "Collection conflict resolved through authorized endpoint; explicit republication restores eligible invoice",
+        "result": "PASS"
+      },
+      {
+        "name": "Rejected import and uncovered-reference rerun preserve last successful publication",
+        "result": "PASS"
+      },
+      {
+        "name": "administrator same-run reports, combined filters, original ranks, empty state, detail and CSV/XLSX exports",
+        "result": "PASS"
+      },
+      {
+        "name": "management same-run reports, combined filters, original ranks, empty state, detail and CSV/XLSX exports",
+        "result": "PASS"
+      },
+      {
+        "name": "Management denied privileged mutations and model-review access; Admin review available",
+        "result": "PASS"
+      },
+      {
+        "name": "All earlier staging publications, study predictions and model registry unchanged",
+        "result": "PASS"
+      },
+      {
+        "name": "Real Admin and Management authentication and approved database roles",
+        "result": "PASS"
+      },
+      {
+        "name": "Current frontend browser interactions verified against isolated staging backend",
+        "result": "PASS"
+      }
+    ],
+    "failed": 0,
+    "skipped": 0
+  },
+  "browser_verification": {
+    "result": "PASS",
+    "check_groups": 13,
+    "checks": [
+      {
+        "name": "administrator account search, pagination, CSV/XLSX download, no-result state and reset",
+        "result": "PASS"
+      },
+      {
+        "name": "administrator new synthetic account detail",
+        "result": "PASS"
+      },
+      {
+        "name": "administrator Management Overview chart rendering, refresh and persistent definition/calculation",
+        "result": "PASS"
+      },
+      {
+        "name": "administrator Account & Prioritization Insights chart rendering, refresh and persistent definition/calculation",
+        "result": "PASS"
+      },
+      {
+        "name": "administrator Analytics Validation chart rendering, refresh and persistent definition/calculation",
+        "result": "PASS"
+      },
+      {
+        "name": "administrator selected analytics tab survives reload",
+        "result": "PASS"
+      },
+      {
+        "name": "management account search, pagination, CSV/XLSX download, no-result state and reset",
+        "result": "PASS"
+      },
+      {
+        "name": "management new synthetic account detail",
+        "result": "PASS"
+      },
+      {
+        "name": "management Management Overview chart rendering, refresh and persistent definition/calculation",
+        "result": "PASS"
+      },
+      {
+        "name": "management Account & Prioritization Insights chart rendering, refresh and persistent definition/calculation",
+        "result": "PASS"
+      },
+      {
+        "name": "management Analytics Validation chart rendering, refresh and persistent definition/calculation",
+        "result": "PASS"
+      },
+      {
+        "name": "management selected analytics tab survives reload",
+        "result": "PASS"
+      },
+      {
+        "name": "Management import screen remains restricted",
+        "result": "PASS"
+      }
+    ],
+    "javascript_errors": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "numerical_reconciliation": {
+    "scope": "Independent synthetic-source and saved-output numerical reconciliation",
+    "result": "PASS",
+    "synthetic_accounts_reconciled": 40,
+    "source_invoices_reconciled": 1000,
+    "analysis_run_id": "8ed4e43f-477c-4121-b7f6-f2c9cce9396d",
+    "ranked_accounts_reconciled": 126,
+    "normalized_values_checked": 504,
+    "criterion_contributions_checked": 504,
+    "maximum_score_difference": 4.440892098500626e-16,
+    "critic_weights_match": true,
+    "competition_ranks_match": true,
+    "source_sha256": "873bfc25a56128959cd43920f8b2299a44837042a4cd6ea576c5197d6e45889e"
+  },
+  "production_preservation": {
+    "result": "PASS",
+    "business_tables_unchanged": 10,
+    "count_and_fingerprint_comparison": true
+  },
+  "deployment": {
+    "url": "https://peslc-dss-academic-web.vercel.app",
+    "state": "READY",
+    "application_commit": "bdcf9d15fc10eecd766ce2fd98f5c0e9229763ce",
+    "new_deployment_required": false
+  },
+  "retained_regression": {
+    "receipt": "qa/security-regression-verification-20261122.json",
+    "backend_passed": 251,
+    "frontend_passed": 186,
+    "runtime_code_unchanged": true,
+    "full_suites_rerun": false
+  },
+  "security": {
+    "production_database_control_check_groups_passed": 9,
+    "staging_database_control_check_groups_passed": 9,
+    "configuration_findings_resolved": 6,
+    "remaining_security_advisories": 1,
+    "remaining_name": "auth_leaked_password_protection",
+    "remaining_status": "DISABLED; not reported as resolved",
+    "paid_upgrade": false
+  },
+  "preservation": {
+    "production_writes": false,
+    "registered_model_changed": false,
+    "study_predictions_changed": false,
+    "earlier_staging_publications_changed": false,
+    "analytical_archive_changed": false,
+    "application_code_or_ui_changed": false,
+    "google_docs_edited": false,
+    "client_uat_repeated": false,
+    "new_client_retest_required": false,
+    "test_sessions_revoked": true
+  },
+  "evidence": {
+    "directory": "backend/.test-tmp/PESLC_STAGING_ASSURANCE_20261124/",
+    "files": [
+      {
+        "file": "results.json",
+        "sha256": "8541d99aea803b287627d10152748e0748221fd2ac9abfc900b09c4b1865e690"
+      },
+      {
+        "file": "browser-results.json",
+        "sha256": "d8ce01d65bff8fb65fe041f1ee06752c8947f9d0d269d3b81502f6af9dffe841"
+      },
+      {
+        "file": "numerical-results.json",
+        "sha256": "f16f04d9bbf867e314e628d931a5f90f9fa58a488ae53d12a7f25455a8b4cdfd"
+      },
+      {
+        "file": "production-preservation.json",
+        "sha256": "b6076e5d2f4c76091303003a53569deb151631289efe030c65010a2eb79f595c"
+      },
+      {
+        "file": "QA_ONLY_VOLUME.csv",
+        "sha256": "873bfc25a56128959cd43920f8b2299a44837042a4cd6ea576c5197d6e45889e"
+      }
+    ]
+  },
+  "interpretation": "Defined workflow, browser, numerical and preservation checks passed. The larger import used the current local application connected to real isolated staging services; it is not a new Vercel volume test, human UAT session, actual future-year sales evaluation, unlimited-load claim or comprehensive security certification. Completed phases were retained when only the remaining checks were continued. Original attempt records remain in the private evidence directory."
+}
