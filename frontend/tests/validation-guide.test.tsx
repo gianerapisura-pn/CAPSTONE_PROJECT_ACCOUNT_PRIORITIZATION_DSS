@@ -30,7 +30,7 @@ test("additional study checks explain every table and leave the source evidence 
   };
   const before = JSON.stringify(evidence);
   const { container } = render(<AdditionalValidation evidence={evidence} referenceDate="2025-12-31" />);
-  for (const topic of ["features", "incidence", "annual", "recency", "relationship", "bootstrap"]) {
+  for (const topic of ["features", "incidence", "annual", "relationship", "bootstrap"]) {
     expect(container.querySelector(`[data-validation-guide="${topic}"]`)).not.toBeNull();
   }
   for (const table of container.querySelectorAll("table")) {
@@ -39,6 +39,11 @@ test("additional study checks explain every table and leave the source evidence 
   expect(screen.getByText(/first group minus the second/)).not.toBeVisible();
   expect(screen.getByText(/no discrimination and 1 is perfect/)).not.toBeVisible();
   expect(screen.getByText(/1 of 1 available intervals include zero/)).toBeVisible();
+  expect(screen.queryByRole("columnheader", { name: "Recency-only top-decile lift" })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("FPS and recency-only comparison")).not.toBeInTheDocument();
+  expect(container.querySelector('[data-validation-guide="recency"]')).toBeNull();
+  expect(screen.getByRole("columnheader", { name: "Buyer-discrimination AUC" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "FPS versus next-year SI Spearman" })).toBeInTheDocument();
   expect(JSON.stringify(evidence)).toBe(before);
 });
 
@@ -103,7 +108,7 @@ test("yearly score-value association is not described as perturbation rank agree
   render(<AdditionalValidation branch="prescriptive" evidence={{
     fps_future_relationship: [{ year: 2021, auc_fps_for_next_year_purchase: .6, spearman_fps_vs_next_year_si: -.1234 }],
   }} referenceDate="2025-12-31" />);
-  expect(screen.getByText("Supporting evidence: yearly FPS and recency-only diagnostics").closest("details")).toHaveAttribute("open");
+  expect(screen.getByText("Supporting evidence: FPS and historical sales outcomes").closest("details")).toHaveAttribute("open");
   await userEvent.click(screen.getByRole("button", { name: "-0.1234" }));
   const help = screen.getByRole("tooltip");
   expect(help).toHaveTextContent("2021 historical follow-up");

@@ -133,9 +133,10 @@ test("essential validation is visible, unsafe context is rejected, and layouts f
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/reports?tab=analytics-validation&section=validation-findings");
     await expect(page.getByRole("heading", { name: "Historical classifier finding" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Official priority method versus a Recency-only rule" })).toBeVisible();
-    await expect(page.getByRole("region", { name: "FPS and recency-only comparison" })).toContainText("4.39x");
-    await expect(page.getByRole("region", { name: "FPS and recency-only comparison" })).toContainText("4.92x");
+    await expect(page.getByRole("region", { name: "FPS and recency-only comparison" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Annual Account Ranking History" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Buyer-discrimination AUC" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "FPS versus next-year SI Spearman" })).toBeVisible();
     const bootstrap = page.getByRole("region", { name: "Bootstrap uncertainty for historical group differences" });
     await expect(bootstrap).toBeVisible();
     await expect(bootstrap.locator("tbody tr")).toHaveCount(2);

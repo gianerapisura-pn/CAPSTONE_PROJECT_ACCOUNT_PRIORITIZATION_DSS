@@ -89,8 +89,9 @@ test("validation tables and charts include visible plain-language guides without
   for (const chart of container.querySelectorAll(".native-chart")) {
     expect(chart.querySelector("[data-validation-guide]")).not.toBeNull();
   }
-  expect(screen.getByText(/0.01 means one percentage point/)).not.toBeVisible();
+  expect(screen.queryByText(/0.01 means one percentage point/)).not.toBeInTheDocument();
   expect(screen.getAllByText(/not twice as many buyers/)).toHaveLength(2);
+  for (const explanation of screen.getAllByText(/not twice as many buyers/)) expect(explanation).not.toBeVisible();
   expect(screen.queryByText("0.7649")).not.toBeInTheDocument();
   expect(screen.queryByText("92.41%")).not.toBeInTheDocument();
 });
@@ -226,7 +227,7 @@ test("validation results start expanded while technical explanations stay option
   render(<ReportsPage />);
   await user.click(screen.getByRole("tab", { name: "Analytics Validation" }));
   const disclosures = document.querySelectorAll("#validation-findings details.native-evidence-details");
-  expect(disclosures).toHaveLength(6);
+  expect(disclosures).toHaveLength(3);
   const navigation = screen.getByRole("navigation", { name: "Analytics Validation sections" });
   for (const link of within(navigation).getAllByRole("link")) {
     expect(document.querySelector(link.getAttribute("href")!)).not.toBeNull();
@@ -262,73 +263,61 @@ test("validation results start expanded while technical explanations stay option
   expect(screen.getByText(/Predictions are not verified future sales/)).toBeInTheDocument();
 });
 
-test("CRITIC influence shows ten rows per page without changing saved results", async () => {
-  const user = userEvent.setup();
-  influenceRows = Array.from({ length: 23 }, (_, index) => ({ removed_account: `INFLUENCE ACCOUNT ${index + 1}`, maximum_absolute_weight_change: .0046, spearman_correlation: .99, group_movement_rate: .02 }));
-  const before = JSON.stringify(influenceRows);
-  render(<ReportsPage />);
-  await user.click(screen.getByRole("tab", { name: "Analytics Validation" }));
-  const panel = screen.getByText("Leave-one-account-out CRITIC influence (23)").closest("details")!;
-  const scope = within(panel);
-  const bodyRows = () => panel.querySelectorAll("tbody tr");
-  expect(scope.queryByRole("columnheader",{name:"Recomputed weights"})).not.toBeInTheDocument();
-  expect(scope.getByRole("columnheader",{name:"Temporarily omitted account"})).toBeInTheDocument();
-  expect(bodyRows()).toHaveLength(10);
-  expect(scope.getByText("Showing 1-10 of 23")).toBeInTheDocument();
-  expect(scope.getByRole("button", { name: "Previous influence page" })).toBeDisabled();
-  expect(bodyRows()[0]).toHaveTextContent("INFLUENCE ACCOUNT 1");
-  expect(bodyRows()[0]).toHaveTextContent("0.0046");
-  await user.click(scope.getByRole("button", { name: "Next influence page" }));
-  expect(bodyRows()).toHaveLength(10);
-  expect(scope.getByText("Showing 11-20 of 23")).toBeInTheDocument();
-  await user.click(scope.getByRole("button", { name: "Next influence page" }));
-  expect(bodyRows()).toHaveLength(3);
-  expect(scope.getByText("Showing 21-23 of 23")).toBeInTheDocument();
-  expect(scope.getByRole("button", { name: "Next influence page" })).toBeDisabled();
-  await user.click(scope.getByRole("button", { name: "Previous influence page" }));
-  expect(scope.getByText("Showing 11-20 of 23")).toBeInTheDocument();
-  expect(JSON.stringify(influenceRows)).toBe(before);
-});
-
-test("empty CRITIC influence has no phantom page or active navigation", async () => {
-  render(<ReportsPage />);
-  await userEvent.setup().click(screen.getByRole("tab", { name: "Analytics Validation" }));
-  const panel = screen.getByText("Leave-one-account-out CRITIC influence (0)").closest("details")!;
-  expect(panel.querySelectorAll("tbody tr")).toHaveLength(0);
-  expect(within(panel).getByText("Showing 0-0 of 0")).toBeInTheDocument();
-  expect(within(panel).getByRole("button", { name: "Previous influence page" })).toBeDisabled();
-  expect(within(panel).getByRole("button", { name: "Next influence page" })).toBeDisabled();
-  for (const label of ["historical criterion-removal", "boundary movement"]) {
-    expect(screen.getByRole("button", { name: `Previous ${label} page` })).toBeDisabled();
-    expect(screen.getByRole("button", { name: `Next ${label} page` })).toBeDisabled();
+test.each(["administrator", "management"])("%s retains core validation while research-only displays are absent with evidence present", async role => {
+  authState.role = role;
+  influenceRows = [{ removed_account: "INFLUENCE ACCOUNT", maximum_absolute_weight_change: .0514, spearman_correlation: .98, group_movement_rate: .1 }];
+  supplementalRows = [
+    { source_member: "qa/current_metrics.csv", comparison: "CRITIC vs Entropy", spearman: .95 },
+    { source_member: "AGGREGATION/current_metrics.csv", comparison: "Additive MCS vs CRITIC-TOPSIS", spearman: .99 },
+    { source_member: "qa/backtest_summary.csv", method: "Equal Weighting", mean_lift: 4 },
+    { source_member: "qa/criterion_ablation_current.csv", removed_criterion: "recency", rank_spearman: .48 },
+    { source_member: "qa/criterion_ablation_history.csv", removed_criterion: "recency", cutoff: "2024" },
+  ];
+  const before = JSON.stringify({ influenceRows, supplementalRows });
+  const { container } = render(<ReportsPage />);
+  await userEvent.click(screen.getByRole("tab", { name: "Analytics Validation" }));
+  expect(container.textContent).not.toMatch(/TOPSIS|Entropy|Equal Weighting|criterion-removal|leave-one-account-out|account-omission|INFLUENCE ACCOUNT|4,000/i);
+  expect(container.querySelector('[data-validation-guide="influence"]')).toBeNull();
+  for (const label of ["influence", "historical criterion-removal"]) {
+    expect(screen.queryByRole("button", { name: `Next ${label} page` })).not.toBeInTheDocument();
   }
+  expect(screen.getByRole("heading", { name: "What determines the Final Priority Score?" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Sensitivity summary" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Backtest summary" })).toBeVisible();
+  expect(screen.getAllByText(/2030-06-01/).length).toBeGreaterThan(0);
+  expect(screen.getAllByRole("tab")).toHaveLength(3);
+  expect(JSON.stringify({ influenceRows, supplementalRows })).toBe(before);
 });
 
-test("historical checks and boundary observations have independent ten-row pages", async () => {
-  const user = userEvent.setup();
+test("missing supplementary evidence leaves no comparison placeholders and preserves empty boundary navigation", async () => {
+  render(<ReportsPage />);
+  await userEvent.click(screen.getByRole("tab", { name: "Analytics Validation" }));
+  expect(screen.queryByText(/criterion-removal|leave-one-account-out|Supplementary weighting/i)).not.toBeInTheDocument();
+  const panel = screen.getByText("Priority boundary movement observations (0)").closest("details")!;
+  expect(panel).toHaveAttribute("open");
+  expect(within(panel).getByText("Showing 0-0 of 0")).toBeInTheDocument();
+  for (const direction of ["Previous", "Next"]) expect(within(panel).getByRole("button", { name: `${direction} boundary movement page` })).toBeDisabled();
+});
+
+test("boundary observations retain ten-row pagination without mutating shared historical evidence", async () => {
   supplementalRows = [
     ...Array.from({ length: 23 }, (_, index) => ({ source_member: "qa/criterion_ablation_history.csv", cutoff: `PERIOD ${index + 1}`, removed_criterion: "recency", eligible_accounts: 40, selected_count: 4, capture_rate: .2, lift: 2 })),
     ...Array.from({ length: 31 }, (_, index) => ({ source_member: "qa/boundary_movement.csv", account_name: `BOUNDARY ACCOUNT ${index + 1}`, group_change_count: 1, group_change_rate: (31 - index) / 100, baseline_priority_group: "High", perturbation_level: .1, maximum_absolute_rank_change: 2 })),
   ];
   const before = JSON.stringify(supplementalRows);
   render(<ReportsPage />);
-  await user.click(screen.getByRole("tab", { name: "Analytics Validation" }));
-  const historical = screen.getByText("Historical criterion-removal checks (23)").closest("details")!;
-  const boundary = screen.getByText("Priority boundary movement observations (31)").closest("details")!;
-  for (const [panel, label, total] of [[historical, "historical criterion-removal", 23], [boundary, "boundary movement", 31]] as const) {
-    const scope = within(panel);
-    expect(panel.querySelectorAll("tbody tr")).toHaveLength(10);
-    expect(scope.getByRole("button", { name: `Previous ${label} page` })).toBeDisabled();
-    const pages = Math.ceil(total / 10);
-    for (let page = 2; page <= pages; page++) await user.click(scope.getByRole("button", { name: `Next ${label} page` }));
-    expect(panel.querySelectorAll("tbody tr")).toHaveLength(total % 10);
-    expect(scope.getByText(`Showing ${(pages - 1) * 10 + 1}-${total} of ${total}`)).toBeInTheDocument();
-    expect(scope.getByRole("button", { name: `Next ${label} page` })).toBeDisabled();
-    await user.click(scope.getByRole("button", { name: `Previous ${label} page` }));
-    expect(panel.querySelectorAll("tbody tr")).toHaveLength(10);
-    if (label === "historical criterion-removal") expect(within(boundary).getByText("Page 1 of 4")).toBeInTheDocument();
-    else expect(within(historical).getByText("Page 2 of 3")).toBeInTheDocument();
-  }
+  await userEvent.click(screen.getByRole("tab", { name: "Analytics Validation" }));
+  expect(screen.queryByText(/Historical criterion-removal checks/)).not.toBeInTheDocument();
+  const panel = screen.getByText("Priority boundary movement observations (31)").closest("details")!;
+  const scope = within(panel);
+  expect(panel.querySelectorAll("tbody tr")).toHaveLength(10);
+  expect(scope.getByRole("button", { name: "Previous boundary movement page" })).toBeDisabled();
+  for (let page = 2; page <= 4; page++) await userEvent.click(scope.getByRole("button", { name: "Next boundary movement page" }));
+  expect(panel.querySelectorAll("tbody tr")).toHaveLength(1);
+  expect(scope.getByText("Showing 31-31 of 31")).toBeInTheDocument();
+  expect(scope.getByRole("button", { name: "Next boundary movement page" })).toBeDisabled();
+  await userEvent.click(scope.getByRole("button", { name: "Previous boundary movement page" }));
+  expect(panel.querySelectorAll("tbody tr")).toHaveLength(10);
   expect(JSON.stringify(supplementalRows)).toBe(before);
 });
 

@@ -41,7 +41,7 @@ for (const width of [1440, 1366, 1024, 390]) {
     const validation = page.locator("#validation-findings");
     await expect(validation).toBeVisible();
     const sections = validation.locator("details.native-evidence-details");
-    await expect(sections).toHaveCount(9);
+    await expect(sections).toHaveCount(6);
     await expect(validation.locator("details:not([open])")).toHaveCount(0);
     for (const section of await sections.all()) {
       await section.locator(":scope>summary").click();
@@ -50,24 +50,12 @@ for (const width of [1440, 1366, 1024, 390]) {
       await expect(section).toHaveAttribute("open");
     }
     await expect(validation.locator("details:not([open])")).toHaveCount(0);
-    const influence = validation.locator("summary").filter({ hasText: "Leave-one-account-out CRITIC influence" }).locator("..");
-    const seen: string[] = [];
-    await expect(influence.getByRole("button", { name: "Previous influence page" })).toBeDisabled();
-    for (let current = 1; current <= 9; current++) {
-      await expect(influence.locator("tbody tr")).toHaveCount(current === 9 ? 3 : 10);
-      await expect(influence.getByText(`Page ${current} of 9`, { exact: true })).toBeVisible();
-      seen.push(...await influence.locator("tbody tr td:first-child").allTextContents());
-      if (current < 9) await influence.getByRole("button", { name: "Next influence page" }).click();
-    }
-    expect(seen).toHaveLength(83);
-    expect(new Set(seen).size).toBe(83);
-    await expect(influence.getByRole("button", { name: "Next influence page" })).toBeDisabled();
-    await influence.getByRole("button", { name: "Previous influence page" }).click();
-    await expect(influence.getByText("Showing 71-80 of 83", { exact: true })).toBeVisible();
-    const historical = evidence.supplemental.filter(row => String(row.source_member).endsWith("/criterion_ablation_history.csv"));
+    await expect(validation.getByText(/Leave-one-account-out CRITIC influence|Historical criterion-removal checks|Supplementary weighting and aggregation evidence/)).toHaveCount(0);
+    await expect(validation.getByRole("heading", { name: "Annual Account Ranking History" })).toBeVisible();
+    await expect(validation.getByRole("columnheader", { name: "Buyer-discrimination AUC" })).toBeVisible();
+    await expect(validation.getByRole("columnheader", { name: "FPS versus next-year SI Spearman" })).toBeVisible();
     const boundary = evidence.supplemental.filter(row => String(row.source_member).endsWith("/boundary_movement.csv") && Number(row.group_change_count) > 0).sort((a, b) => Number(b.group_change_rate) - Number(a.group_change_rate));
     for (const [title, label, expected] of [
-      ["Historical criterion-removal checks", "historical criterion-removal", historical.map(row => `${row.cutoff ?? ""}|${row.removed_criterion ?? ""}`)],
       ["Priority boundary movement observations", "boundary movement", boundary.map(row => `${(Number(row.perturbation_level) * 100).toFixed(2)}%|${row.account_name}`)],
     ] as const) {
       const panel = validation.locator("summary").filter({ hasText: title }).locator("..");

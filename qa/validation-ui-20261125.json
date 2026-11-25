@@ -1,0 +1,63 @@
+{
+  "scope": "Targeted Analytics Validation presentation; analytical methods and evidence preserved",
+  "result": "PASS",
+  "frontend_regression": {
+    "passed": 203,
+    "failed": 0,
+    "skipped": 0
+  },
+  "typecheck": "PASS",
+  "lint": "PASS",
+  "production_build": "PASS",
+  "browser": {
+    "result": "PASS",
+    "groups": 4,
+    "roles": [
+      "administrator",
+      "management"
+    ],
+    "widths": [
+      1366,
+      390
+    ],
+    "javascript_errors": 0,
+    "scope": "Synthetic intercepted Auth/API responses; no live database authorization claim",
+    "evidence": "backend/.test-tmp/PESLC_VALIDATION_UI_20261125/local-retest/browser-results.json"
+  },
+  "retained": [
+    "Annual Account Ranking History",
+    "Annual Priority Group Outcomes",
+    "Annual rank agreement and movement",
+    "Historical buyer incidence",
+    "FPS versus next-year SI Spearman",
+    "Buyer-discrimination AUC",
+    "Bootstrap uncertainty",
+    "Predictive evaluation and feature-set sensitivity",
+    "Primary sensitivity",
+    "Published CRITIC weights",
+    "Historical backtesting",
+    "Priority boundary movement",
+    "Operational exports"
+  ],
+  "preservation": {
+    "backend_changed": false,
+    "api_contract_changed": false,
+    "model_or_ranking_changed": false,
+    "supabase_changed": false,
+    "research_evidence_changed": false,
+    "manuscript_changed": false,
+    "original_uat_changed": false
+  },
+  "client_uat": {
+    "new_full_survey_required": false,
+    "reason": "Accepted analytics review and export tasks retained; presentation verified by technical regression. No new client approval is asserted."
+  },
+  "deployment": {
+    "status": "READY FOR RELEASE"
+  },
+  "documentation_followup": [
+    "Review Chapter 3 and Chapter 4 descriptions that explicitly describe the supplementary tables as visible.",
+    "Replace affected Analytics Validation screenshots, especially Figure 4.17, if they show the previous UI.",
+    "Retain supplementary research findings and Appendix B.2."
+  ]
+}
