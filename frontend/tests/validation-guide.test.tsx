@@ -109,6 +109,11 @@ test("yearly score-value association is not described as perturbation rank agree
     fps_future_relationship: [{ year: 2021, auc_fps_for_next_year_purchase: .6, spearman_fps_vs_next_year_si: -.1234 }],
   }} referenceDate="2025-12-31" />);
   expect(screen.getByText("Supporting evidence: FPS and historical sales outcomes").closest("details")).toHaveAttribute("open");
+  const guide = document.querySelector('[data-validation-guide="relationship"]')!;
+  await userEvent.click(guide.querySelector("summary")!);
+  expect(within(guide as HTMLElement).getByText(/Buyer-discrimination AUC measures/)).toBeVisible();
+  expect(guide).toHaveTextContent("FPS versus next-year SI Spearman measures score/value association");
+  expect(guide).not.toHaveTextContent(/Recency-only|TOPSIS|Entropy|criterion removal|leave-one-account-out/i);
   await userEvent.click(screen.getByRole("button", { name: "-0.1234" }));
   const help = screen.getByRole("tooltip");
   expect(help).toHaveTextContent("2021 historical follow-up");

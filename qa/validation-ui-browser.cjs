@@ -69,6 +69,11 @@ const save = () => fs.writeFileSync(path.join(output, 'browser-results.json'), J
         for (const name of ['Annual Account Ranking History', 'Annual rank agreement and movement', 'Historical 12-month buyer incidence by Priority Group', 'What determines the Final Priority Score?', 'Sensitivity summary', 'Backtest summary', 'CatBoost feature-set sensitivity', 'Bootstrap uncertainty for historical group differences']) await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
         await expect(page.getByRole('columnheader', { name: 'Buyer-discrimination AUC' })).toBeVisible();
         await expect(page.getByRole('columnheader', { name: 'FPS versus next-year SI Spearman' })).toBeVisible();
+        const relationshipGuide = page.locator('[data-validation-guide="relationship"]');
+        await relationshipGuide.locator('summary').click();
+        await expect(relationshipGuide).toContainText('Buyer-discrimination AUC measures');
+        await expect(relationshipGuide).toContainText('FPS versus next-year SI Spearman measures score/value association');
+        await expect(relationshipGuide).not.toContainText(/Recency-only|TOPSIS|Entropy|criterion removal|leave-one-account-out/i);
         await page.getByRole('combobox', { name: /^Ranking year/ }).selectOption('2022');
         await expect(page.locator('.annual-ranking-section tbody')).toContainText('SYNTHETIC ACCOUNT');
         await page.getByRole('combobox', { name: /^Group-outcome cutoff year/ }).selectOption('2022');

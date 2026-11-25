@@ -1,0 +1,24 @@
+{
+  "scope": "Align the displayed FPS?historical-outcomes Details guide with its retained AUC and Spearman columns",
+  "result": "PASS",
+  "frontend_regression": {
+    "passed": 203,
+    "failed": 0,
+    "skipped": 0
+  },
+  "typecheck": "PASS",
+  "lint": "PASS",
+  "preserved": [
+    "All retained charts and tables",
+    "Analytical methods and outputs",
+    "Backend and API contracts",
+    "Supabase data and schema",
+    "Research evidence",
+    "Original client UAT",
+    "Manuscript"
+  ],
+  "browser_check": "Expanded relationship guide is explicitly checked by the updated browser verifier; release execution recorded separately.",
+  "new_client_uat_required": false,
+  "evidence_directory": "backend/.test-tmp/PESLC_VALIDATION_GUIDE_20261125",
+  "deployment": "READY FOR RELEASE"
+}

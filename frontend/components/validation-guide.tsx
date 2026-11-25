@@ -138,7 +138,7 @@ export const validationGuides = {
   relationship: [
     "Is a higher priority score associated with later buying?",
     "These saved historical diagnostics compare Final Priority Scores with actual purchases and invoice values in each following year; they do not use CatBoost predictions.",
-    "Buyer-discrimination AUC measures how often a buyer has a higher FPS than a nonbuyer: 0.5 is no discrimination and 1 is perfect. FPS versus next-year SI Spearman measures score/value association: near 1 is positive, near 0 is weak, and negative means an opposite pattern. Recency-only lift is the simple rule's value capture versus random.",
+    "Buyer-discrimination AUC measures how often a buyer has a higher FPS than a nonbuyer: 0.5 is no discrimination and 1 is perfect. FPS versus next-year SI Spearman measures score/value association: near 1 is positive, near 0 is weak, and negative means an opposite pattern.",
     "A relationship can be weak even when the review method is stable. FPS is a multicriteria review score, not a calibrated purchase probability or a promised sales amount.",
   ],
   bootstrap: [
