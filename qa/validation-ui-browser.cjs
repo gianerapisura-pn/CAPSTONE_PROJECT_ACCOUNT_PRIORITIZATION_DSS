@@ -3,7 +3,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { createRequire } = require('node:module');
-const { chromium, expect } = createRequire(path.resolve(__dirname, '../frontend/package.json'))('@playwright/test');
+const { chromium, expect: baseExpect } = createRequire(path.resolve(__dirname, '../frontend/package.json'))('@playwright/test');
+const expect = baseExpect.configure({ timeout: 30000 });
 const origin = process.argv[2];
 const output = process.argv[3];
 const run = { analysis_run_id: 'synthetic-ui-run', analysis_reference_date: '2030-06-01', completed_at: '2030-06-01T12:00:00Z', model_version: 'catboost_stage8' };

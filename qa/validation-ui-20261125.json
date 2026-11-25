@@ -22,7 +22,8 @@
     ],
     "javascript_errors": 0,
     "scope": "Synthetic intercepted Auth/API responses; no live database authorization claim",
-    "evidence": "backend/.test-tmp/PESLC_VALIDATION_UI_20261125/local-retest/browser-results.json"
+    "evidence": "backend/.test-tmp/PESLC_VALIDATION_UI_20261125/local-retest/browser-results.json",
+    "export_scope": "Existing download controls verified with synthetic response; no production exporter or workbook-content change."
   },
   "retained": [
     "Annual Account Ranking History",
@@ -46,18 +47,123 @@
     "supabase_changed": false,
     "research_evidence_changed": false,
     "manuscript_changed": false,
-    "original_uat_changed": false
+    "original_uat_changed": false,
+    "backend_tree_identical_to_baseline": true
   },
   "client_uat": {
     "new_full_survey_required": false,
     "reason": "Accepted analytics review and export tasks retained; presentation verified by technical regression. No new client approval is asserted."
   },
   "deployment": {
-    "status": "READY FOR RELEASE"
+    "id": "dpl_BLWrSwNDwhUjhiQMZ8XzCtdYaEix",
+    "status": "READY",
+    "url": "https://peslc-dss-academic-web.vercel.app",
+    "commit": "5e6f59aacd3cb465442437b7acb7a2ffd24eec15",
+    "project": "peslc-dss-academic-web",
+    "paid_upgrade": false
   },
   "documentation_followup": [
     "Review Chapter 3 and Chapter 4 descriptions that explicitly describe the supplementary tables as visible.",
     "Replace affected Analytics Validation screenshots, especially Figure 4.17, if they show the previous UI.",
     "Retain supplementary research findings and Appendix B.2."
+  ],
+  "application_commit": "5e6f59aacd3cb465442437b7acb7a2ffd24eec15",
+  "ui_scope": {
+    "not_rendered": [
+      "MCS versus TOPSIS",
+      "CRITIC versus Entropy versus Equal Weighting",
+      "Recency-only comparison and its shared-table column",
+      "Leave-One-Account-Out table and summary",
+      "Current and historical criterion-removal displays"
+    ],
+    "additional_4000_scenarios": "No dedicated display existed; no replacement introduced."
+  },
+  "story_order": [
+    "Study and published-run context",
+    "Historical predictive evaluation",
+    "Historical Priority Group outcomes and annual account rankings",
+    "Annual ranking agreement, FPS?SI relationships and uncertainty",
+    "Published weights, primary sensitivity and historical backtesting",
+    "Priority boundary movement"
+  ],
+  "production_http": {
+    "statuses": {
+      "/login": 200,
+      "/reports": 200,
+      "/api/health": 200,
+      "/api/reports/native/validation": 401
+    },
+    "result": "PASS",
+    "scope": "Public pages, backend health, and unauthenticated API denial; no database writes"
+  },
+  "production_browser": {
+    "result": "PASS",
+    "groups": 4,
+    "roles": [
+      "administrator",
+      "management"
+    ],
+    "widths": [
+      1366,
+      390
+    ],
+    "javascript_errors": 0,
+    "unexpected_requests": 0,
+    "scope": "Local/released frontend rendering with synthetic intercepted Auth/API; not live database authorization or client UAT",
+    "evidence": "backend/.test-tmp/PESLC_VALIDATION_UI_20261125/production-final/browser-results.json"
+  },
+  "commands": [
+    "npm --prefix frontend test -- --maxWorkers=1 --no-file-parallelism --reporter=json --outputFile=validation-ui-results.json",
+    "npm --prefix frontend run typecheck",
+    "npm --prefix frontend run lint",
+    "npm --prefix frontend run build -- --webpack",
+    "node qa/validation-ui-browser.cjs <local-or-production-origin> <evidence-directory>"
+  ],
+  "source_files": [
+    "frontend/components/additional-validation.tsx",
+    "frontend/components/native-report-views.tsx"
+  ],
+  "test_files": [
+    "frontend/tests/reports-page.test.tsx",
+    "frontend/tests/validation-guide.test.tsx",
+    "frontend/e2e/post-qa-presentation.spec.ts",
+    "frontend/e2e/ux-journeys.spec.ts",
+    "qa/validation-ui-browser.cjs"
+  ],
+  "objectives": "Research objectives and analytical methods unchanged; current UI verification confirms retained evaluation, ranking interpretation, historical outcome, sensitivity and operational review paths. Original research acceptance records are retained.",
+  "verdict": "IMPLEMENTED AND VERIFIED within the defined presentation and release-check scope",
+  "evidence": [
+    {
+      "path": "backend/.test-tmp/PESLC_VALIDATION_UI_20261125/frontend-results.json",
+      "sha256": "7a6e3b0122f381811f96aa5085f7c97422c1797bba42c951b571f6330ce11115"
+    },
+    {
+      "path": "backend/.test-tmp/PESLC_VALIDATION_UI_20261125/frontend-tests.log",
+      "sha256": "30e1e638953336f5d7f5068ad72b58da23ea3f039b54e4a5072511b476f6a14d"
+    },
+    {
+      "path": "backend/.test-tmp/PESLC_VALIDATION_UI_20261125/types.log",
+      "sha256": "6ce64b45b8e329dacdf4d498d367b907274c8c6262f1784465eb391a37626e67"
+    },
+    {
+      "path": "backend/.test-tmp/PESLC_VALIDATION_UI_20261125/lint.log",
+      "sha256": "e06414b34719efb2b7d0473b682d9397f864283eb3ae61ec03a2a621fc700de7"
+    },
+    {
+      "path": "backend/.test-tmp/PESLC_VALIDATION_UI_20261125/build.log",
+      "sha256": "135c6ee68c94c2f91476d45ee1dbffbf5d38d1a8300219c111f3a05dc53ce6f0"
+    },
+    {
+      "path": "backend/.test-tmp/PESLC_VALIDATION_UI_20261125/local-retest/browser-results.json",
+      "sha256": "fb6185735d68d147355911dbb21dbbf7e771dde52c68544510f43ee06c986d8a"
+    },
+    {
+      "path": "backend/.test-tmp/PESLC_VALIDATION_UI_20261125/production-final/browser-results.json",
+      "sha256": "fb6185735d68d147355911dbb21dbbf7e771dde52c68544510f43ee06c986d8a"
+    },
+    {
+      "path": "backend/.test-tmp/PESLC_VALIDATION_UI_20261125/production-http.json",
+      "sha256": "befd02bd31edfe9c5c30a3e1aca7ac4d7a1c2f03028b6b3e9dcca1d65b27770a"
+    }
   ]
 }
