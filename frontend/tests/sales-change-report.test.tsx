@@ -23,14 +23,14 @@ test("keeps historical sales separate from current priority and permits account 
   expect(screen.getByText(/Operational 12-month class: With No Future Sales/)).toBeVisible();
   await userEvent.selectOptions(screen.getByLabelText("Purchasing group"), "Current year only");
   expect(screen.queryByText("FORMER")).not.toBeInTheDocument();
-  expect(screen.getByRole("img", { name: /Sales bridge from 2030 to 2031/ })).toBeInTheDocument();
+  expect(screen.getByRole("img", { name: /Annual sales: 2030:/ })).toBeInTheDocument();
 });
 test("sends selected complete years to the server", async () => {
   render(<SalesChangeReport publicationId="publication" />);
   await userEvent.selectOptions(screen.getByLabelText("Comparison years"), "2029:2030");
   expect(state.paths.at(-1)).toBe("/reports/native/sales-change?previous_year=2029&current_year=2030");
 });
-test("does not show a bridge from a different publication", () => {
+test("does not show charts from a different publication", () => {
   render(<SalesChangeReport publicationId="newer-publication" />);
   expect(screen.getByRole("status")).toHaveTextContent("publication changed");
   expect(screen.queryByText("FORMER")).not.toBeInTheDocument();

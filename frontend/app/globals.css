@@ -211,6 +211,25 @@ select:not([multiple]):not([size]) { appearance: none; padding-right: 36px; back
 .model-review-panel caption{text-align:left;padding:10px 0;font-size:12px;color:var(--muted)}
 
 /* Historical sales report uses the existing native reporting design. */
+.sales-comparison-charts{display:grid;gap:20px;min-width:0}
+.sales-chart-card{display:grid;gap:12px;min-width:0;padding:16px;border:1px solid var(--line);border-radius:6px;background:#fff}
+.sales-chart-card h3{font-size:15px;line-height:1.5}
+.sales-annual-chart{width:100%;min-width:0}
+.sales-chart-tooltip{max-width:min(280px,calc(100vw - 48px));padding:12px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);box-shadow:0 4px 16px #0002;white-space:normal;overflow-wrap:anywhere}
+.sales-change-report .sales-chart-tooltip p{margin-top:6px;font-size:12px;line-height:1.5}
+.sales-contribution-chart{display:grid;gap:14px;min-width:0;padding-top:4px}
+.sales-contribution-chart .sales-contribution-row{display:grid;grid-template-columns:190px minmax(0,1fr) 140px;gap:16px;align-items:center;max-width:none;min-width:0;font-size:12px;line-height:1.5;text-decoration:none}
+.sales-contribution-name{overflow-wrap:anywhere;text-decoration:underline dotted #8eb8ac;text-underline-offset:3px}
+.sales-contribution-amount{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}
+.sales-contribution-track{display:block;position:relative;min-width:0;height:30px;background:#f7f9fa;border-top:1px solid #edf0f2;border-bottom:1px solid #edf0f2}
+.sales-contribution-zero{position:absolute;top:-4px;bottom:-4px;width:1px;background:#46565d;z-index:1}
+.sales-contribution-bar{position:absolute;top:3px;height:22px;max-width:100%;background:#4d78ac}
+.sales-contribution-bar.decrease{background:#ac5c53}.sales-contribution-bar.increase{background:#168366}.sales-contribution-bar.unchanged{min-width:2px;background:#76858c;transform:translateX(-1px)}
+.sales-contribution-axis{display:grid;grid-template-columns:190px minmax(0,1fr) 140px;gap:16px}
+.sales-contribution-ticks{display:block;grid-column:2;position:relative;height:26px;border-top:1px solid #76858c;font-size:10px;color:#425466}
+.sales-contribution-ticks>span{position:absolute;top:7px;white-space:nowrap;transform:translateX(-50%)}
+.sales-contribution-ticks>span.first{transform:none}.sales-contribution-ticks>span.last{transform:translateX(-100%)}
+@media(max-width:760px){.sales-chart-card{padding:12px}.sales-contribution-chart .sales-contribution-row{grid-template-columns:minmax(0,1fr) auto;gap:7px 10px}.sales-contribution-track{grid-column:1/-1;grid-row:2}.sales-contribution-amount{grid-column:2;grid-row:1;font-size:11px}.sales-contribution-axis{grid-template-columns:minmax(0,1fr);gap:0}.sales-contribution-ticks{grid-column:1}}
 .sales-change-report .sales-period{width:100%;max-width:280px}
 .sales-change-report .sales-table-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;max-width:720px}
 .sales-change-report .sales-table-controls .native-filter{min-width:0;max-width:none;white-space:normal}
