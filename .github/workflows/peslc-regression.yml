@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: progress-future-import-model-monitoring-20261026
+          ref: ${{ github.ref }}
           persist-credentials: false
       - uses: actions/setup-python@v6
         with:
@@ -44,7 +44,8 @@ jobs:
             tests/test_import_corrections.py \
             tests/test_persistence.py \
             tests/test_account_and_model_failure_regressions.py \
-            tests/test_serverless_connections.py
+            tests/test_serverless_connections.py \
+            tests/test_sales_change.py
 
   frontend:
     name: Frontend tests, types and lint
@@ -53,7 +54,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: progress-future-import-model-monitoring-20261026
+          ref: ${{ github.ref }}
           persist-credentials: false
       - uses: actions/setup-node@v5
         with:

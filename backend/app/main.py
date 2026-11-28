@@ -704,6 +704,24 @@ def native_overview(user: AuthenticatedUser = Depends(require_user),
     }
 
 
+@app.get("/reports/native/sales-change")
+def native_sales_change(previous_year: int | None = None, current_year: int | None = None,
+                        user: AuthenticatedUser = Depends(require_user),
+                        db: Session = Depends(get_db)):
+    from app.analytics.validation.sales_change import sales_change_report
+    run = _latest_or_404(db)
+    payload = run_payload(db, run, sections={"accounts", "business_baselines"})
+    annual = (run.context_metrics or {}).get("annual_account_sales")
+    if annual is None:
+        return {"run": serialize_run(run), "available_periods": [], "comparison": None,
+                "availability_note": "Account-level sales history is unavailable for this publication."}
+    try:
+        return {"run": serialize_run(run), **sales_change_report(
+            annual, payload["business_baselines"], payload["accounts"], previous_year, current_year)}
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
 @app.get("/reports/native/insights")
 def native_insights(user: AuthenticatedUser = Depends(require_user),
                     db: Session = Depends(get_db)):

@@ -98,6 +98,11 @@ def test_future_source_publications_are_isolated_and_idempotent(monkeypatch):
             _, second_result = publish(db, second)
             second_run = db.get(AnalyticsRun, second_result["analysis_run_id"])
             second_payload = run_payload(db, second_run)
+            sales_history = second_payload["context_metrics"]["annual_account_sales"]
+            assert {(row["year"], row["account"], row["sales"], row["invoice_count"])
+                    for row in sales_history} == {
+                (2025, "ACME", "100.00", 1), (2026, "NEW FUTURE ACCOUNT", "80.00", 1),
+            }
             assert second_run.analysis_run_id != first_run.analysis_run_id
             assert run_payload(db, first_run) == first_payload
             assert any(row["account"] == "ACME" for row in second_payload["rfm"])

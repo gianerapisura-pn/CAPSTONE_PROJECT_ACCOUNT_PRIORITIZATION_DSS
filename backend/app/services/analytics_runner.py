@@ -12,6 +12,7 @@ from app.analytics.predictive.future_transaction import FutureTransactionResult
 from app.analytics.prescriptive.scoring import compute_priorities, scoring_activity_24m
 from app.analytics.validation.backtest import run_historical_backtest
 from app.analytics.validation.baselines import annual_business_baselines
+from app.analytics.validation.sales_change import annual_account_sales
 from app.analytics.validation.sensitivity import (
     run_leave_one_out_influence,
     run_sensitivity_suite,
@@ -201,6 +202,7 @@ def run_account_prioritization(
             invoice_groups, reference, b2b_accounts,
         ),
         context_metrics={
+            "annual_account_sales": annual_account_sales(invoice_groups, reference),
             "historical_account_count": len(historical_identity_names if historical_identity_names is not None else {
                 group.standardized_account_name
                 for group in invoice_groups
