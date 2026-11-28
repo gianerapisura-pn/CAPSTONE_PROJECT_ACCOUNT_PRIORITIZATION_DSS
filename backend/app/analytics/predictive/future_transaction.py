@@ -135,7 +135,10 @@ def classification_metrics(actual, predicted) -> dict:
             float(balanced_accuracy_score(actual_series, predicted_array))
             if both_classes else None
         ),
-        "mcc": float(matthews_corrcoef(actual_series, predicted_array)),
+        "mcc": (
+            float(matthews_corrcoef(actual_series, predicted_array))
+            if len(set(actual_series) | set(predicted_array)) > 1 else 0.0
+        ),
         "class_distribution": {
             label: int((actual_series == label).sum())
             for label in (FUTURE_TRANSACTION, NO_FUTURE_TRANSACTION)

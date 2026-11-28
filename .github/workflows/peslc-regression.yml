@@ -35,7 +35,7 @@ jobs:
         # Private-package role parity runs locally with the approved isolated review database.
         # This runner executes only self-contained synthetic checks; it receives no client data.
         run: |
-          python -m pytest -q \
+          python -m pytest -q -W error \
             tests/test_auth.py \
             tests/test_password_screening.py \
             tests/test_import_future.py \

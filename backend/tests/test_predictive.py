@@ -80,6 +80,7 @@ def test_single_class_metrics_suppress_balanced_measures():
     assert result["accuracy"] == 1
     assert result["macro_f1"] is None
     assert result["balanced_accuracy"] is None
+    assert result["mcc"] == 0.0
 
 
 def test_locked_integer_class_orientation_is_explicit():

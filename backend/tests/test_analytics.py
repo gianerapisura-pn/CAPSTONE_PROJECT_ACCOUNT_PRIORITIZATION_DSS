@@ -8,7 +8,7 @@ from app.analytics.prescriptive.scoring import assign_priority_groups, compute_p
 from app.analytics.validation.backtest import run_historical_backtest, top_decile_backtest
 from app.analytics.validation.baselines import annual_business_baselines
 from app.analytics.validation.sensitivity import (
-    run_leave_one_out_influence, run_sensitivity, run_sensitivity_suite,
+    _rank_correlation, run_leave_one_out_influence, run_sensitivity, run_sensitivity_suite,
 )
 from app.core.analytics_config import DEFAULT_ANALYTICS_CONFIG
 from app.etl.invoices import InvoiceGroup, SourceRow, group_invoices
@@ -47,6 +47,19 @@ def test_rfm_uses_explicit_reference_and_linear_quintiles_with_ties():
 
 def test_quantile_constant_component_gets_neutral_score():
     assert _quantile_scores({"A": 7, "B": 7}, True) == {"A": 3, "B": 3}
+
+
+@pytest.mark.parametrize("left,right,expected", [
+    ([1], [1], 1.0),
+    ([1, 1, 1], [1, 2, 3], 1.0),
+    ([1, 2, 3], [1, 1, 1], 1.0),
+    ([1, 2, 3], [3, 2, 1], -1.0),
+])
+def test_rank_correlation_preserves_constant_fallback_without_warnings(left, right, expected):
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert _rank_correlation(left, right) == pytest.approx(expected)
 
 
 def test_logical_invoice_frequency_is_not_collection_row_count():

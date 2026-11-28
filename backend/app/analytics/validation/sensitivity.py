@@ -40,6 +40,14 @@ class CriticInfluence:
     group_movement_rate: float
 
 
+def _rank_correlation(left: list[int], right: list[int]) -> float:
+    """Preserve the existing neutral fallback without correlating constant ranks."""
+    if len(left) < 2 or len(set(left)) < 2 or len(set(right)) < 2:
+        return 1.0
+    correlation = spearmanr(left, right).correlation
+    return float(correlation if not np.isnan(correlation) else 1.0)
+
+
 def run_sensitivity(
     priorities: list[AccountPriority],
     base_weights: dict[str, float],
@@ -78,11 +86,10 @@ def run_sensitivity(
         }
         ranks = analytical_ranks(list(scores.items()))
         groups = assign_priority_groups(list(scores.items()))
-        correlation = spearmanr(
+        correlation_value = _rank_correlation(
             [baseline_ranks[item.account] for item in priorities],
             [ranks[item.account] for item in priorities],
-        ).correlation
-        correlation_value = float(correlation if not np.isnan(correlation) else 1.0)
+        )
         spearman_values.append(correlation_value)
         moved = 0
         for item in priorities:
@@ -164,10 +171,10 @@ def run_leave_one_out_influence(
         common = [item.account for item in reduced_priorities if item.account in baseline_rank]
         reduced_rank = {item.account: item.priority_rank for item in reduced_priorities}
         reduced_group = {item.account: item.priority_group for item in reduced_priorities}
-        correlation = spearmanr(
+        correlation = _rank_correlation(
             [baseline_rank[account] for account in common],
             [reduced_rank[account] for account in common],
-        ).correlation
+        )
         result = CriticInfluence(
             removed_account=removed,
             recomputed_weights=weights,
@@ -175,7 +182,7 @@ def run_leave_one_out_influence(
                 abs(weights[criterion] - baseline_weights[criterion])
                 for criterion in CRITERIA
             ),
-            spearman_correlation=float(correlation if not np.isnan(correlation) else 1.0),
+            spearman_correlation=correlation,
             group_movement_rate=sum(
                 reduced_group[account] != baseline_group[account] for account in common
             ) / len(common),

@@ -121,7 +121,12 @@ def test_comparison_uses_real_candidates_without_changing_active_model(published
             return np.ones(len(frame), dtype=int)
     monkeypatch.setattr(review, "_load_artifact", lambda _: Active())
     before = (model.status, model.artifact_hash, run.critic_weights, db.query(PredictiveMonitoringEvaluation).count())
-    report = review.compare_models(db)
+    # The synthetic history deliberately has no observed settlement durations.
+    # Both chronological fit/transform pairs must emit the known imputer warning;
+    # the frozen wrapper and its missing-value behavior remain unchanged.
+    with pytest.warns(UserWarning, match="Skipping features without any observed values") as warnings:
+        report = review.compare_models(db)
+    assert len(warnings) == 4
     assert len(report["results"]) == 3
     assert all(len(result["folds"]) == 2 for result in report["results"])
     assert report["activation_performed"] is False

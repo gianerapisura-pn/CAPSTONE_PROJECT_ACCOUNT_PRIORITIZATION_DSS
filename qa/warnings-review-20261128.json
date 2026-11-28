@@ -1,0 +1,43 @@
+{
+  "scope": "Numerical edge-case warnings, isolated test resource cleanup, and provider-notice review",
+  "backend": {
+    "result": "PASS",
+    "passed": 277,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "unexpected_warnings": 0,
+    "command": "python -m pytest -q -W error",
+    "expected_warning_assertion": "The model-review synthetic fixture deliberately has no observed settlement values; its four imputer warnings are explicitly asserted. No global warning suppression was introduced."
+  },
+  "changes": [
+    "Preserve the existing correlation fallback without calling Spearman on constant or undersized ranks.",
+    "Preserve MCC=0 for identical single-class labels without invoking an undefined correlation calculation.",
+    "Close isolated SQLAlchemy test sessions and engine pools before SQLite garbage collection.",
+    "Pin AnyIO 4.14.2, compatible with the existing FastAPI/Starlette dependency line.",
+    "Treat unexpected backend warnings as errors in selected CI regression."
+  ],
+  "preserved": [
+    "Frozen CatBoost artifact and wrapper",
+    "Locked original analytics package",
+    "CRITIC/MCS method, RNG stream, ranks, groups and study predictions",
+    "Production data and immutable publications",
+    "UI, manuscript, Figma and client UAT responses"
+  ],
+  "provider_notices": {
+    "supabase": {
+      "project": "ocroshaikrfzvwtpbqzs",
+      "name": "auth_leaked_password_protection",
+      "count": 1,
+      "status": "REMAINS_VISIBLE",
+      "reason": "Native leaked-password protection is Pro and above. Existing free application-level screening remains a separate safeguard; it does not clear the native advisory.",
+      "source": "https://supabase.com/docs/guides/auth/password-security"
+    },
+    "vercel": {
+      "status": "REMAINS_VISIBLE",
+      "reason": "Required numerical and frozen-model dependencies exceed the standard function bundle. Existing Large Functions deployment is READY. No required library was removed and no paid upgrade was enabled.",
+      "source": "https://vercel.com/docs/functions/limitations"
+    }
+  },
+  "interpretation": "The defined backend checks pass under strict warning handling. Provider notices are not relabeled as resolved or as passing tests. Historical unsuccessful attempts remain recorded. No new client UAT or manual researcher regression is required for this warning-handling change. The previously requested confirmation of the new Management Overview remains separate."
+}
