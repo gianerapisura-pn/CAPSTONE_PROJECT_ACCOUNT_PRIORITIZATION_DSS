@@ -3,6 +3,13 @@ import { vi } from "vitest";
 import { ExplainedValue, priorityExplanation, resultExplanation, ResultValue } from "@/components/result-explanation";
 import type { AccountDecisionRow, NormalizationEvidence } from "@/types/dss";
 
+test("definition-only help does not offer an empty calculation disclosure", () => {
+  render(<ExplainedValue explanation={{ title: "Column meaning", basis: "The meaning is complete here.", interpretation: "The meaning is complete here.", compact: true }}>Column</ExplainedValue>);
+  fireEvent.focus(screen.getByRole("button", { name: "Column" }));
+  expect(screen.getByRole("tooltip")).toHaveTextContent("The meaning is complete here.");
+  expect(screen.queryByText("Definition and calculation")).not.toBeInTheDocument();
+});
+
 test("linked explanations preserve native navigation and open help on keyboard focus", () => {
   render(<ExplainedValue href="/accounts/test" explanation={{ title: "Test account", basis: "This account's saved result", interpretation: "Actual account interpretation", compact: true }}>Test account</ExplainedValue>);
   const link = screen.getByRole("link", { name: "Test account" });
