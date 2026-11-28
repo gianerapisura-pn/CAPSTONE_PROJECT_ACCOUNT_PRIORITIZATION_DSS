@@ -74,7 +74,7 @@ function cellExplanation(row: SalesRow, measure: Measure, c: Comparison, referen
 
 function SalesBridgeTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value: string } }) {
   const name = payload?.value ?? "";
-  const lines = name === "Previous year only" ? ["Earlier", "only"] : name === "Current year only" ? ["Later", "only"] : name === "Both years" ? ["Both", "years"] : [name];
+  const lines = name === "Previous year only" ? ["Earlier", "only"] : name === "Current year only" ? ["Later", "only"] : name === "Both years" || name === "Purchased in both years" ? ["Both", "years"] : [name];
   return <text x={x} y={y} dy={14} textAnchor="middle" fill="#425466" fontSize={11}>{lines.map((line, i) => <tspan key={line} x={x} dy={i ? 14 : 0}>{line}</tspan>)}</text>;
 }
 
@@ -113,9 +113,10 @@ export function SalesChangeReport({ publicationId }: { publicationId: string }) 
         </select></label>
         <p><ExplainedValue explanation={{ title: "Total sales change", basis: "The difference between all accepted Sales Invoice sales in the selected complete years.", interpretation: changeReading(c.previous_total, c.current_total, c.change, c), calculation: `${peso(c.current_total)} − ${peso(c.previous_total)} = ${peso(c.change)}.`, compact: true }}><strong>{peso(Math.abs(Number(c.change)))} {Number(c.change) < 0 ? "decrease" : Number(c.change) > 0 ? "increase" : "change"}</strong></ExplainedValue>{c.change_pct != null ? ` (${Math.abs(c.change_pct).toFixed(2)}%)` : " (percentage unavailable because previous sales were zero)"}. Sales moved from {peso(c.previous_total)} to {peso(c.current_total)} across {c.account_count} purchasing accounts.</p>
         <div className="sales-bridge-chart" role="img" aria-label={`Sales bridge from ${c.previous_year} to ${c.current_year}. ${c.groups.map(g => `${g.group}: ${peso(g.change)}, ${g.account_count} accounts`).join(". ")}`}>
+          <p className="native-note">Sales (PHP)</p>
           <ResponsiveContainer width="100%" height={290}><BarChart data={chart} margin={{ top: 20, right: 8, bottom: 4, left: 0 }} accessibilityLayer>
             <CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="name" interval={0} tick={<SalesBridgeTick />} height={46} />
-            <YAxis width={52} tick={{ fontSize: 11 }} tickFormatter={value => compactMoney.format(Number(value))} label={{ value: "PHP", position: "insideTopLeft", offset: -8 }} /><ReferenceLine y={0} stroke="#76858c" />
+            <YAxis width={52} tick={{ fontSize: 11 }} tickFormatter={value => compactMoney.format(Number(value))} /><ReferenceLine y={0} stroke="#76858c" />
             <Tooltip allowEscapeViewBox={{ x: false, y: false }} wrapperStyle={{ maxWidth: "min(280px, calc(100vw - 48px))", whiteSpace: "normal", zIndex: 20 }} content={({ active, payload }) => { const row = payload?.[0]?.payload as typeof chart[number] | undefined;
               const members = c.accounts.filter(account => account.group === row?.name);
               const before = members.reduce((total, account) => total + Number(account.previous_sales), 0);
