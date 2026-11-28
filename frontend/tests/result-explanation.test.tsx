@@ -1,7 +1,24 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { vi } from "vitest";
-import { priorityExplanation, resultExplanation, ResultValue } from "@/components/result-explanation";
+import { ExplainedValue, priorityExplanation, resultExplanation, ResultValue } from "@/components/result-explanation";
 import type { AccountDecisionRow, NormalizationEvidence } from "@/types/dss";
+
+test("linked explanations preserve native navigation and open help on keyboard focus", () => {
+  render(<ExplainedValue href="/accounts/test" explanation={{ title: "Test account", basis: "This account's saved result", interpretation: "Actual account interpretation", compact: true }}>Test account</ExplainedValue>);
+  const link = screen.getByRole("link", { name: "Test account" });
+  expect(link).toHaveAttribute("href", "/accounts/test");
+  fireEvent.focus(link);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Actual account interpretation");
+  const event = new MouseEvent("click", { bubbles: true, cancelable: true, ctrlKey: true });
+  let componentPreventedNavigation = true;
+  document.addEventListener("click", click => {
+    componentPreventedNavigation = click.defaultPrevented;
+    // jsdom has no browser navigation; inspect bubbling before cancelling its default.
+    click.preventDefault();
+  }, { once: true });
+  link.dispatchEvent(event);
+  expect(componentPreventedNavigation).toBe(false);
+});
 
 const row = {
   final_priority_score: 0.625,

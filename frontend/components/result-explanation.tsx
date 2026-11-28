@@ -2,6 +2,7 @@
 
 import { Children, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import type { AccountDecisionRow, NormalizationEvidence } from "@/types/dss";
 import { accountInterpretation, displayedNumber, scalarInterpretation } from "@/lib/result-interpretation";
 
@@ -148,11 +149,12 @@ export function resultExplanation(key: string, row?: Partial<AccountDecisionRow>
   return explanations[key] ?? explanations.count;
 }
 
-export function ExplainedValue({ children, explanation, className = "", inline = true }: {
+export function ExplainedValue({ children, explanation, className = "", inline = true, href }: {
   children: ReactNode;
   explanation: ResultExplanation;
   className?: string;
   inline?: boolean;
+  href?: string;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -244,14 +246,14 @@ export function ExplainedValue({ children, explanation, className = "", inline =
     setOpen(true);
   }
   return <>
-    <span ref={ref} className={`explained-value ${inline ? "" : "explained-value-block"} ${className}`} tabIndex={0} role="button" aria-expanded={open} aria-describedby={open ? id : undefined}
-      onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); dismissed.current = false; if (open) setOpen(false); else show(); } }}
+    <span ref={ref} className={`explained-value ${inline ? "" : "explained-value-block"} ${className}`} tabIndex={href ? undefined : 0} role={href ? undefined : "button"} aria-expanded={href ? undefined : open} aria-describedby={open ? id : undefined}
+      onKeyDown={event => { if (!href && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); dismissed.current = false; if (open) setOpen(false); else show(); } }}
       onPointerEnter={event => { if (event.pointerType !== "touch" && !hoverDismissedUntilMovement && canHover()) show(); }}
       onPointerMove={event => { if (hoverDismissedUntilMovement && event.pointerType !== "touch" && canHover()) { resumeExplanationHover(); show(); } }}
       onPointerLeave={() => { dismissed.current = false; scheduleClose(); }} onFocus={() => { if (pointerType.current !== "touch") show(); }} onBlur={() => { dismissed.current = false; scheduleClose(); }}
       onPointerDown={event => { pointerType.current = event.pointerType; }}
-      onClick={event => { event.preventDefault(); event.stopPropagation(); dismissed.current = false; if (!open) { show(); keepOpen(); } else if (pointerType.current === "touch") setOpen(false); else keepOpen(); pointerType.current = ""; }}>
-      {children}
+      onClick={event => { if (href) return; event.preventDefault(); event.stopPropagation(); dismissed.current = false; if (!open) { show(); keepOpen(); } else if (pointerType.current === "touch") setOpen(false); else keepOpen(); pointerType.current = ""; }}>
+      {href ? <Link href={href} className={className} aria-describedby={open ? id : undefined}>{children}</Link> : children}
     </span>
     {open && position && createPortal(<div ref={cardRef} id={id} role="tooltip" tabIndex={0} className={`result-explanation${explanation.compact ? " result-explanation-compact" : ""}`} style={{ left: position.left, top: position.top }}
       onPointerEnter={cancelClose} onPointerLeave={scheduleClose} onPointerDownCapture={keepOpen} onFocus={keepOpen}

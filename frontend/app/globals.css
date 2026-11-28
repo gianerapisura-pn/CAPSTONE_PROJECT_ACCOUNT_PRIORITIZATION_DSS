@@ -211,4 +211,21 @@ select:not([multiple]):not([size]) { appearance: none; padding-right: 36px; back
 .model-review-panel caption{text-align:left;padding:10px 0;font-size:12px;color:var(--muted)}
 
 /* Historical sales report uses the existing native reporting design. */
+.sales-change-report .sales-period{width:100%;max-width:280px}
+.sales-change-report .sales-table-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;max-width:720px}
+.sales-change-report .sales-table-controls .native-filter{min-width:0;max-width:none;white-space:normal}
+.sales-change-report .native-filter select{width:100%;max-width:none;min-width:0}
+.sales-bridge-chart{min-width:0;width:100%}
+.sales-bridge-tooltip{max-width:min(280px,calc(100vw - 48px));padding:12px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);box-shadow:0 4px 16px #0002;white-space:normal;overflow-wrap:anywhere}
+.sales-change-report .sales-bridge-tooltip p{margin-top:6px;font-size:12px;line-height:1.5}
+.sales-comparison-table table{min-width:880px;table-layout:auto}
+.sales-comparison-table th{white-space:normal;line-height:1.5}
+.sales-change-report .sales-comparison-table td:first-child{min-width:200px;max-width:280px;white-space:normal;overflow-wrap:anywhere}
+.sales-comparison-table td:nth-child(2){min-width:125px;max-width:160px;white-space:normal}
+.sales-comparison-table td:last-child{min-width:120px;white-space:normal}
+.sales-comparison-table td{font-variant-numeric:tabular-nums;vertical-align:top}
+.sales-number{white-space:nowrap}
+.sales-scroll-hint{display:none}
+@media(max-width:900px){.sales-scroll-hint{display:block}}
+@media(max-width:600px){.sales-change-report .sales-table-controls{grid-template-columns:minmax(0,1fr)}}
 .sales-change-report{display:grid;gap:14px;min-width:0;padding:20px;border:1px solid var(--line);border-radius:8px;background:#fff}.sales-change-report h2,.sales-change-report h3,.sales-change-report p{margin:0}.sales-change-report .native-filter{max-width:360px}.sales-change-report td:first-child{min-width:210px;max-width:320px;white-space:normal}.sales-change-report .account-name-link{font-weight:700;color:var(--green-dark);text-decoration:none}.sales-change-report td details{max-width:240px;white-space:normal}.sales-change-report td details p{padding-top:8px;line-height:1.5}.sales-change-report td:not(:first-child){font-variant-numeric:tabular-nums}.sales-change-report .native-chart{min-width:0;width:100%;height:auto}.sales-change-report .native-chart-tooltip{max-width:270px;padding:12px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);box-shadow:0 4px 16px #0002}.sales-change-report .native-chart-tooltip p{margin-top:6px;font-size:12px}@media(max-width:600px){.sales-change-report{padding:14px;gap:12px}}

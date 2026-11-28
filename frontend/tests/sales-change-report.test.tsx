@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { SalesChangeReport, type SalesChange } from "@/components/sales-change-report";
@@ -19,6 +19,7 @@ test("keeps historical sales separate from current priority and permits account 
   expect(screen.getByText("FORMER")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "CURRENT" })).toHaveAttribute("href", "/accounts/a");
   await userEvent.click(screen.getByText("#1 · High"));
+  await userEvent.click(screen.getByText("Definition and calculation"));
   expect(screen.getByText(/Operational 12-month class: With No Future Sales/)).toBeVisible();
   await userEvent.selectOptions(screen.getByLabelText("Purchasing group"), "Current year only");
   expect(screen.queryByText("FORMER")).not.toBeInTheDocument();
@@ -71,4 +72,36 @@ test("equal sales changes have deterministic account-name ordering", async () =>
       .map(row => within(row).getAllByRole("cell")[0].textContent);
     expect(names).toEqual(["Alpha", "Beta", "Zulu"]);
   }
+});
+
+test("every sales cell explains the account-specific result and preserves calculation details", async () => {
+  render(<SalesChangeReport publicationId="publication" />);
+  const row = screen.getByRole("link", { name: "CURRENT" }).closest("tr")!;
+  const cells = within(row).getAllByRole("cell");
+  const readings = [/Currently ranked #1/, /no accepted SI sales in 2030/, /0.00% of all accepted SI sales/, /100.00% of all accepted SI sales/, /Sales rose by/, /first in the current review order/];
+  for (let i = 0; i < cells.length; i++) {
+    fireEvent.focus(cells[i].querySelector("a, [role=button]")!);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(readings[i]);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("CURRENT");
+    await userEvent.click(screen.getByText("Definition and calculation"));
+    expect(screen.getByRole("tooltip").querySelector("details")).toHaveAttribute("open");
+    fireEvent.keyDown(window, { key: "Escape" });
+  }
+});
+
+test("zero change is unchanged, zero denominators have no inferred percentage, and unranked accounts have no score", () => {
+  const comparison = state.data!.comparison!;
+  comparison.previous_total = "0";
+  comparison.current_total = "0";
+  comparison.change = "0";
+  comparison.change_pct = null;
+  comparison.accounts = [{ ...comparison.accounts[0], previous_sales: "0", current_sales: "0", change: "0", previous_share_pct: null, current_share_pct: null }];
+  render(<SalesChangeReport publicationId="publication" />);
+  const cells = within(screen.getByRole("table")).getAllByRole("row")[1].querySelectorAll("td");
+  fireEvent.focus(cells[2].querySelector("[role=button]")!);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("share is undefined");
+  fireEvent.focus(cells[4].querySelector("[role=button]")!);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Sales were unchanged");
+  fireEvent.focus(cells[5].querySelector("[role=button]")!);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("No current rank or score is inferred");
 });
