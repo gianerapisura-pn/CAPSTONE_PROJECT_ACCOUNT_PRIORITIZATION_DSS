@@ -166,7 +166,7 @@ def reproduce(source: Path, output: Path):
         reference("Recency-only", int(recent["eligible_accounts"]), int(recent["selected_accounts"]),
                   float(recent["recency_only_capture"]), float(recent["recency_only_lift"]), recent["comparison_scope"])
         for r in weighting_reference + aggregation_reference:
-            if r["cutoff"] == cutoff and r["method"] not in {"CRITIC", "MCS"}:
+            if r["cutoff"] == cutoff and r["method"] not in {"CRITIC", "MCS", "Additive MCS"}:
                 reference(r["method"], int(r["eligible_account_count"]), int(r["selected_count_after_ties"]),
                           float(r["capture_rate"]), float(r["lift_over_expected_random"]), "Preserved original comparison and original tie rules")
     write("annual_account_sales.csv", annual_rows)
