@@ -38,6 +38,7 @@ def reproduce(source: Path, output: Path):
         invoices = read("/03_INVOICES/invoices.csv")
         baseline = read("/04_DESCRIPTIVE/annual_baseline.csv")
         priorities = {r["account_key"]: r for r in read("/06_PRIORITY/current_priority.csv")}
+        statuses = {r["account_key"]: r["account_status"] for r in read("/01_ACCOUNTS/account_status.csv")}
         ranks = read("/08_BACKTEST/rankings.csv")
         selected = read("/08_BACKTEST/selected.csv")
         summary = read("/08_BACKTEST/summary.csv")
@@ -87,6 +88,7 @@ def reproduce(source: Path, output: Path):
             comparisons.append({"previous_year": year - 1, "current_year": year, "group": group,
                 "account_count": len(accounts), "previous_sales": str(before), "current_sales": str(after),
                 "change": str(after - before), "previous_share_pct": float(before / prev_total * 100) if prev_total else None,
+                "current_share_pct": float(after / curr_total * 100) if curr_total else None,
                 "previous_total": str(prev_total), "current_total": str(curr_total)})
             for account in sorted(accounts):
                 p, c = annual.get((year - 1, account), D(0)), annual.get((year, account), D(0))
@@ -98,6 +100,9 @@ def reproduce(source: Path, output: Path):
                     "current_share_pct": float(c / curr_total * 100) if curr_total else None,
                     "current_priority_rank": current.get("priority_rank"),
                     "current_priority_group": current.get("priority_group"),
+                    "current_final_priority_score": current.get("final_priority_score"),
+                    "current_account_status": statuses.get(account),
+                    "current_is_ranked": bool(current),
                     "current_predicted_target": current.get("predicted_target"),
                     "current_analysis_reference": current.get("analysis_reference")})
         assert net == curr_total - prev_total

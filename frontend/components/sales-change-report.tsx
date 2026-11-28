@@ -25,6 +25,7 @@ const pct = (value: number | null) => value == null ? "No percentage: zero total
 export function SalesChangeReport({ publicationId }: { publicationId: string }) {
   const [period, setPeriod] = useState("");
   const [group, setGroup] = useState("");
+  const [sort, setSort] = useState("account");
   const [previous, current] = period.split(":");
   const path = "/reports/native/sales-change" + (period ? `?previous_year=${previous}&current_year=${current}` : "");
   const { data, error, loading, reload } = useApi<SalesChange>(path);
@@ -38,7 +39,12 @@ export function SalesChangeReport({ publicationId }: { publicationId: string }) 
           change: Number(row.change), count: row.account_count, total: false }; }),
       { name: String(c.current_year), range: [0, Number(c.current_total)], change: Number(c.current_total), count: null, total: true }];
   })() : [];
-  const rows = c?.accounts.filter(row => !group || row.group === group) ?? [];
+  const rows = (c?.accounts.filter(row => !group || row.group === group) ?? []).sort((a, b) => {
+    const change = sort === "decrease" ? Number(a.change) - Number(b.change)
+      : sort === "increase" ? Number(b.change) - Number(a.change) : 0;
+    return change || a.account.localeCompare(b.account, "en")
+      || (a.account_key ?? "").localeCompare(b.account_key ?? "", "en");
+  });
   return <section className="sales-change-report" aria-label="Historical sales comparison">
     <h2 className="report-section-title">What changed between complete years?</h2>
     <p className="native-note">Follow the sales change from one year to the next, then review the accounts behind it. This uses all accepted Sales Invoices, including historical accounts that are not currently ranked. Account filters above do not change this comparison.</p>
@@ -62,8 +68,9 @@ export function SalesChangeReport({ publicationId }: { publicationId: string }) 
         <p className="native-note">Blue bars show annual totals. Green adds sales; muted red subtracts sales. Purchasing groups describe these two years only: they do not establish acquisition, churn, closure, or the cause of a change.</p>
         <h3>Which accounts contributed?</h3>
         <label className="native-filter">Purchasing group<select aria-label="Purchasing group" value={group} onChange={e => setGroup(e.target.value)}><option value="">All purchasing accounts</option>{c.groups.map(g => <option key={g.group} value={g.group}>{g.group} ({g.account_count})</option>)}</select></label>
+        <label className="native-filter">Sort accounts<select aria-label="Sort accounts" value={sort} onChange={e => setSort(e.target.value)}><option value="account">Account name</option><option value="decrease">Largest sales decrease first</option><option value="increase">Largest sales increase first</option></select></label>
         <p className="native-note">Sales and shares refer to the selected historical years. Current priority and prediction refer to the publication at {data.run.analysis_reference_date ?? "the saved reference"}; they do not explain historical sales changes. The group filter narrows the table only.</p>
-        <PaginatedTable key={`${period}:${group}`} rows={rows} label="sales comparison">{visible => <div className="table-wrap"><table><thead><tr><th>Account</th><th>Purchasing group</th><th>{c.previous_year} sales</th><th>{c.current_year} sales</th><th>Change (PHP)</th><th>Current priority</th></tr></thead><tbody>{visible.map(row => <tr key={row.account}>
+        <PaginatedTable key={`${period}:${group}:${sort}`} rows={rows} label="sales comparison">{visible => <div className="table-wrap"><table><thead><tr><th>Account</th><th>Purchasing group</th><th>{c.previous_year} sales</th><th>{c.current_year} sales</th><th>Change (PHP)</th><th>Current priority</th></tr></thead><tbody>{visible.map(row => <tr key={row.account}>
           <td>{row.account_key ? <Link className="account-name-link" href={accountDetailHref(row.account_key, "")}>{row.account}</Link> : row.account}</td><td>{row.group}</td>
           <td title={pct(row.previous_share_pct)}>{peso(row.previous_sales)}</td><td title={pct(row.current_share_pct)}>{peso(row.current_sales)}</td>
           <td title={`${row.account}: ${Number(row.change) < 0 ? "less" : "more"} recorded SI sales in ${c.current_year} than ${c.previous_year}.`}>{peso(row.change)}</td>

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { SalesChangeReport, type SalesChange } from "@/components/sales-change-report";
@@ -38,4 +38,37 @@ test("missing snapshot is an honest empty state", () => {
   state.data = { run: fixture().run, available_periods: [], comparison: null };
   render(<SalesChangeReport publicationId="publication" />);
   expect(screen.getByRole("status")).toHaveTextContent("Two consecutive complete years");
+});
+
+test("sorts numeric changes across all pages, resets the page and retains the group filter", async () => {
+  const base = fixture().comparison!.accounts[0];
+  state.data!.comparison!.accounts = Array.from({ length: 13 }, (_, i) => ({
+    ...base, account: `Account ${String(i).padStart(2, "0")}`, change: String(i === 12 ? -100 : i),
+  }));
+  state.data!.comparison!.accounts.push({ ...base, account: "Excluded", group: "Current year only", change: "999" });
+  render(<SalesChangeReport publicationId="publication" />);
+  await userEvent.click(screen.getByRole("button", { name: "Next sales comparison page" }));
+  await userEvent.selectOptions(screen.getByLabelText("Sort accounts"), "decrease");
+  const names = () => within(screen.getByRole("table")).getAllByRole("row").slice(1)
+    .map(row => within(row).getAllByRole("cell")[0].textContent);
+  expect(names()[0]).toBe("Account 12");
+  expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+  await userEvent.selectOptions(screen.getByLabelText("Purchasing group"), "Previous year only");
+  await userEvent.selectOptions(screen.getByLabelText("Sort accounts"), "increase");
+  expect(names()[0]).toBe("Account 11");
+  expect(screen.queryByText("Excluded")).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Next sales comparison page" }));
+  expect(names().at(-1)).toBe("Account 12");
+});
+
+test("equal sales changes have deterministic account-name ordering", async () => {
+  const base = fixture().comparison!.accounts[0];
+  state.data!.comparison!.accounts = ["Zulu", "Alpha", "Beta"].map(account => ({ ...base, account }));
+  render(<SalesChangeReport publicationId="publication" />);
+  for (const direction of ["increase", "decrease"]) {
+    await userEvent.selectOptions(screen.getByLabelText("Sort accounts"), direction);
+    const names = within(screen.getByRole("table")).getAllByRole("row").slice(1)
+      .map(row => within(row).getAllByRole("cell")[0].textContent);
+    expect(names).toEqual(["Alpha", "Beta", "Zulu"]);
+  }
 });
