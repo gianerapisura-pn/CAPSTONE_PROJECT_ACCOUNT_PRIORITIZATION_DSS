@@ -258,9 +258,10 @@ test("validation results start expanded while technical explanations stay option
   expect(screen.queryByText("9 / 70")).not.toBeInTheDocument();
   expect(screen.queryByText("0.7649")).not.toBeInTheDocument();
   expect(screen.queryByText("92.41%")).not.toBeInTheDocument();
-  expect(screen.getByText("83")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Before you read the results" })).not.toBeInTheDocument();
+  expect(screen.getByText(/Study classifications: 10 With Future Sales and 73 With No Future Sales/)).toBeInTheDocument();
   expect(screen.queryByText("Study outcome monitoring")).not.toBeInTheDocument();
-  expect(screen.getByText(/Predictions are not verified future sales/)).toBeInTheDocument();
+  expect(screen.getByText(/Predictions are not confirmed sales/)).toHaveTextContent("Outcome window: 2026-01-01 to 2026-12-31");
 });
 
 test.each(["administrator", "management"])("%s retains core validation while research-only displays are absent with evidence present", async role => {
