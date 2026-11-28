@@ -42,6 +42,9 @@ def reproduce(source: Path, output: Path):
         selected = read("/08_BACKTEST/selected.csv")
         summary = read("/08_BACKTEST/summary.csv")
         outer = read("/05_BENCHMARK/outer_predictions.csv")
+        recency_reference = read("/08_BACKTEST/recency_only_benchmark.csv")
+        weighting_reference = read("/01_WEIGHTING/backtest.csv")
+        aggregation_reference = read("/02_AGGREGATION/backtest.csv")
         inventory = [{"member": n, "bytes": archive.getinfo(n).file_size,
                       "sha256": hashlib.sha256(archive.read(n)).hexdigest()}
                      for n in archive.namelist() if not n.endswith("/")]
@@ -102,7 +105,7 @@ def reproduce(source: Path, output: Path):
         direct = sum((D(r["si_amount"]) * (1 if int(r["si_date"][:4]) == year else -1)
                       for r in invoices if int(r["si_date"][:4]) in (year - 1, year)), D(0))
         assert direct == net
-    buyers_rows, breadth_rows, monetary_rows = [], [], []
+    buyers_rows, breadth_rows, monetary_rows, comparator_reference = [], [], [], []
     for cutoff in sorted({r["cutoff"] for r in ranks}):
         ranked = [r for r in ranks if r["cutoff"] == cutoff]
         ranked.sort(key=lambda r: (int(r["historical_rank"]), r["account_key"]))
@@ -145,13 +148,34 @@ def reproduce(source: Path, output: Path):
         ordered = sorted(eligible, key=lambda a: (-monetary[a], a))
         money_keys = set(ordered[:len(chosen)])
         monetary_rows.append({"cutoff": cutoff, "tie_rule": "Exact K; Monetary24m descending then canonical account ID",
-                              **metrics(money_keys), "official_mcs_lift": official["sales_lift"]})
+                              **metrics(money_keys), "official_mcs_lift": official["sales_lift"],
+                              "overlap_with_official_count": len(money_keys & chosen),
+                              "overlap_with_official_share": len(money_keys & chosen) / len(chosen),
+                              "random_expected_sales_capture": len(chosen) / len(eligible),
+                              "random_expected_buyer_precision": len(buyers) / len(eligible),
+                              "random_expected_buyer_recall": len(chosen) / len(eligible)})
+        # Reference the existing comparisons without retuning or replacing their tie rules.
+        def reference(method, n, k, capture, lift, scope):
+            comparator_reference.append({"cutoff": cutoff, "method": method, "N": n, "K": k,
+                "sales_capture": capture, "sales_lift": lift,
+                "matched_to_official_N_and_K": n == len(eligible) and k == len(chosen), "scope": scope})
+        reference("CRITIC-MCS", len(eligible), len(chosen), official["sales_capture"], official["sales_lift"], "Official saved selection")
+        monetary_metrics = metrics(money_keys)
+        reference("Monetary24m-only", len(eligible), len(money_keys), monetary_metrics["sales_capture"], monetary_metrics["sales_lift"], "Supplementary exact-K comparator")
+        recent = next(r for r in recency_reference if int(r["year"]) == origin.year)
+        reference("Recency-only", int(recent["eligible_accounts"]), int(recent["selected_accounts"]),
+                  float(recent["recency_only_capture"]), float(recent["recency_only_lift"]), recent["comparison_scope"])
+        for r in weighting_reference + aggregation_reference:
+            if r["cutoff"] == cutoff and r["method"] not in {"CRITIC", "MCS"}:
+                reference(r["method"], int(r["eligible_account_count"]), int(r["selected_count_after_ties"]),
+                          float(r["capture_rate"]), float(r["lift_over_expected_random"]), "Preserved original comparison and original tie rules")
     write("annual_account_sales.csv", annual_rows)
     write("sales_group_decomposition.csv", comparisons)
     write("account_sales_changes.csv", account_rows)
     write("buyer_top_k.csv", buyers_rows)
     write("illustrative_selection_breadth.csv", breadth_rows)
     write("monetary_only_comparison.csv", monetary_rows)
+    write("existing_comparator_reference.csv", comparator_reference)
     report = {"source_sha256": digest, "logical_invoices": len(invoices),
         "source_sales_total": str(sum((D(r["si_amount"]) for r in invoices), D(0))),
         "annual_comparisons": len(comparisons) // 3, "historical_cutoffs": len(buyers_rows),
